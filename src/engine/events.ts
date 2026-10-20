@@ -1,0 +1,24 @@
+// Every game action is announced as an event. Screens, notifications and
+// (later) the glasses and AI System only listen; none of them own the rules.
+
+import type { Completion, StatKey } from './types'
+
+export type GameEvent =
+  | { type: 'quest.completed'; completion: Completion; questTitle: string }
+  | { type: 'quest.undone'; questId: string; questTitle: string }
+  | { type: 'level.up'; level: number }
+  | { type: 'wallet.full'; month: string; budget: number }
+  | { type: 'player.awakened'; name: string; stats: StatKey[] }
+
+type Listener = (event: GameEvent) => void
+
+const listeners = new Set<Listener>()
+
+export function onGameEvent(listener: Listener): () => void {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+export function emit(event: GameEvent): void {
+  for (const listener of listeners) listener(event)
+}
