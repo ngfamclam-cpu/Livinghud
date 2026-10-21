@@ -1,19 +1,19 @@
 import { useState } from 'react'
-import { STATS, type Completion, type Player, type Quest, type Summary } from '../engine'
+import { STATS, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
 import { completeQuest, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
-import { Settings } from './Settings'
-
-const money = (n: number) => `$${n.toFixed(2)}`
+import { Bar } from './Bar'
+import { money, monthName } from './format'
 
 export function Hud({ player, quests, summary }: { player: Player; quests: Quest[]; summary: Summary }) {
-  const [showSettings, setShowSettings] = useState(false)
-  const dailies = quests.filter(q => q.kind === 'daily' && q.active).sort((a, b) => a.createdAt - b.createdAt)
+  const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
+  const dailies = active.filter(q => q.kind === 'daily')
+  const sides = active.filter(q => q.kind === 'side')
+  const mains = active.filter(q => q.kind === 'main')
   const doneCount = dailies.filter(q => summary.todayDone.has(q.id)).length
-  const { level, wallet } = summary
+  const sideDone = sides.filter(q => summary.weekDone.has(q.id)).length
+  const { level, wallet, savings } = summary
   const weakest = player.stats.reduce((a, b) => ((summary.stats[b] ?? 0) < (summary.stats[a] ?? 0) ? b : a), player.stats[0])
-
-  if (showSettings) return <Settings player={player} onClose={() => setShowSettings(false)} />
 
   return (
     <main className="hud">
@@ -33,7 +33,8 @@ export function Hud({ player, quests, summary }: { player: Player; quests: Quest
         <div className="wallet">
           <div>
             <div className="muted">Reward Wallet · {monthName(wallet.month)}</div>
-            <div className="big">{money(wallet.earned)} <small>/ {money(wallet.budget)}</small></div>
+            <div className="big">{money(wallet.available)} <small>to spend</small></div>
+            <div className="muted">Earned {money(wallet.earned)} of {money(wallet.budget)}</div>
           </div>
           <div className="vault">
             <div className="muted">Vault</div>
@@ -41,7 +42,21 @@ export function Hud({ player, quests, summary }: { player: Player; quests: Quest
           </div>
         </div>
         <Bar value={wallet.earned} max={wallet.budget} variant="gold" />
+        {savings.target > 0 || player.settings.savingsGoal.type === 'percent' ? (
+          <p className={`muted gate ${savings.met ? 'met' : ''}`}>
+            {savings.met
+              ? `Savings goal met: ${money(savings.saved)} saved. The shop is open.`
+              : `Shop locked until you save ${money(savings.target)} this month (${money(savings.saved)} so far).`}
+          </p>
+        ) : null}
       </SystemWindow>
+
+      {summary.recoveryToday && (
+        <SystemWindow title="Recovery Day" className="recovery">
+          <p className="system-line">Today's quests: hydrate, eat well, rest.</p>
+          <p className="muted">Your streaks are protected and skipped dailies won't lower your stats. Dailies you still do count as normal.</p>
+        </SystemWindow>
+      )}
 
       <SystemWindow title="Stats">
         <ul className="stats">
@@ -67,12 +82,26 @@ export function Hud({ player, quests, summary }: { player: Player; quests: Quest
         </ul>
       </SystemWindow>
 
-      <button className="ghost settings-button" onClick={() => setShowSettings(true)}>Settings &amp; save file</button>
+      {sides.length > 0 && (
+        <SystemWindow title={`Side Quests · this week ${sideDone}/${sides.length}`}>
+          <ul className="quests">
+            {sides.map(q => <QuestRow key={q.id} quest={q} done={summary.weekDone.get(q.id)} />)}
+          </ul>
+        </SystemWindow>
+      )}
+
+      {mains.length > 0 && (
+        <SystemWindow title="Main Quests">
+          <ul className="quests">
+            {mains.map(q => <MainQuestRow key={q.id} quest={q} summary={summary} />)}
+          </ul>
+        </SystemWindow>
+      )}
     </main>
   )
 }
 
-function QuestRow({ quest, done, streak }: { quest: Quest; done?: Completion; streak: number }) {
+function QuestRow({ quest, done, streak = 0 }: { quest: Quest; done?: Completion; streak?: number }) {
   const [open, setOpen] = useState(false)
   return (
     <li className={`quest ${done ? 'done' : ''}`}>
@@ -104,17 +133,42 @@ function QuestRow({ quest, done, streak }: { quest: Quest; done?: Completion; st
   )
 }
 
-function Bar({ value, max, label, variant, thin }: { value: number; max: number; label?: string; variant?: 'gold'; thin?: boolean }) {
-  const pct = max > 0 ? Math.min(100, (100 * value) / max) : 0
-  return (
-    <div className={`bar ${variant ?? ''} ${thin ? 'thin' : ''}`} role="progressbar" aria-valuenow={Math.round(value)} aria-valuemax={max}>
-      <div className="fill" style={{ width: `${pct}%` }} />
-      {label && <span className="bar-label">{label}</span>}
-    </div>
-  )
-}
+function MainQuestRow({ quest, summary }: { quest: Quest; summary: Summary }) {
+  const [open, setOpen] = useState(false)
+  const stages = quest.stages ?? []
+  const progress = summary.mainProgress.get(quest.id) ?? { cleared: 0, current: null, done: false }
+  const stage = stages.find(s => s.id === progress.current)
+  const index = stages.findIndex(s => s.id === progress.current)
 
-function monthName(month: string): string {
-  const [y, m] = month.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleString(undefined, { month: 'long' })
+  return (
+    <li className={`quest main-quest ${progress.done ? 'done' : ''}`}>
+      <button className="quest-main" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+        <span className="stat-key">{quest.stat}</span>
+        <span className="quest-title">{quest.title}</span>
+        <span className="streak">{progress.cleared}/{stages.length}</span>
+      </button>
+      <Bar value={progress.cleared} max={stages.length} thin />
+      {stage ? (
+        <div className="quest-detail">
+          <p><b>Stage {index + 1}: {stage.title}.</b> {stage.description}</p>
+          <p className="muted">Pays +{stage.xp} XP · +{money(questReward(quest, 'full', summary.wallet.budget, 0, stage).dollars)}</p>
+        </div>
+      ) : (
+        <p className="system-line">Main quest cleared.</p>
+      )}
+      {open && (
+        <ol className="stage-list">
+          {stages.map((s, i) => (
+            <li key={s.id} className={i < index || progress.done ? 'cleared-stage' : s.id === progress.current ? 'current-stage' : ''}>
+              {s.title}
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="quest-actions">
+        {progress.cleared > 0 && <button className="ghost small" onClick={() => undoQuest(quest)}>Undo last stage</button>}
+        {stage && <button className="small" onClick={() => completeQuest(quest)}>Clear stage</button>}
+      </div>
+    </li>
+  )
 }

@@ -24,3 +24,10 @@ export function daysBetween(a: string, b: string): number {
   const [by, bm, bd] = b.split('-').map(Number)
   return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000)
 }
+
+/** The Monday that starts the week a day belongs to. Side quests reset weekly. */
+export function weekOf(day: string): string {
+  const [y, m, d] = day.split('-').map(Number)
+  const weekday = (new Date(y, m - 1, d).getDay() + 6) % 7 // Monday = 0
+  return addDays(day, -weekday)
+}

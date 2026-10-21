@@ -20,6 +20,21 @@ function toastFor(event: GameEvent): Toast | null {
       return { id: nextId++, text: `Reward Wallet full: $${event.budget} earned this month. Extra earnings go to the Vault.`, big: true }
     case 'player.awakened':
       return { id: nextId++, text: `Welcome, ${event.name}. Your daily quests have arrived.`, big: true }
+    case 'mainQuest.cleared':
+      return { id: nextId++, text: `MAIN QUEST CLEARED: ${event.questTitle}. S-rank rewards are within reach.`, big: true }
+    case 'reward.purchased': {
+      const p = event.purchase
+      const xp = p.xp > 0 ? `  +${p.xp} ${p.stat} XP` : ''
+      return { id: nextId++, text: `${p.rank}-rank reward claimed: ${p.title}. Enjoy it.${xp}` }
+    }
+    case 'reward.refunded':
+      return { id: nextId++, text: `Refunded: ${event.purchase.title}  +$${event.purchase.price.toFixed(2)}` }
+    case 'recovery.granted':
+      return { id: nextId++, text: 'Recovery Day token granted for tomorrow. Your streaks are safe.', big: true }
+    case 'savings.logged':
+      return { id: nextId++, text: `${event.kind === 'saved' ? 'Savings' : 'Income'} logged: $${event.amount.toFixed(2)}` }
+    case 'savings.goalMet':
+      return { id: nextId++, text: `Savings goal met: $${event.target.toFixed(2)}. The Reward Shop is open.`, big: true }
     default:
       return null
   }

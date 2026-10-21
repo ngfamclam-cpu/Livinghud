@@ -1,11 +1,20 @@
 import { useRef, useState } from 'react'
-import type { Player } from '../engine'
-import { exportSave, importSave, resetEverything } from '../db/actions'
+import type { Difficulty, Player, SavingsGoal } from '../engine'
+import { exportSave, importSave, resetEverything, updateSettings } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 
 export function Settings({ player, onClose }: { player: Player; onClose: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState('')
+  const [budget, setBudget] = useState(String(player.settings.monthlyBudget))
+  const [goal, setGoal] = useState<SavingsGoal>(player.settings.savingsGoal)
+  const [difficulty, setDifficulty] = useState<Difficulty>(player.settings.difficulty)
+  const [saved, setSaved] = useState('')
+
+  const saveSettings = async () => {
+    await updateSettings({ monthlyBudget: Math.max(0, Number(budget) || 0), savingsGoal: goal, difficulty })
+    setSaved('Settings saved.')
+  }
 
   const download = async () => {
     const blob = new Blob([await exportSave()], { type: 'application/json' })
@@ -35,6 +44,41 @@ export function Settings({ player, onClose }: { player: Player; onClose: () => v
   return (
     <main className="hud">
       <SystemWindow title="Settings">
+        <label>
+          Monthly reward budget ($)
+          <input type="number" min={0} inputMode="decimal" value={budget} onChange={e => setBudget(e.target.value)} />
+        </label>
+        <p className="muted">Changing the budget changes what quests pay from now on and how big every month's wallet is.</p>
+        <label>
+          Savings gate
+          <select value={goal.type} onChange={e => setGoal(g => ({ ...g, type: e.target.value as SavingsGoal['type'] }))}>
+            <option value="fixed">Save a fixed amount each month</option>
+            <option value="percent">Save a % of income</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        {goal.type !== 'off' && (
+          <label>
+            {goal.type === 'fixed' ? 'Save each month ($)' : 'Save this % of income'}
+            <input type="number" min={0} inputMode="decimal" value={goal.amount} onChange={e => setGoal(g => ({ ...g, amount: Math.max(0, Number(e.target.value) || 0) }))} />
+          </label>
+        )}
+        <label>
+          Difficulty
+          <select value={difficulty} onChange={e => setDifficulty(e.target.value as Difficulty)}>
+            <option value="casual">Casual</option>
+            <option value="normal">Normal</option>
+            <option value="hardcore">Hardcore</option>
+          </select>
+        </label>
+        <p className="muted">Penalty modes take effect in a later update.</p>
+        <div className="row end">
+          <button onClick={saveSettings}>Save settings</button>
+        </div>
+        {saved && <p className="system-line">{saved}</p>}
+      </SystemWindow>
+
+      <SystemWindow title="Save file">
         <p>Your progress lives only in this browser for now. Download a save file regularly so clearing your browser never wipes your character.</p>
         <div className="row">
           <button onClick={download}>Download save file</button>
@@ -42,11 +86,6 @@ export function Settings({ player, onClose }: { player: Player; onClose: () => v
           <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={e => e.target.files?.[0] && upload(e.target.files[0])} />
         </div>
         {message && <p className="system-line">{message}</p>}
-        <dl className="status-list">
-          <dt>Player</dt><dd>{player.name}</dd>
-          <dt>Reward budget</dt><dd>${player.settings.monthlyBudget}/month</dd>
-          <dt>Difficulty</dt><dd>{player.settings.difficulty}</dd>
-        </dl>
         <div className="row end">
           <button className="ghost danger" onClick={reset}>Reset everything</button>
           <button onClick={onClose}>Back to HUD</button>

@@ -17,6 +17,7 @@ A Solo Leveling-style RPG HUD for real life. Real tasks are quests, progress sho
 - **Quests:** daily, side (weekly), main (multi-stage). Each has a "minimum version" for bad days that pays half and keeps the streak.
 - **Rewards in dollars, no gold:** a monthly budget ($150 default) that about 80% completion earns in full. Overflow goes to the Vault, the only way to buy A/S rewards. The wallet unlocks only after the month's savings goal is met. Rewards are ranked E–S by price: E <$10, D $10–30, C $30–75, B $75–200, A $200–500, S $500+, each with a minimum level.
 - **Special rules:** dates cost wallet money and also earn CHA XP. Buying a rave or big night out grants a Recovery Day token.
+- **Phase 2 rulings:** E–B rewards spend wallet then Vault; A/S are Vault-only; S also needs one cleared main quest. Unspent wallet money rolls into the Vault when the month ends. Side quests pay $10 (budget/15) and 40 XP, reset Mondays; main quest stages pay their template amount scaled to budget/150 and have no minimum version. Side/main pay is on top of dailies, so it mostly lands in the Vault. Purchases can be refunded the same game day.
 - **Penalties:** configurable Casual / Normal / Hardcore.
 - **Onboarding ("Awakening"):** every preference is asked at signup, not hard-coded. The quest and reward lists are a template library.
 - **Smart glasses** (Meta Ray-Ban Display style): Phase 8. Keep the event bus clean so notifications, a mini-HUD and voice check-off plug in.
@@ -25,8 +26,8 @@ A Solo Leveling-style RPG HUD for real life. Real tasks are quests, progress sho
 
 ## Phases
 1. **Done:** Awakening signup, HUD, dailies with complete/minimum/undo, XP/levels, stats, rank, wallet/Vault, save file, PWA.
-2. **Next:** reward shop with E–S ranks and level gates, savings gate, Vault spending, side and main quests (first main quest: side income), owner's real reward list.
-3. Stat decay, streak badges and multipliers, penalty modes in effect, unlockable INT/AGI dailies.
+2. **Done:** reward shop with E–S ranks and level gates, savings gate, Vault spending, side and main quests (first main quest: side income), owner's real reward list.
+3. **Next:** stat decay, streak badges and multipliers, penalty modes in effect, unlockable INT/AGI dailies.
 4. Quest timers / focus sessions, Party list (days since contact with each friend).
 5. Supabase accounts and sync.
 6. Loot and cosmetics.
