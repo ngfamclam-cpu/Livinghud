@@ -10,7 +10,11 @@ This is **Phase 2**. On top of Phase 1 (the Awakening signup, the player HUD, da
 - **Special rewards**: dates earn CHA XP; a rave or big night out grants a Recovery Day for the next day (streaks and stats are protected).
 - **Side quests** (reset every Monday) and **main quests** cleared stage by stage. The first suggested main quest is Side income.
 
-Data stays in your browser for now.
+## Cloud sync
+
+Your progress saves to the cloud by itself, stored in this project's own Vercel Blob storage (no other service). Each character has a secret **sync code**, shown in Settings. Enter it on another phone or computer to load the same character there.
+
+One-time setup in Vercel: open the project, go to **Storage**, create a **Blob** store (choose Private if asked) and connect it to this project. Sync only runs on the live site; `npm run dev` works offline without it.
 
 ## Run it on your computer
 
@@ -34,7 +38,8 @@ Other commands:
 | Folder | What lives there |
 | --- | --- |
 | `src/engine/` | The game rules: XP, levels, pay, stats, ranks, events. No screens, so the phone app, glasses and AI System can reuse it later. |
-| `src/db/` | Saving to the browser's database, plus every action that changes data (complete a quest, undo, save file). |
+| `src/db/` | Saving to the browser's database, every action that changes data (complete a quest, undo, save file), and cloud sync. |
+| `api/` | The Vercel Function that stores cloud saves. |
 | `src/ui/` | The screens: Awakening signup, HUD, Quest board, Reward Shop, settings and System pop-ups. |
 
 Every action is announced on an event bus (`src/engine/events.ts`), such as `quest.completed` or `level.up`. Screens only listen, which is how the smart-glasses notifications will plug in later.
@@ -45,7 +50,7 @@ Every action is announced on an event bus (`src/engine/events.ts`), such as `que
 2. **Reward shop, E–S ranks, savings gate, side and main quests** (this version)
 3. Stat decay, streak badges and multipliers, penalty modes, unlockable dailies
 4. Quest timers and the Party list
-5. Accounts and cloud sync (Supabase)
+5. Accounts (real logins on top of cloud sync)
 6. Loot and cosmetics
 7. AI System quest master
 8. Native apps, health data, smart glasses

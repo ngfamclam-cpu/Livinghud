@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react'
 import type { Difficulty, Player, SavingsGoal } from '../engine'
 import { exportSave, importSave, resetEverything, updateSettings } from '../db/actions'
+import { forgetSync } from '../db/sync'
 import { SystemWindow } from './SystemWindow'
+import { SyncPanel } from './CloudSync'
 
 export function Settings({ player, onClose }: { player: Player; onClose: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null)
@@ -37,7 +39,8 @@ export function Settings({ player, onClose }: { player: Player; onClose: () => v
   }
 
   const reset = async () => {
-    if (!confirm('Delete all progress on this device and start a new Awakening? Download a save file first if you want to keep it.')) return
+    if (!confirm('Delete all progress on this device and start a new Awakening? The cloud copy stays, and your old sync code can still load it.')) return
+    forgetSync()
     await resetEverything()
   }
 
@@ -78,8 +81,10 @@ export function Settings({ player, onClose }: { player: Player; onClose: () => v
         {saved && <p className="system-line">{saved}</p>}
       </SystemWindow>
 
+      <SyncPanel />
+
       <SystemWindow title="Save file">
-        <p>Your progress lives only in this browser for now. Download a save file regularly so clearing your browser never wipes your character.</p>
+        <p className="muted">Optional: cloud sync already keeps your progress safe. A save file is an extra copy you keep yourself.</p>
         <div className="row">
           <button onClick={download}>Download save file</button>
           <button className="ghost" onClick={() => fileInput.current?.click()}>Load save file</button>

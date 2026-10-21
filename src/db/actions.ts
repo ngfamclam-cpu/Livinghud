@@ -342,18 +342,19 @@ export async function deleteSavings(id: string): Promise<void> {
   await db.savings.delete(id)
 }
 
-// ---- Save file: protects progress while data only lives in this browser ----
+// ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
 const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings]
 
-export async function exportSave(): Promise<string> {
+/** Every record, in a stable order, so two copies of the same game serialize identically. */
+export async function saveData() {
   const [players, quests, completions, rewards, purchases, savings] = await Promise.all(tables().map(t => t.toArray()))
-  return JSON.stringify(
-    { format: SAVE_FORMAT, version: 2, exportedAt: Date.now(), players, quests, completions, rewards, purchases, savings },
-    null,
-    2,
-  )
+  return { format: SAVE_FORMAT, version: 2, players, quests, completions, rewards, purchases, savings }
+}
+
+export async function exportSave(): Promise<string> {
+  return JSON.stringify({ ...(await saveData()), exportedAt: Date.now() }, null, 2)
 }
 
 /** Loads a save file. Phase 1 (version 1) saves load too; they just have no rewards yet. */

@@ -10,7 +10,8 @@ A Solo Leveling-style RPG HUD for real life. Real tasks are quests, progress sho
 - Starts as a personal tool but will become a public product, so build with scaling in mind (accounts, sync, multi-user).
 
 ## Decisions already made
-- **Stack:** React + TypeScript + Vite as an installable PWA; IndexedDB via Dexie now; Supabase for login and sync in Phase 5; native wrapper later.
+- **Stack:** React + TypeScript + Vite as an installable PWA, hosted on Vercel (every merge to `main` deploys). IndexedDB via Dexie is the working copy; native wrapper later.
+- **Cloud sync (owner wants no extra services, so no Supabase):** `api/sync.ts` is a Vercel Function that stores the whole save in the project's Vercel Blob store. A secret 25-character sync code links devices; the server only stores its SHA-256 hash. `src/db/sync.ts` uploads ~1.5s after any change and pulls on open/focus; the device with unsynced changes wins. Real logins come later (Phase 5) on the same Vercel storage.
 - **Architecture:** game rules live only in `src/engine/` (no React, no DB). Every action emits an event on the bus in `src/engine/events.ts`; screens, and later smart glasses and the AI System, only listen.
 - **Data:** totals are derived from the completion log, never stored. Every record carries `userId` and timestamps.
 - **Stats:** STR (fitness/posture), VIT (sleep/water/nutrition), INT (learning/reflection), CHA (friends/family/dating), AGI (discipline/life admin), WLT (money/career/side income). Each is a 0–100 score over the last 30 days and can go down.
@@ -29,7 +30,7 @@ A Solo Leveling-style RPG HUD for real life. Real tasks are quests, progress sho
 2. **Done:** reward shop with E–S ranks and level gates, savings gate, Vault spending, side and main quests (first main quest: side income), owner's real reward list.
 3. **Next:** stat decay, streak badges and multipliers, penalty modes in effect, unlockable INT/AGI dailies.
 4. Quest timers / focus sessions, Party list (days since contact with each friend).
-5. Supabase accounts and sync.
+5. Real accounts (replace the sync code with logins) on Vercel storage.
 6. Loot and cosmetics.
 7. AI System quest master.
 8. Native apps, health data, smart glasses.
