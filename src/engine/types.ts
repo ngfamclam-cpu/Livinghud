@@ -142,3 +142,19 @@ export interface SavingsEntry {
   day: string
   createdAt: number
 }
+
+/** One of the strength routine's exercises; plankSeconds is timed, the rest are reps. */
+export type ExerciseKey = keyof FitnessBaseline
+
+/** A set of the strength routine. Today's progress is the sum of today's sets. */
+export interface ExerciseSet {
+  id: string
+  userId: string
+  exercise: ExerciseKey
+  /** Reps, or seconds for the plank. */
+  amount: number
+  /** Game day, YYYY-MM-DD. */
+  day: string
+  source: 'camera' | 'manual'
+  createdAt: number
+}

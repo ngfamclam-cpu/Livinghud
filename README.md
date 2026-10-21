@@ -10,6 +10,10 @@ This is **Phase 2**. On top of Phase 1 (the Awakening signup, the player HUD, da
 - **Special rewards**: dates earn CHA XP; a rave or big night out grants a Recovery Day for the next day (streaks and stats are protected).
 - **Side quests** (reset every Monday) and **main quests** cleared stage by stage. The first suggested main quest is Side income.
 
+## Workout rep counter
+
+Tap **Workout** on the strength routine. Prop your phone up side-on, tap **Start camera**, and the counter tracks pushups, squats and glute bridges, and times your plank while your body is straight. It counts out loud and clears the quest when you hit every target. The tracking runs entirely on your phone; no video leaves it. Pull-ups, or anything the camera misses, can be added by hand.
+
 ## Cloud sync
 
 Your progress saves to the cloud by itself, stored in this project's own Vercel Blob storage (no other service). Each character has a secret **sync code**, shown in Settings. Enter it on another phone or computer to load the same character there.

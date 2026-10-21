@@ -8,6 +8,7 @@ import { QuestBoard } from './ui/QuestBoard'
 import { Shop } from './ui/Shop'
 import { Settings } from './ui/Settings'
 import { SystemToasts } from './ui/SystemToasts'
+import { Workout } from './ui/Workout'
 
 type Tab = 'hud' | 'quests' | 'shop' | 'settings'
 
@@ -21,16 +22,18 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
+  const [workout, setWorkout] = useState(false)
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
       db.rewards.where('userId').equals(LOCAL_USER).toArray(),
       db.purchases.where('userId').equals(LOCAL_USER).toArray(),
       db.savings.where('userId').equals(LOCAL_USER).toArray(),
+      db.sets.where('userId').equals(LOCAL_USER).toArray(),
     ])
-    return { player, quests, completions, rewards, purchases, savings }
+    return { player, quests, completions, rewards, purchases, savings, sets }
   })
 
   if (!data) return null
@@ -43,8 +46,17 @@ export default function App() {
     )
   }
 
-  const { player, quests, rewards, purchases, savings } = data
-  const summary = summarize(player, quests, data.completions, now, { purchases, savings })
+  const { player, quests, rewards, purchases, savings, sets } = data
+  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets })
+
+  if (workout) {
+    return (
+      <>
+        <Workout summary={summary} sets={sets} onClose={() => setWorkout(false)} />
+        <SystemToasts />
+      </>
+    )
+  }
 
   return (
     <>
@@ -55,7 +67,7 @@ export default function App() {
           </button>
         ))}
       </nav>
-      {tab === 'hud' && <Hud player={player} quests={quests} summary={summary} />}
+      {tab === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setWorkout(true)} />}
       {tab === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} />}
       {tab === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} />}
       {tab === 'settings' && <Settings player={player} onClose={() => setTab('hud')} />}

@@ -1,7 +1,7 @@
 // Every game action is announced as an event. Screens, notifications and
 // (later) the glasses and AI System only listen; none of them own the rules.
 
-import type { Completion, Purchase, StatKey } from './types'
+import type { Completion, ExerciseKey, Purchase, StatKey } from './types'
 
 export type GameEvent =
   | { type: 'quest.completed'; completion: Completion; questTitle: string }
@@ -15,6 +15,9 @@ export type GameEvent =
   | { type: 'recovery.granted'; day: string }
   | { type: 'savings.logged'; kind: 'saved' | 'income'; amount: number }
   | { type: 'savings.goalMet'; month: string; target: number }
+  /** Live from a camera while you train; nothing is saved until the set is logged. */
+  | { type: 'workout.rep'; exercise: ExerciseKey; count: number }
+  | { type: 'workout.set'; exercise: ExerciseKey; amount: number; total: number; target: number }
 
 type Listener = (event: GameEvent) => void
 

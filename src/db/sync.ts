@@ -5,7 +5,7 @@
 // device. If both devices changed, the device that changed last wins.
 
 import { liveQuery } from 'dexie'
-import { importSave, saveData } from './actions'
+import { importSave, SAVE_TABLES, saveData } from './actions'
 
 const KEY_STORE = 'livinghud-sync-key'
 /** Fingerprint of the save this device last agreed on with the cloud. */
@@ -206,7 +206,7 @@ function setKey(key: string) {
 
 /** The same game always gives the same fingerprint, wherever it was saved. */
 function fingerprint(data: Partial<SaveData>): string {
-  const text = JSON.stringify([data.players, data.quests, data.completions, data.rewards, data.purchases, data.savings].map(t => t ?? []))
+  const text = JSON.stringify(SAVE_TABLES.map(t => data[t] ?? []))
   // cyrb53: a fast, well-spread 53-bit string hash.
   let h1 = 0xdeadbeef
   let h2 = 0x41c6ce57

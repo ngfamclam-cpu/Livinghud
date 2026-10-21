@@ -11,11 +11,13 @@ import {
   checkPurchase,
   emit,
   questReward,
+  routineLevel,
   rewardRank,
   strengthDescription,
   summarize,
   type Completion,
   type CompletionVersion,
+  type ExerciseKey,
   type FitnessBaseline,
   type PlayerSettings,
   type Purchase,
@@ -86,14 +88,15 @@ export async function updateSettings(patch: Partial<PlayerSettings>): Promise<vo
 async function snapshot() {
   const player = await db.players.get(LOCAL_USER)
   if (!player) throw new Error('No player yet')
-  const [quests, completions, purchases, savings] = await Promise.all([
+  const [quests, completions, purchases, savings, sets] = await Promise.all([
     db.quests.where('userId').equals(LOCAL_USER).toArray(),
     db.completions.where('userId').equals(LOCAL_USER).toArray(),
     db.purchases.where('userId').equals(LOCAL_USER).toArray(),
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
+    db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const summary = summarize(player, quests, completions, new Date(), { purchases, savings })
-  return { player, quests, completions, purchases, savings, summary }
+  const summary = summarize(player, quests, completions, new Date(), { purchases, savings, sets })
+  return { player, quests, completions, purchases, savings, sets, summary }
 }
 
 /** Announces level-ups, a full wallet and a met savings goal after any change. */
@@ -342,15 +345,40 @@ export async function deleteSavings(id: string): Promise<void> {
   await db.savings.delete(id)
 }
 
+// ---- Strength routine ----
+
+/** Logs a set of the strength routine and clears the quest once every target is hit. */
+export async function logSet(exercise: ExerciseKey, amount: number, source: 'camera' | 'manual'): Promise<void> {
+  amount = Math.floor(amount)
+  if (!(amount > 0)) return
+  const { summary, quests } = await snapshot()
+  await db.sets.add({ id: newId(), userId: LOCAL_USER, exercise, amount, day: summary.today, source, createdAt: Date.now() })
+  const after = await snapshot()
+  const routine = after.summary.routine
+  if (!routine) return
+  emit({ type: 'workout.set', exercise, amount, total: routine.done[exercise] ?? 0, target: routine.targets[exercise] ?? 0 })
+
+  const quest = quests.find(q => q.kind === 'daily' && q.active && q.templateId === 'str-routine')
+  if (quest && !after.summary.todayDone.has(quest.id) && routineLevel(routine.targets, routine.done) === 'full') {
+    await completeQuest(quest, 'full')
+  }
+}
+
+export async function deleteSet(id: string): Promise<void> {
+  await db.sets.delete(id)
+}
+
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets]
+/** The record lists a save file holds, in order. */
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings] = await Promise.all(tables().map(t => t.toArray()))
-  return { format: SAVE_FORMAT, version: 2, players, quests, completions, rewards, purchases, savings }
+  const [players, quests, completions, rewards, purchases, savings, sets] = await Promise.all(tables().map(t => t.toArray()))
+  return { format: SAVE_FORMAT, version: 3, players, quests, completions, rewards, purchases, savings, sets }
 }
 
 export async function exportSave(): Promise<string> {
@@ -371,6 +399,7 @@ export async function importSave(json: string): Promise<void> {
     await db.rewards.bulkPut(data.rewards ?? [])
     await db.purchases.bulkPut(data.purchases ?? [])
     await db.savings.bulkPut(data.savings ?? [])
+    await db.sets.bulkPut(data.sets ?? [])
   })
 }
 

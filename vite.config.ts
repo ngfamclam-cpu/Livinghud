@@ -28,6 +28,12 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png}'],
         runtimeCaching: [
           {
+            // The rep counter's body-tracking engine and model (about 17 MB): downloaded on the first workout, then offline.
+            urlPattern: /\/(assets\/[^/]+\.wasm|models\/[^/]+)$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'pose-model', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
+          },
+          {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/,
             handler: 'CacheFirst',
             options: { cacheName: 'fonts', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },

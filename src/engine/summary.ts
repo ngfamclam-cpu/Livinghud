@@ -5,7 +5,8 @@
 import { levelFromXp, type LevelInfo } from './leveling'
 import { playerRank, round2, savingsStatus, type SavingsStatus } from './economy'
 import { addDays, dayKey, daysBetween, monthOf, weekOf } from './time'
-import type { Completion, Player, Purchase, Quest, RewardRank, SavingsEntry, StatKey } from './types'
+import { routineDone, routineTargets, type RoutineTargets } from './workout'
+import type { Completion, ExerciseSet, Player, Purchase, Quest, RewardRank, SavingsEntry, StatKey } from './types'
 
 export const STAT_WINDOW_DAYS = 30
 
@@ -55,11 +56,14 @@ export interface Summary {
   streaks: Map<string, number>
   /** Today is a Recovery Day: streaks are protected and missed dailies don't count. */
   recoveryToday: boolean
+  /** Strength routine targets and today's logged progress; null without a fitness test. */
+  routine: { targets: RoutineTargets; done: RoutineTargets } | null
 }
 
 export interface Logs {
   purchases?: Purchase[]
   savings?: SavingsEntry[]
+  sets?: ExerciseSet[]
 }
 
 const weight = (c: Completion) => (c.version === 'full' ? 1 : 0.5)
@@ -69,7 +73,7 @@ export function summarize(
   quests: Quest[],
   completions: Completion[],
   now: Date,
-  { purchases = [], savings = [] }: Logs = {},
+  { purchases = [], savings = [], sets = [] }: Logs = {},
 ): Summary {
   const today = dayKey(now, player.settings.resetHour)
   const week = weekOf(today)
@@ -193,5 +197,6 @@ export function summarize(
     mainQuestsCleared,
     streaks,
     recoveryToday: recoveryDays.has(today),
+    routine: player.fitness ? { targets: routineTargets(player.fitness), done: routineDone(sets, today) } : null,
   }
 }

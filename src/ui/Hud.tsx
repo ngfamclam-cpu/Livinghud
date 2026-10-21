@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { STATS, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
+import { EXERCISES, STATS, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
 import { completeQuest, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
 import { money, monthName } from './format'
 
-export function Hud({ player, quests, summary }: { player: Player; quests: Quest[]; summary: Summary }) {
+export function Hud({ player, quests, summary, onStartWorkout }: { player: Player; quests: Quest[]; summary: Summary; onStartWorkout: () => void }) {
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
   const sides = active.filter(q => q.kind === 'side')
@@ -77,7 +77,14 @@ export function Hud({ player, quests, summary }: { player: Player; quests: Quest
         )}
         <ul className="quests">
           {dailies.map(q => (
-            <QuestRow key={q.id} quest={q} done={summary.todayDone.get(q.id)} streak={summary.streaks.get(q.id) ?? 0} />
+            <QuestRow
+              key={q.id}
+              quest={q}
+              done={summary.todayDone.get(q.id)}
+              streak={summary.streaks.get(q.id) ?? 0}
+              routine={q.templateId === 'str-routine' ? summary.routine : null}
+              onStartWorkout={onStartWorkout}
+            />
           ))}
         </ul>
       </SystemWindow>
@@ -101,8 +108,19 @@ export function Hud({ player, quests, summary }: { player: Player; quests: Quest
   )
 }
 
-function QuestRow({ quest, done, streak = 0 }: { quest: Quest; done?: Completion; streak?: number }) {
+interface RowProps {
+  quest: Quest
+  done?: Completion
+  streak?: number
+  routine?: Summary['routine']
+  onStartWorkout?: () => void
+}
+
+function QuestRow({ quest, done, streak = 0, routine, onStartWorkout }: RowProps) {
   const [open, setOpen] = useState(false)
+  const routineParts = routine
+    ? EXERCISES.filter(e => routine.targets[e.key]).map(e => `${e.name} ${Math.min(routine.done[e.key] ?? 0, routine.targets[e.key]!)}/${routine.targets[e.key]}`)
+    : []
   return (
     <li className={`quest ${done ? 'done' : ''}`}>
       <button className="quest-main" onClick={() => setOpen(o => !o)} aria-expanded={open}>
@@ -110,6 +128,7 @@ function QuestRow({ quest, done, streak = 0 }: { quest: Quest; done?: Completion
         <span className="quest-title">{quest.title}</span>
         {streak > 0 && <span className="streak" title={`${streak}-day streak`}>{streak}d</span>}
       </button>
+      {routineParts.length > 0 && <p className="routine-line muted">{routineParts.join(' · ')}</p>}
       {open && (
         <div className="quest-detail">
           {quest.description && <p>{quest.description}</p>}
@@ -117,6 +136,9 @@ function QuestRow({ quest, done, streak = 0 }: { quest: Quest; done?: Completion
         </div>
       )}
       <div className="quest-actions">
+        {routine && onStartWorkout && (
+          <button className={`small ${done ? 'ghost' : ''} workout-button`} onClick={onStartWorkout}>Workout</button>
+        )}
         {done ? (
           <>
             <span className="cleared">{done.version === 'full' ? 'CLEAR' : 'MIN CLEAR'} +{done.xp} XP · +{money(done.dollars)}</span>
