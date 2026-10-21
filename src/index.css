@@ -243,6 +243,18 @@ button.icon { padding: 2px 8px; font-size: 1.1rem; line-height: 1; border-color:
 .lock-reason { color: var(--muted); font-size: 0.88rem; margin-right: auto; }
 .lock-reason::before { content: '🔒 '; }
 
+/* ---- Cloud sync ---- */
+.sync-state { color: var(--muted); }
+.sync-state.sync-synced { color: var(--good); }
+.sync-state.sync-not-configured { color: var(--gold); }
+.sync-code { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+.sync-code code {
+  flex: 1; font-size: 1.05rem; letter-spacing: 0.08em; color: var(--accent);
+  background: rgba(5, 10, 20, 0.7); border: 1px solid rgba(47, 143, 255, 0.5); border-radius: var(--radius); padding: 8px 10px;
+  overflow-wrap: anywhere;
+}
+.error { color: var(--danger); }
+
 /* ---- System toasts ---- */
 .toasts { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); width: min(92vw, 480px); display: grid; gap: 8px; z-index: 10; pointer-events: none; }
 .toast {

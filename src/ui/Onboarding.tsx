@@ -18,6 +18,7 @@ import {
 } from '../engine'
 import { awaken } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
+import { LinkForm } from './CloudSync'
 
 const MIN_STATS = 3
 const MIN_DAILIES = 3
@@ -47,6 +48,7 @@ export function Onboarding() {
     bedTime: '23:00',
   })
   const [saving, setSaving] = useState(false)
+  const [returning, setReturning] = useState(false)
 
   const hasStr = stats.includes('STR')
   const order: Step[] = ['welcome', 'stats', ...(hasStr ? (['fitness'] as Step[]) : []), 'dailies', 'main', 'budget', 'rewards', 'difficulty', 'day', 'status']
@@ -111,6 +113,19 @@ export function Onboarding() {
             <input value={name} onChange={e => setName(e.target.value)} placeholder="Player name" autoFocus maxLength={24} />
           </label>
           {nav(name.trim().length > 0, 'Accept')}
+        </SystemWindow>
+      )}
+
+      {step === 'welcome' && (
+        <SystemWindow title="Returning Player">
+          {returning ? (
+            <LinkForm onCancel={() => setReturning(false)} />
+          ) : (
+            <>
+              <p className="muted">Already have a character on another device? Load it with your sync code from Settings.</p>
+              <button className="ghost small" onClick={() => setReturning(true)}>Enter sync code</button>
+            </>
+          )}
         </SystemWindow>
       )}
 
