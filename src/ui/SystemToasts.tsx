@@ -13,7 +13,7 @@ const MAX_VISIBLE = 2
 function toastFor(event: GameEvent): Toast | null {
   switch (event.type) {
     case 'quest.completed':
-      return { id: nextId++, text: `Quest cleared: ${event.questTitle}  +${event.completion.xp} XP  +$${event.completion.dollars.toFixed(2)}` }
+      return { id: nextId++, text: `${event.via === 'automation' ? 'Auto-cleared' : 'Quest cleared'}: ${event.questTitle}  +${event.completion.xp} XP  +$${event.completion.dollars.toFixed(2)}` }
     case 'level.up':
       return { id: nextId++, text: `LEVEL UP! You are now level ${event.level}.`, big: true }
     case 'wallet.full':

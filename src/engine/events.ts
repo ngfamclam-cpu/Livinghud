@@ -4,7 +4,7 @@
 import type { Completion, ExerciseKey, Purchase, StatKey } from './types'
 
 export type GameEvent =
-  | { type: 'quest.completed'; completion: Completion; questTitle: string }
+  | { type: 'quest.completed'; completion: Completion; questTitle: string; via?: 'automation' }
   | { type: 'quest.undone'; questId: string; questTitle: string }
   | { type: 'level.up'; level: number }
   | { type: 'wallet.full'; month: string; budget: number }

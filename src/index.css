@@ -269,6 +269,16 @@ button.icon { padding: 2px 8px; font-size: 1.1rem; line-height: 1; border-color:
 .check input { width: auto; }
 .manual { margin-top: 12px; }
 
+/* ---- Auto-complete ---- */
+.howto { margin: 0 0 12px; border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 8px 12px; }
+.howto summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.howto ol { padding-left: 1.3em; margin: 10px 0; }
+.howto li { margin-bottom: 6px; line-height: 1.4; }
+.howto ul { padding-left: 1.1em; margin: 6px 0; }
+.automations li { flex-wrap: wrap; }
+.automations .quest-title { flex: 1; min-width: 50%; }
+.link-buttons { display: flex; gap: 6px; }
+
 /* ---- Cloud sync ---- */
 .sync-state { color: var(--muted); }
 .sync-state.sync-synced { color: var(--good); }

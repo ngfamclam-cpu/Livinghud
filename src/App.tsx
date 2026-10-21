@@ -70,7 +70,7 @@ export default function App() {
       {tab === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setWorkout(true)} />}
       {tab === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} />}
       {tab === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} />}
-      {tab === 'settings' && <Settings player={player} onClose={() => setTab('hud')} />}
+      {tab === 'settings' && <Settings player={player} quests={quests} onClose={() => setTab('hud')} />}
       <SystemToasts />
     </>
   )

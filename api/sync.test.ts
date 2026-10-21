@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { handle, normalizeKey, type SaveStore } from './sync'
+import { handle } from './sync'
+import { normalizeKey, type Store } from '../server/blob'
+import { memoryStore } from '../server/memoryStore'
 
 const KEY = 'ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ2'
 const save = JSON.stringify({ format: 'livinghud-save', version: 2, players: [{ id: 'local' }] })
-
-function memoryStore(): SaveStore & { files: Map<string, string> } {
-  const files = new Map<string, string>()
-  return { files, read: async p => files.get(p) ?? null, write: async (p, b) => void files.set(p, b) }
-}
 
 const req = (method: string, key: string | null, body?: string) =>
   new Request('https://x/api/sync', { method, body, headers: key ? { 'x-sync-key': key } : {} })
@@ -46,10 +43,8 @@ describe('sync api', () => {
   })
 
   it('says when cloud storage is not connected', async () => {
-    const broken: SaveStore = {
-      read: async () => { throw new Error('No token found. Either configure the BLOB_READ_WRITE_TOKEN environment variable') },
-      write: async () => {},
-    }
+    const fail = async (): Promise<never> => { throw new Error('No token found. Either configure the BLOB_READ_WRITE_TOKEN environment variable') }
+    const broken: Store = { read: fail, write: fail, writeIf: fail }
     const res = await handle(req('GET', KEY), broken)
     expect(res.status).toBe(503)
     expect(await res.json()).toEqual({ error: 'not-configured' })

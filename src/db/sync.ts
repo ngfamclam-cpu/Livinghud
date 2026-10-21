@@ -5,7 +5,7 @@
 // device. If both devices changed, the device that changed last wins.
 
 import { liveQuery } from 'dexie'
-import { importSave, SAVE_TABLES, saveData } from './actions'
+import { importSave, randomCode, SAVE_TABLES, saveData } from './actions'
 
 const KEY_STORE = 'livinghud-sync-key'
 /** Fingerprint of the save this device last agreed on with the cloud. */
@@ -82,7 +82,7 @@ export function startSync(): void {
   liveQuery(saveData).subscribe({
     next: data => {
       if (data.players.length === 0) return // never upload an empty game
-      if (!storage.get(KEY_STORE)) setKey(newCode()) // sync turns on by itself once you have a character
+      if (!storage.get(KEY_STORE)) setKey(randomCode()) // sync turns on by itself once you have a character
       if (fingerprint(data) === storage.get(AGREED_STORE)) return
       clearTimeout(pushTimer)
       pushTimer = setTimeout(() => background(push), PUSH_DELAY_MS)
@@ -220,12 +220,6 @@ function fingerprint(data: Partial<SaveData>): string {
   return `${text.length}:${(4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)}`
 }
 
-// No 0/O or 1/I, so a code copied by hand can't be misread. 25 characters is about 125 bits.
-const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-
-function newCode(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(25)), b => ALPHABET[b % ALPHABET.length]).join('')
-}
 
 function normalize(code: string): string | null {
   const key = code.toUpperCase().replace(/[^A-Z0-9]/g, '')

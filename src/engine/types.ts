@@ -33,6 +33,8 @@ export interface PlayerSettings {
   resetHour: number
   wakeTime: string
   bedTime: string
+  /** Secret in this player's auto-complete links (see api/trigger.ts). */
+  triggerToken?: string
 }
 
 export interface Player {
