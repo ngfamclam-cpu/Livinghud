@@ -47,6 +47,16 @@ export interface Player {
   updatedAt: number
 }
 
+/** One step of a main quest. Stages are cleared in order. */
+export interface QuestStage {
+  id: string
+  title: string
+  description: string
+  xp: number
+  /** Dollars this stage pays at the default $150 budget; scaled to the player's budget. */
+  basePay: number
+}
+
 export interface Quest {
   id: string
   userId: string
@@ -57,6 +67,8 @@ export interface Quest {
   minVersion: string
   active: boolean
   templateId: string | null
+  /** Main quests only: the stages, in order. */
+  stages?: QuestStage[]
   createdAt: number
   updatedAt: number
 }
@@ -69,7 +81,64 @@ export interface Completion {
   /** Game day this counts for, as YYYY-MM-DD (see dayKey). */
   day: string
   version: CompletionVersion
+  /** Main quests only: which stage this clears. */
+  stageId?: string
   xp: number
   dollars: number
+  createdAt: number
+}
+
+/** Ranked E-S by price; see rewardRank. */
+export type RewardRank = 'E' | 'D' | 'C' | 'B' | 'A' | 'S'
+
+/**
+ * Special reward rules. A date costs money and also earns CHA XP; a big night
+ * out (a rave, a night of drinking) grants a Recovery Day token for the next day.
+ */
+export type RewardSpecial = 'none' | 'date' | 'bigNight'
+
+export interface Reward {
+  id: string
+  userId: string
+  title: string
+  /** Real price in dollars. The rank and minimum level come from this. */
+  price: number
+  category: string
+  special: RewardSpecial
+  /** Optional extra gate, e.g. new running shoes need STR 40. */
+  statGate: { stat: StatKey; min: number } | null
+  active: boolean
+  templateId: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+/** A reward bought with real money. Copies the reward so history survives edits. */
+export interface Purchase {
+  id: string
+  userId: string
+  rewardId: string
+  title: string
+  price: number
+  rank: RewardRank
+  special: RewardSpecial
+  /** Game day of the purchase, YYYY-MM-DD. */
+  day: string
+  fromWallet: number
+  fromVault: number
+  /** XP the purchase grants (dates earn CHA XP). */
+  xp: number
+  stat: StatKey | null
+  createdAt: number
+}
+
+/** A savings or income entry for the monthly savings gate. */
+export interface SavingsEntry {
+  id: string
+  userId: string
+  kind: 'saved' | 'income'
+  amount: number
+  /** Game day logged, YYYY-MM-DD. Counts toward that day's month. */
+  day: string
   createdAt: number
 }

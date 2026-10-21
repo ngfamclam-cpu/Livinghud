@@ -2,7 +2,12 @@ import { useState } from 'react'
 import {
   DAILY_TEMPLATES,
   DEFAULT_FITNESS,
+  MAIN_TEMPLATES,
   MAX_STARTER_DAILIES,
+  RANK_MIN_LEVEL,
+  REWARD_TEMPLATES,
+  SUGGESTED_MAIN,
+  rewardRank,
   STATS,
   SUGGESTED_STARTERS,
   dailyPay,
@@ -23,7 +28,7 @@ const DIFFICULTIES: { key: Difficulty; name: string; text: string }[] = [
   { key: 'hardcore', name: 'Hardcore', text: 'Missed dailies cost HP. At 0 HP you lose wallet money or a level.' },
 ]
 
-type Step = 'welcome' | 'stats' | 'fitness' | 'dailies' | 'budget' | 'difficulty' | 'day' | 'status'
+type Step = 'welcome' | 'stats' | 'fitness' | 'dailies' | 'main' | 'budget' | 'rewards' | 'difficulty' | 'day' | 'status'
 
 export function Onboarding() {
   const [step, setStep] = useState<Step>('welcome')
@@ -31,6 +36,8 @@ export function Onboarding() {
   const [stats, setStats] = useState<StatKey[]>(['STR', 'VIT', 'CHA', 'WLT'])
   const [fitness, setFitness] = useState<FitnessBaseline>(DEFAULT_FITNESS)
   const [dailyIds, setDailyIds] = useState<string[]>([])
+  const [mainIds, setMainIds] = useState<string[]>([SUGGESTED_MAIN])
+  const [rewardIds, setRewardIds] = useState<string[]>(REWARD_TEMPLATES.map(t => t.id))
   const [settings, setSettings] = useState<PlayerSettings>({
     monthlyBudget: 150,
     savingsGoal: { type: 'fixed', amount: 200 },
@@ -42,7 +49,7 @@ export function Onboarding() {
   const [saving, setSaving] = useState(false)
 
   const hasStr = stats.includes('STR')
-  const order: Step[] = ['welcome', 'stats', ...(hasStr ? (['fitness'] as Step[]) : []), 'dailies', 'budget', 'difficulty', 'day', 'status']
+  const order: Step[] = ['welcome', 'stats', ...(hasStr ? (['fitness'] as Step[]) : []), 'dailies', 'main', 'budget', 'rewards', 'difficulty', 'day', 'status']
   const index = order.indexOf(step)
   const next = () => {
     const to = order[index + 1]
@@ -53,9 +60,13 @@ export function Onboarding() {
   const patch = (p: Partial<PlayerSettings>) => setSettings(s => ({ ...s, ...p }))
 
   const toggleStat = (key: StatKey) => {
-    setStats(s => (s.includes(key) ? s.filter(k => k !== key) : [...s, key]))
+    const nextStats = stats.includes(key) ? stats.filter(k => k !== key) : [...stats, key]
+    setStats(nextStats)
     setDailyIds([])
+    setMainIds(ids => ids.filter(id => nextStats.includes(MAIN_TEMPLATES.find(t => t.id === id)!.stat)))
   }
+  const toggle = (id: string, set: (f: (ids: string[]) => string[]) => void) =>
+    set(ids => (ids.includes(id) ? ids.filter(i => i !== id) : [...ids, id]))
   const toggleDaily = (id: string) =>
     setDailyIds(ids =>
       ids.includes(id) ? ids.filter(i => i !== id) : ids.length < MAX_STARTER_DAILIES ? [...ids, id] : ids,
@@ -63,7 +74,15 @@ export function Onboarding() {
 
   const finish = async () => {
     setSaving(true)
-    await awaken({ name: name.trim() || 'Player', stats, fitness: hasStr ? fitness : null, dailyTemplateIds: dailyIds, settings })
+    await awaken({
+      name: name.trim() || 'Player',
+      stats,
+      fitness: hasStr ? fitness : null,
+      dailyTemplateIds: dailyIds,
+      mainTemplateIds: mainIds,
+      rewardTemplateIds: rewardIds,
+      settings,
+    })
   }
 
   const progress = (
@@ -148,6 +167,45 @@ export function Onboarding() {
         </SystemWindow>
       )}
 
+      {step === 'main' && (
+        <SystemWindow title="Main quests">
+          <p>Main quests are big goals cleared in stages over weeks or months. Each stage pays more than a daily, and clearing a whole main quest unlocks S-rank rewards. Pick any you want to start with, or none for now.</p>
+          <div className="choices">
+            {MAIN_TEMPLATES.filter(t => stats.includes(t.stat)).map(t => (
+              <button key={t.id} className={`choice ${mainIds.includes(t.id) ? 'picked' : ''}`} onClick={() => toggle(t.id, setMainIds)} aria-pressed={mainIds.includes(t.id)}>
+                <span className="stat-key">{t.stat}</span>
+                <span><b>{t.title}</b><br /><small>{t.stages.map(s => s.title).join(' → ')}</small></span>
+              </button>
+            ))}
+          </div>
+          <p className="muted">You can add side quests (weekly) and more main quests from the Quests screen later.</p>
+          {nav(true)}
+        </SystemWindow>
+      )}
+
+      {step === 'rewards' && (
+        <SystemWindow title="Your reward list">
+          <p>What will you spend your Reward Wallet on? Rewards are ranked E–S by price, and higher ranks need a higher level. Keep what fits your life; you can add your own in the Shop.</p>
+          <div className="row">
+            <button className="chip" onClick={() => setRewardIds(REWARD_TEMPLATES.map(t => t.id))}>Use suggested</button>
+            <button className="chip" onClick={() => setRewardIds([])}>Clear all</button>
+          </div>
+          <div className="choices">
+            {REWARD_TEMPLATES.map(t => {
+              const rank = rewardRank(t.price)
+              return (
+                <button key={t.id} className={`choice ${rewardIds.includes(t.id) ? 'picked' : ''}`} onClick={() => toggle(t.id, setRewardIds)} aria-pressed={rewardIds.includes(t.id)}>
+                  <span className="stat-key">{rank}</span>
+                  <span><b>{t.title}</b> · ${t.price}<br /><small>{t.category}{RANK_MIN_LEVEL[rank] > 1 ? ` · level ${RANK_MIN_LEVEL[rank]}+` : ''}</small></span>
+                </button>
+              )
+            })}
+          </div>
+          <p className="muted">{rewardIds.length} rewards picked</p>
+          {nav(true)}
+        </SystemWindow>
+      )}
+
       {step === 'budget' && (
         <SystemWindow title="Rewards and savings">
           <p>Quests pay real dollars into your Reward Wallet. How much can you spend on rewards each month?</p>
@@ -213,7 +271,9 @@ export function Onboarding() {
             <dt>Name</dt><dd>{name}</dd>
             <dt>Stats</dt><dd>{stats.join(' · ')}</dd>
             <dt>Daily quests</dt><dd>{dailyIds.map(id => DAILY_TEMPLATES.find(t => t.id === id)?.title).join(', ')}</dd>
+            <dt>Main quests</dt><dd>{mainIds.map(id => MAIN_TEMPLATES.find(t => t.id === id)?.title).join(', ') || 'None yet'}</dd>
             <dt>Reward budget</dt><dd>${settings.monthlyBudget}/month</dd>
+            <dt>Rewards</dt><dd>{rewardIds.length} in your shop</dd>
             <dt>Savings goal</dt><dd>{savingsText(settings)}</dd>
             <dt>Difficulty</dt><dd>{DIFFICULTIES.find(d => d.key === settings.difficulty)?.name}</dd>
             <dt>Daily reset</dt><dd>{formatHour(settings.resetHour)}</dd>

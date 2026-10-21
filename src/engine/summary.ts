@@ -1,11 +1,11 @@
-// Everything on the HUD is derived from the completion log, never stored as
-// running totals. Undo is just deleting a completion, nothing can drift, and
-// syncing devices later only has to merge logs.
+// Everything on the HUD is derived from the logs (completions, purchases,
+// savings), never stored as running totals. Undo is just deleting a record,
+// nothing can drift, and syncing devices later only has to merge logs.
 
 import { levelFromXp, type LevelInfo } from './leveling'
-import { playerRank, type RewardRank } from './economy'
-import { addDays, dayKey, daysBetween, monthOf } from './time'
-import type { Completion, Player, Quest, StatKey } from './types'
+import { playerRank, round2, savingsStatus, type SavingsStatus } from './economy'
+import { addDays, dayKey, daysBetween, monthOf, weekOf } from './time'
+import type { Completion, Player, Purchase, Quest, RewardRank, SavingsEntry, StatKey } from './types'
 
 export const STAT_WINDOW_DAYS = 30
 
@@ -14,22 +14,52 @@ export interface WalletSummary {
   budget: number
   /** Earned this month, capped at the budget. */
   earned: number
-  /** Overflow from every month beyond its budget, saved for A/S-rank rewards. */
+  /** Spent from the wallet this month. */
+  spent: number
+  /** Left to spend this month. */
+  available: number
+  /**
+   * Overflow from every month beyond its budget, plus wallet money left unspent
+   * when a month ends, minus Vault purchases. The only way to pay for A/S rewards.
+   */
   vault: number
+}
+
+export interface MainQuestProgress {
+  /** Stages cleared, in order. */
+  cleared: number
+  /** The stage to work on next; null once every stage is cleared. */
+  current: string | null
+  done: boolean
 }
 
 export interface Summary {
   today: string
+  week: string
   totalXp: number
   level: LevelInfo
   wallet: WalletSummary
+  savings: SavingsStatus
   /** 0-100 per stat: how that life area went over the last 30 days. */
   stats: Partial<Record<StatKey, number>>
   /** Share of dailies done over the last 30 days, 0-1. */
   completionRate: number
   rank: RewardRank
+  /** Dailies done today. */
   todayDone: Map<string, Completion>
+  /** Side quests done this week. */
+  weekDone: Map<string, Completion>
+  /** Main quest progress by quest id. */
+  mainProgress: Map<string, MainQuestProgress>
+  mainQuestsCleared: number
   streaks: Map<string, number>
+  /** Today is a Recovery Day: streaks are protected and missed dailies don't count. */
+  recoveryToday: boolean
+}
+
+export interface Logs {
+  purchases?: Purchase[]
+  savings?: SavingsEntry[]
 }
 
 const weight = (c: Completion) => (c.version === 'full' ? 1 : 0.5)
@@ -39,36 +69,80 @@ export function summarize(
   quests: Quest[],
   completions: Completion[],
   now: Date,
+  { purchases = [], savings = [] }: Logs = {},
 ): Summary {
   const today = dayKey(now, player.settings.resetHour)
+  const week = weekOf(today)
   const startDay = dayKey(new Date(player.createdAt), player.settings.resetHour)
   const budget = player.settings.monthlyBudget
-
-  const totalXp = completions.reduce((sum, c) => sum + c.xp, 0)
-
-  // Wallet: each month caps at the budget, the rest goes to the Vault.
-  const byMonth = new Map<string, number>()
-  for (const c of completions) {
-    const m = monthOf(c.day)
-    byMonth.set(m, (byMonth.get(m) ?? 0) + c.dollars)
-  }
   const month = monthOf(today)
-  let vault = 0
-  for (const total of byMonth.values()) vault += Math.max(0, total - budget)
+
+  const totalXp = completions.reduce((sum, c) => sum + c.xp, 0) + purchases.reduce((sum, p) => sum + p.xp, 0)
+
+  // Wallet: each month caps at the budget and the overflow goes to the Vault.
+  // When a month ends, whatever the wallet didn't spend rolls into the Vault too.
+  const earnedBy = new Map<string, number>()
+  for (const c of completions) earnedBy.set(monthOf(c.day), (earnedBy.get(monthOf(c.day)) ?? 0) + c.dollars)
+  const spentBy = new Map<string, number>()
+  let vaultSpent = 0
+  for (const p of purchases) {
+    spentBy.set(monthOf(p.day), (spentBy.get(monthOf(p.day)) ?? 0) + p.fromWallet)
+    vaultSpent += p.fromVault
+  }
+  let vault = -vaultSpent
+  for (const [m, total] of earnedBy) {
+    vault += Math.max(0, total - budget)
+    if (m < month) vault += Math.max(0, Math.min(budget, total) - (spentBy.get(m) ?? 0))
+  }
+  const earned = round2(Math.min(budget, earnedBy.get(month) ?? 0))
+  const spent = round2(spentBy.get(month) ?? 0)
   const wallet: WalletSummary = {
     month,
     budget,
-    earned: round2(Math.min(budget, byMonth.get(month) ?? 0)),
-    vault: round2(vault),
+    earned,
+    spent,
+    available: round2(Math.max(0, earned - spent)),
+    vault: round2(Math.max(0, vault)),
   }
 
+  // A big night out grants a Recovery Day token for the next day.
+  const recoveryDays = new Set(purchases.filter(p => p.special === 'bigNight').map(p => addDays(p.day, 1)))
+
+  const byId = new Map(quests.map(q => [q.id, q]))
   const todayDone = new Map<string, Completion>()
-  for (const c of completions) if (c.day === today) todayDone.set(c.questId, c)
+  const weekDone = new Map<string, Completion>()
+  const stagesDone = new Map<string, Set<string>>()
+  for (const c of completions) {
+    const kind = byId.get(c.questId)?.kind
+    if (kind === 'daily' && c.day === today) todayDone.set(c.questId, c)
+    if (kind === 'side' && weekOf(c.day) === week) weekDone.set(c.questId, c)
+    if (kind === 'main' && c.stageId) {
+      if (!stagesDone.has(c.questId)) stagesDone.set(c.questId, new Set())
+      stagesDone.get(c.questId)!.add(c.stageId)
+    }
+  }
+
+  const mainProgress = new Map<string, MainQuestProgress>()
+  let mainQuestsCleared = 0
+  for (const q of quests) {
+    if (q.kind !== 'main') continue
+    const stages = q.stages ?? []
+    const doneIds = stagesDone.get(q.id) ?? new Set()
+    const cleared = stages.filter(s => doneIds.has(s.id)).length
+    const current = stages.find(s => !doneIds.has(s.id))?.id ?? null
+    const done = stages.length > 0 && current === null
+    if (done) mainQuestsCleared++
+    mainProgress.set(q.id, { cleared, current, done })
+  }
 
   // Rolling 30-day window. Past days count fully; today only counts what is
   // already done, so stats don't dip every morning before you start.
+  // Recovery Days are skipped, so a planned rest never lowers a stat.
   const pastDays = Math.min(STAT_WINDOW_DAYS - 1, Math.max(0, daysBetween(startDay, today)))
   const windowStart = addDays(today, -pastDays)
+  let restDays = 0
+  for (const d of recoveryDays) if (d >= windowStart && d < today) restDays++
+  const countedDays = pastDays - restDays
   const dailies = quests.filter(q => q.kind === 'daily' && q.active)
   const inWindow = completions.filter(c => c.day >= windowStart && c.day <= today)
 
@@ -80,20 +154,24 @@ export function summarize(
     const ids = new Set(statDailies.map(q => q.id))
     const done = inWindow.filter(c => ids.has(c.questId)).reduce((s, c) => s + weight(c), 0)
     const doneToday = statDailies.filter(q => todayDone.has(q.id)).length
-    const possible = statDailies.length * pastDays + doneToday
-    stats[stat] = possible > 0 ? Math.round((100 * Math.min(done, possible)) / possible) : 0
-    allDone += done
+    const possible = statDailies.length * countedDays + doneToday
+    const counted = Math.min(done, possible)
+    stats[stat] = possible > 0 ? Math.round((100 * counted) / possible) : 0
+    allDone += counted
     allPossible += possible
   }
   const completionRate = allPossible > 0 ? Math.min(1, allDone / allPossible) : 0
 
+  // Streaks count back from today (or yesterday if today isn't done yet).
+  // A Recovery Day neither breaks a streak nor adds to it.
   const streaks = new Map<string, number>()
   for (const q of dailies) {
     const days = new Set(completions.filter(c => c.questId === q.id).map(c => c.day))
     let day = days.has(today) ? today : addDays(today, -1)
     let streak = 0
-    while (days.has(day)) {
-      streak++
+    for (let guard = 0; guard < 3650; guard++) {
+      if (days.has(day)) streak++
+      else if (!recoveryDays.has(day)) break
       day = addDays(day, -1)
     }
     streaks.set(q.id, streak)
@@ -101,17 +179,19 @@ export function summarize(
 
   return {
     today,
+    week,
     totalXp,
     level: levelFromXp(totalXp),
     wallet,
+    savings: savingsStatus(player.settings.savingsGoal, savings, month),
     stats,
     completionRate,
     rank: playerRank(completionRate),
     todayDone,
+    weekDone,
+    mainProgress,
+    mainQuestsCleared,
     streaks,
+    recoveryToday: recoveryDays.has(today),
   }
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
 }

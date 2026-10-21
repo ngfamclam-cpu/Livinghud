@@ -3,16 +3,28 @@
 
 import {
   DAILY_TEMPLATES,
+  DATE_XP,
+  MAIN_TEMPLATES,
+  REWARD_TEMPLATES,
+  SIDE_TEMPLATES,
+  addDays,
+  checkPurchase,
   emit,
-  levelFromXp,
   questReward,
+  rewardRank,
   strengthDescription,
   summarize,
+  type Completion,
   type CompletionVersion,
   type FitnessBaseline,
   type PlayerSettings,
+  type Purchase,
   type Quest,
+  type QuestStage,
+  type Reward,
+  type RewardSpecial,
   type StatKey,
+  type Summary,
 } from '../engine'
 import { db, LOCAL_USER, newId } from './db'
 
@@ -21,6 +33,8 @@ export interface AwakeningAnswers {
   stats: StatKey[]
   fitness: FitnessBaseline | null
   dailyTemplateIds: string[]
+  mainTemplateIds: string[]
+  rewardTemplateIds: string[]
   settings: PlayerSettings
 }
 
@@ -43,7 +57,10 @@ export async function awaken(answers: AwakeningAnswers): Promise<void> {
       updatedAt: now + i,
     }
   })
-  await db.transaction('rw', db.players, db.quests, async () => {
+  answers.mainTemplateIds.forEach((id, i) => quests.push(mainFromTemplate(id, now + 100 + i)))
+  const rewards = answers.rewardTemplateIds.map((id, i) => rewardFromTemplate(id, now + i))
+
+  await db.transaction('rw', db.players, db.quests, db.rewards, async () => {
     await db.players.put({
       id: LOCAL_USER,
       userId: LOCAL_USER,
@@ -55,84 +72,309 @@ export async function awaken(answers: AwakeningAnswers): Promise<void> {
       updatedAt: now,
     })
     await db.quests.bulkPut(quests)
+    await db.rewards.bulkPut(rewards)
   })
   emit({ type: 'player.awakened', name: answers.name, stats: answers.stats })
+}
+
+export async function updateSettings(patch: Partial<PlayerSettings>): Promise<void> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player) return
+  await db.players.update(LOCAL_USER, { settings: { ...player.settings, ...patch }, updatedAt: Date.now() })
 }
 
 async function snapshot() {
   const player = await db.players.get(LOCAL_USER)
   if (!player) throw new Error('No player yet')
-  const quests = await db.quests.where('userId').equals(LOCAL_USER).toArray()
-  const completions = await db.completions.where('userId').equals(LOCAL_USER).toArray()
-  return { player, quests, completions, summary: summarize(player, quests, completions, new Date()) }
+  const [quests, completions, purchases, savings] = await Promise.all([
+    db.quests.where('userId').equals(LOCAL_USER).toArray(),
+    db.completions.where('userId').equals(LOCAL_USER).toArray(),
+    db.purchases.where('userId').equals(LOCAL_USER).toArray(),
+    db.savings.where('userId').equals(LOCAL_USER).toArray(),
+  ])
+  const summary = summarize(player, quests, completions, new Date(), { purchases, savings })
+  return { player, quests, completions, purchases, savings, summary }
 }
 
-export async function completeQuest(quest: Quest, version: CompletionVersion): Promise<void> {
+/** Announces level-ups, a full wallet and a met savings goal after any change. */
+async function announceProgress(before: Summary): Promise<void> {
+  const { summary: after } = await snapshot()
+  if (after.level.level > before.level.level) emit({ type: 'level.up', level: after.level.level })
+  const { budget } = after.wallet
+  if (budget > 0 && before.wallet.earned < budget && after.wallet.earned >= budget) {
+    emit({ type: 'wallet.full', month: after.wallet.month, budget })
+  }
+  if (after.savings.target > 0 && !before.savings.met && after.savings.met) {
+    emit({ type: 'savings.goalMet', month: after.wallet.month, target: after.savings.target })
+  }
+}
+
+// ---- Quests ----
+
+/** Completes a daily (today), a side quest (this week) or the current stage of a main quest. */
+export async function completeQuest(quest: Quest, version: CompletionVersion = 'full'): Promise<void> {
   const before = await snapshot()
-  const day = before.summary.today
-  if (before.summary.todayDone.has(quest.id)) return
+  const { summary, player } = before
+  if (!quest.active) return
+
+  let stage: QuestStage | undefined
+  if (quest.kind === 'daily' && summary.todayDone.has(quest.id)) return
+  if (quest.kind === 'side' && summary.weekDone.has(quest.id)) return
+  if (quest.kind === 'main') {
+    const current = summary.mainProgress.get(quest.id)?.current
+    stage = quest.stages?.find(s => s.id === current)
+    if (!stage) return
+    version = 'full'
+  }
 
   const activeDailies = before.quests.filter(q => q.kind === 'daily' && q.active).length
-  const reward = questReward(quest, version, before.player.settings.monthlyBudget, activeDailies)
-  const completion = {
+  const reward = questReward(quest, version, player.settings.monthlyBudget, activeDailies, stage)
+  const completion: Completion = {
     id: newId(),
     userId: LOCAL_USER,
     questId: quest.id,
     stat: quest.stat,
-    day,
+    day: summary.today,
     version,
+    ...(stage ? { stageId: stage.id } : {}),
     xp: reward.xp,
     dollars: reward.dollars,
     createdAt: Date.now(),
   }
   await db.completions.add(completion)
-  emit({ type: 'quest.completed', completion, questTitle: quest.title })
-
-  const after = await snapshot()
-  const newLevel = levelFromXp(after.summary.totalXp).level
-  if (newLevel > before.summary.level.level) emit({ type: 'level.up', level: newLevel })
-  const budget = after.player.settings.monthlyBudget
-  if (before.summary.wallet.earned < budget && after.summary.wallet.earned >= budget) {
-    emit({ type: 'wallet.full', month: after.summary.wallet.month, budget })
+  emit({ type: 'quest.completed', completion, questTitle: stage ? `${quest.title}: ${stage.title}` : quest.title })
+  if (stage && quest.stages?.[quest.stages.length - 1].id === stage.id) {
+    emit({ type: 'mainQuest.cleared', questId: quest.id, questTitle: quest.title })
   }
+  await announceProgress(summary)
 }
 
+/** Undoes today's daily, this week's side quest, or the last cleared main quest stage. */
 export async function undoQuest(quest: Quest): Promise<void> {
-  const { summary } = await snapshot()
-  const done = summary.todayDone.get(quest.id)
+  const { summary, completions } = await snapshot()
+  let done: Completion | undefined
+  if (quest.kind === 'daily') done = summary.todayDone.get(quest.id)
+  if (quest.kind === 'side') done = summary.weekDone.get(quest.id)
+  if (quest.kind === 'main') {
+    done = completions.filter(c => c.questId === quest.id && c.stageId).sort((a, b) => b.createdAt - a.createdAt)[0]
+  }
   if (!done) return
   await db.completions.delete(done.id)
   emit({ type: 'quest.undone', questId: quest.id, questTitle: quest.title })
 }
 
+export async function addSideQuest(input: { stat: StatKey; title: string; description: string; minVersion: string; templateId?: string }): Promise<void> {
+  const now = Date.now()
+  await db.quests.add({
+    id: newId(),
+    userId: LOCAL_USER,
+    kind: 'side',
+    stat: input.stat,
+    title: input.title.trim(),
+    description: input.description.trim(),
+    minVersion: input.minVersion.trim() || 'Half of it',
+    active: true,
+    templateId: input.templateId ?? null,
+    createdAt: now,
+    updatedAt: now,
+  })
+}
+
+export async function addSideFromTemplate(templateId: string): Promise<void> {
+  const t = SIDE_TEMPLATES.find(t => t.id === templateId)
+  if (t) await addSideQuest({ ...t, templateId: t.id })
+}
+
+export async function addMainFromTemplate(templateId: string): Promise<void> {
+  await db.quests.add(mainFromTemplate(templateId, Date.now()))
+}
+
+/** A custom main quest: one stage per line, each paying a mid-size stage reward. */
+export async function addCustomMain(input: { stat: StatKey; title: string; description: string; stageTitles: string[] }): Promise<void> {
+  const now = Date.now()
+  await db.quests.add({
+    id: newId(),
+    userId: LOCAL_USER,
+    kind: 'main',
+    stat: input.stat,
+    title: input.title.trim(),
+    description: input.description.trim(),
+    minVersion: '',
+    active: true,
+    templateId: null,
+    stages: input.stageTitles.map((title, i) => ({ id: `s${i + 1}`, title, description: '', xp: 150, basePay: 30 })),
+    createdAt: now,
+    updatedAt: now,
+  })
+}
+
+/** Removes a quest from the board. Its history stays, so XP and money already earned are kept. */
+export async function archiveQuest(quest: Quest): Promise<void> {
+  await db.quests.update(quest.id, { active: false, updatedAt: Date.now() })
+}
+
+function mainFromTemplate(templateId: string, at: number): Quest {
+  const t = MAIN_TEMPLATES.find(t => t.id === templateId)!
+  return {
+    id: newId(),
+    userId: LOCAL_USER,
+    kind: 'main',
+    stat: t.stat,
+    title: t.title,
+    description: t.description,
+    minVersion: '',
+    active: true,
+    templateId: t.id,
+    stages: t.stages.map(s => ({ ...s })),
+    createdAt: at,
+    updatedAt: at,
+  }
+}
+
+// ---- Rewards ----
+
+export interface RewardInput {
+  title: string
+  price: number
+  category: string
+  special: RewardSpecial
+  statGate?: { stat: StatKey; min: number } | null
+  templateId?: string
+}
+
+function newReward(input: RewardInput, at: number): Reward {
+  return {
+    id: newId(),
+    userId: LOCAL_USER,
+    title: input.title.trim(),
+    price: Math.max(0, Math.round(input.price * 100) / 100),
+    category: input.category.trim() || 'Other',
+    special: input.special,
+    statGate: input.statGate ?? null,
+    active: true,
+    templateId: input.templateId ?? null,
+    createdAt: at,
+    updatedAt: at,
+  }
+}
+
+function rewardFromTemplate(templateId: string, at: number): Reward {
+  const t = REWARD_TEMPLATES.find(t => t.id === templateId)!
+  return newReward({ ...t, templateId: t.id }, at)
+}
+
+export async function addReward(input: RewardInput): Promise<void> {
+  await db.rewards.add(newReward(input, Date.now()))
+}
+
+/** Adds suggested rewards the player doesn't already have. */
+export async function addSuggestedRewards(templateIds: string[]): Promise<void> {
+  const existing = new Set((await db.rewards.where('userId').equals(LOCAL_USER).toArray()).filter(r => r.active).map(r => r.templateId))
+  const now = Date.now()
+  await db.rewards.bulkAdd(templateIds.filter(id => !existing.has(id)).map((id, i) => rewardFromTemplate(id, now + i)))
+}
+
+export async function removeReward(reward: Reward): Promise<void> {
+  await db.rewards.update(reward.id, { active: false, updatedAt: Date.now() })
+}
+
+/** Buys a reward if every gate passes. Returns why not when it can't. */
+export async function buyReward(reward: Reward): Promise<string | null> {
+  const { summary } = await snapshot()
+  const check = checkPurchase(reward, {
+    level: summary.level.level,
+    stats: summary.stats,
+    wallet: summary.wallet.available,
+    vault: summary.wallet.vault,
+    savingsMet: summary.savings.met,
+    mainQuestsCleared: summary.mainQuestsCleared,
+  })
+  if (!check.ok) return check.reason
+
+  const purchase: Purchase = {
+    id: newId(),
+    userId: LOCAL_USER,
+    rewardId: reward.id,
+    title: reward.title,
+    price: reward.price,
+    rank: rewardRank(reward.price),
+    special: reward.special,
+    day: summary.today,
+    fromWallet: check.fromWallet,
+    fromVault: check.fromVault,
+    xp: reward.special === 'date' ? DATE_XP : 0,
+    stat: reward.special === 'date' ? 'CHA' : null,
+    createdAt: Date.now(),
+  }
+  await db.purchases.add(purchase)
+  emit({ type: 'reward.purchased', purchase })
+  if (purchase.special === 'bigNight') emit({ type: 'recovery.granted', day: addDays(purchase.day, 1) })
+  await announceProgress(summary)
+  return null
+}
+
+/** Refunds a purchase made today, putting the money back where it came from. */
+export async function refundPurchase(purchase: Purchase): Promise<void> {
+  const { summary } = await snapshot()
+  if (purchase.day !== summary.today) return
+  await db.purchases.delete(purchase.id)
+  emit({ type: 'reward.refunded', purchase })
+}
+
+// ---- Savings gate ----
+
+export async function logSavings(kind: 'saved' | 'income', amount: number): Promise<void> {
+  if (!(amount > 0)) return
+  const { summary } = await snapshot()
+  await db.savings.add({
+    id: newId(),
+    userId: LOCAL_USER,
+    kind,
+    amount: Math.round(amount * 100) / 100,
+    day: summary.today,
+    createdAt: Date.now(),
+  })
+  emit({ type: 'savings.logged', kind, amount })
+  await announceProgress(summary)
+}
+
+export async function deleteSavings(id: string): Promise<void> {
+  await db.savings.delete(id)
+}
+
 // ---- Save file: protects progress while data only lives in this browser ----
 
 const SAVE_FORMAT = 'livinghud-save'
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings]
 
 export async function exportSave(): Promise<string> {
-  const [players, quests, completions] = await Promise.all([
-    db.players.toArray(),
-    db.quests.toArray(),
-    db.completions.toArray(),
-  ])
-  return JSON.stringify({ format: SAVE_FORMAT, version: 1, exportedAt: Date.now(), players, quests, completions }, null, 2)
+  const [players, quests, completions, rewards, purchases, savings] = await Promise.all(tables().map(t => t.toArray()))
+  return JSON.stringify(
+    { format: SAVE_FORMAT, version: 2, exportedAt: Date.now(), players, quests, completions, rewards, purchases, savings },
+    null,
+    2,
+  )
 }
 
+/** Loads a save file. Phase 1 (version 1) saves load too; they just have no rewards yet. */
 export async function importSave(json: string): Promise<void> {
   const data = JSON.parse(json)
   if (data?.format !== SAVE_FORMAT || !Array.isArray(data.players)) {
     throw new Error('This is not a LivingHUD save file.')
   }
-  await db.transaction('rw', db.players, db.quests, db.completions, async () => {
-    await Promise.all([db.players.clear(), db.quests.clear(), db.completions.clear()])
+  await db.transaction('rw', tables(), async () => {
+    await Promise.all(tables().map(t => t.clear()))
     await db.players.bulkPut(data.players)
     await db.quests.bulkPut(data.quests ?? [])
     await db.completions.bulkPut(data.completions ?? [])
+    await db.rewards.bulkPut(data.rewards ?? [])
+    await db.purchases.bulkPut(data.purchases ?? [])
+    await db.savings.bulkPut(data.savings ?? [])
   })
 }
 
 export async function resetEverything(): Promise<void> {
-  await db.transaction('rw', db.players, db.quests, db.completions, async () => {
-    await Promise.all([db.players.clear(), db.quests.clear(), db.completions.clear()])
+  await db.transaction('rw', tables(), async () => {
+    await Promise.all(tables().map(t => t.clear()))
   })
 }
