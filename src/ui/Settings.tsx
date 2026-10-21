@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
-import type { Difficulty, Player, SavingsGoal } from '../engine'
+import type { Difficulty, Player, Quest, SavingsGoal } from '../engine'
 import { exportSave, importSave, resetEverything, updateSettings } from '../db/actions'
 import { forgetSync } from '../db/sync'
 import { SystemWindow } from './SystemWindow'
 import { SyncPanel } from './CloudSync'
+import { Automations } from './Automations'
 
-export function Settings({ player, onClose }: { player: Player; onClose: () => void }) {
+export function Settings({ player, quests, onClose }: { player: Player; quests: Quest[]; onClose: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState('')
   const [budget, setBudget] = useState(String(player.settings.monthlyBudget))
@@ -80,6 +81,8 @@ export function Settings({ player, onClose }: { player: Player; onClose: () => v
         </div>
         {saved && <p className="system-line">{saved}</p>}
       </SystemWindow>
+
+      <Automations player={player} quests={quests} />
 
       <SyncPanel />
 

@@ -243,6 +243,42 @@ button.icon { padding: 2px 8px; font-size: 1.1rem; line-height: 1; border-color:
 .lock-reason { color: var(--muted); font-size: 0.88rem; margin-right: auto; }
 .lock-reason::before { content: '🔒 '; }
 
+/* ---- Workout ---- */
+.routine-line { margin: 6px 0 0; font-size: 0.85rem; }
+.quest-actions .workout-button { margin-right: auto; }
+.quest.done .workout-button { margin-right: 0; }
+.routine-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.routine-item {
+  width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; text-align: left;
+  background: rgba(5, 10, 20, 0.6); color: var(--text); border: 1px solid rgba(47, 143, 255, 0.3);
+  box-shadow: none; font-weight: 400; letter-spacing: 0; padding: 8px 12px;
+}
+.routine-item .bar { grid-column: 1 / -1; }
+.routine-item.picked { border-color: var(--accent); box-shadow: 0 0 10px var(--glow); }
+.routine-item.done .routine-count { color: var(--good); }
+.routine-count { font-weight: 700; }
+.live-count { text-align: center; margin-bottom: 8px; }
+.live-number { font-size: 4rem; font-weight: 700; color: var(--accent); text-shadow: 0 0 18px var(--glow); line-height: 1; }
+.camera { position: relative; margin: 12px 0 8px; border: 1px solid rgba(47, 143, 255, 0.4); border-radius: var(--radius); overflow: hidden; background: #000; aspect-ratio: 4 / 3; display: none; }
+.camera.on { display: block; }
+.camera video, .camera canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.camera.mirrored video, .camera.mirrored canvas { transform: scaleX(-1); }
+.tracking-badge { position: absolute; left: 8px; top: 8px; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; background: rgba(5, 10, 20, 0.8); color: var(--gold); border: 1px solid var(--gold); }
+.tracking-badge.ok { color: var(--good); border-color: var(--good); }
+.check { flex-direction: row; align-items: center; gap: 6px; margin: 0; }
+.check input { width: auto; }
+.manual { margin-top: 12px; }
+
+/* ---- Auto-complete ---- */
+.howto { margin: 0 0 12px; border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 8px 12px; }
+.howto summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.howto ol { padding-left: 1.3em; margin: 10px 0; }
+.howto li { margin-bottom: 6px; line-height: 1.4; }
+.howto ul { padding-left: 1.1em; margin: 6px 0; }
+.automations li { flex-wrap: wrap; }
+.automations .quest-title { flex: 1; min-width: 50%; }
+.link-buttons { display: flex; gap: 6px; }
+
 /* ---- Cloud sync ---- */
 .sync-state { color: var(--muted); }
 .sync-state.sync-synced { color: var(--good); }

@@ -2,7 +2,7 @@
 // Phase 5 adds Supabase sync on top; records already carry userId + timestamps.
 
 import Dexie, { type EntityTable } from 'dexie'
-import type { Completion, Player, Purchase, Quest, Reward, SavingsEntry } from '../engine'
+import type { Completion, ExerciseSet, Player, Purchase, Quest, Reward, SavingsEntry } from '../engine'
 
 export const LOCAL_USER = 'local'
 
@@ -13,6 +13,7 @@ export const db = new Dexie('livinghud') as Dexie & {
   rewards: EntityTable<Reward, 'id'>
   purchases: EntityTable<Purchase, 'id'>
   savings: EntityTable<SavingsEntry, 'id'>
+  sets: EntityTable<ExerciseSet, 'id'>
 }
 
 db.version(1).stores({
@@ -29,3 +30,8 @@ db.version(2).stores({
 })
 
 export const newId = () => crypto.randomUUID()
+
+// Strength routine sets, logged by the rep counter or by hand.
+db.version(3).stores({
+  sets: 'id, userId, day',
+})

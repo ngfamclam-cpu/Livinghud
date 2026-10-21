@@ -33,6 +33,8 @@ export interface PlayerSettings {
   resetHour: number
   wakeTime: string
   bedTime: string
+  /** Secret in this player's auto-complete links (see api/trigger.ts). */
+  triggerToken?: string
 }
 
 export interface Player {
@@ -140,5 +142,21 @@ export interface SavingsEntry {
   amount: number
   /** Game day logged, YYYY-MM-DD. Counts toward that day's month. */
   day: string
+  createdAt: number
+}
+
+/** One of the strength routine's exercises; plankSeconds is timed, the rest are reps. */
+export type ExerciseKey = keyof FitnessBaseline
+
+/** A set of the strength routine. Today's progress is the sum of today's sets. */
+export interface ExerciseSet {
+  id: string
+  userId: string
+  exercise: ExerciseKey
+  /** Reps, or seconds for the plank. */
+  amount: number
+  /** Game day, YYYY-MM-DD. */
+  day: string
+  source: 'camera' | 'manual'
   createdAt: number
 }

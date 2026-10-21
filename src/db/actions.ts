@@ -8,14 +8,18 @@ import {
   REWARD_TEMPLATES,
   SIDE_TEMPLATES,
   addDays,
+  dayKey,
+  weekOf,
   checkPurchase,
   emit,
   questReward,
+  routineLevel,
   rewardRank,
   strengthDescription,
   summarize,
   type Completion,
   type CompletionVersion,
+  type ExerciseKey,
   type FitnessBaseline,
   type PlayerSettings,
   type Purchase,
@@ -86,14 +90,15 @@ export async function updateSettings(patch: Partial<PlayerSettings>): Promise<vo
 async function snapshot() {
   const player = await db.players.get(LOCAL_USER)
   if (!player) throw new Error('No player yet')
-  const [quests, completions, purchases, savings] = await Promise.all([
+  const [quests, completions, purchases, savings, sets] = await Promise.all([
     db.quests.where('userId').equals(LOCAL_USER).toArray(),
     db.completions.where('userId').equals(LOCAL_USER).toArray(),
     db.purchases.where('userId').equals(LOCAL_USER).toArray(),
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
+    db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const summary = summarize(player, quests, completions, new Date(), { purchases, savings })
-  return { player, quests, completions, purchases, savings, summary }
+  const summary = summarize(player, quests, completions, new Date(), { purchases, savings, sets })
+  return { player, quests, completions, purchases, savings, sets, summary }
 }
 
 /** Announces level-ups, a full wallet and a met savings goal after any change. */
@@ -112,18 +117,26 @@ async function announceProgress(before: Summary): Promise<void> {
 // ---- Quests ----
 
 /** Completes a daily (today), a side quest (this week) or the current stage of a main quest. */
-export async function completeQuest(quest: Quest, version: CompletionVersion = 'full'): Promise<void> {
+export async function completeQuest(
+  quest: Quest,
+  version: CompletionVersion = 'full',
+  { at, via }: { at?: number; via?: 'automation' } = {},
+): Promise<boolean> {
   const before = await snapshot()
   const { summary, player } = before
-  if (!quest.active) return
+  if (!quest.active) return false
 
+  // An automation can report something that happened before the app was opened:
+  // it counts for the game day it happened on.
+  const day = at ? dayKey(new Date(Math.min(at, Date.now())), player.settings.resetHour) : summary.today
+  const mine = before.completions.filter(c => c.questId === quest.id)
   let stage: QuestStage | undefined
-  if (quest.kind === 'daily' && summary.todayDone.has(quest.id)) return
-  if (quest.kind === 'side' && summary.weekDone.has(quest.id)) return
+  if (quest.kind === 'daily' && mine.some(c => c.day === day)) return false
+  if (quest.kind === 'side' && mine.some(c => weekOf(c.day) === weekOf(day))) return false
   if (quest.kind === 'main') {
     const current = summary.mainProgress.get(quest.id)?.current
     stage = quest.stages?.find(s => s.id === current)
-    if (!stage) return
+    if (!stage) return false
     version = 'full'
   }
 
@@ -134,7 +147,7 @@ export async function completeQuest(quest: Quest, version: CompletionVersion = '
     userId: LOCAL_USER,
     questId: quest.id,
     stat: quest.stat,
-    day: summary.today,
+    day,
     version,
     ...(stage ? { stageId: stage.id } : {}),
     xp: reward.xp,
@@ -142,11 +155,12 @@ export async function completeQuest(quest: Quest, version: CompletionVersion = '
     createdAt: Date.now(),
   }
   await db.completions.add(completion)
-  emit({ type: 'quest.completed', completion, questTitle: stage ? `${quest.title}: ${stage.title}` : quest.title })
+  emit({ type: 'quest.completed', completion, questTitle: stage ? `${quest.title}: ${stage.title}` : quest.title, via })
   if (stage && quest.stages?.[quest.stages.length - 1].id === stage.id) {
     emit({ type: 'mainQuest.cleared', questId: quest.id, questTitle: quest.title })
   }
   await announceProgress(summary)
+  return true
 }
 
 /** Undoes today's daily, this week's side quest, or the last cleared main quest stage. */
@@ -342,15 +356,70 @@ export async function deleteSavings(id: string): Promise<void> {
   await db.savings.delete(id)
 }
 
+// ---- Auto-complete links ----
+
+/** The secret in this player's auto-complete links. Saved on the player, so every synced device shares it. */
+export async function ensureTriggerToken(): Promise<string | null> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player) return null
+  if (player.settings.triggerToken) return player.settings.triggerToken
+  return resetTriggerToken()
+}
+
+/** Makes a new secret; every old auto-complete link stops working. */
+export async function resetTriggerToken(): Promise<string> {
+  const token = randomCode()
+  await updateSettings({ triggerToken: token })
+  return token
+}
+
+/** Applies a completion an automation sent while the app was closed. */
+export async function completeFromTrigger(questId: string, version: CompletionVersion, at: number): Promise<void> {
+  const quest = await db.quests.get(questId)
+  if (quest?.userId !== LOCAL_USER) return
+  await completeQuest(quest, version, { at, via: 'automation' })
+}
+
+// No 0/O or 1/I, so a code copied by hand can't be misread. 25 characters is about 125 bits.
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+export function randomCode(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(25)), b => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('')
+}
+
+// ---- Strength routine ----
+
+/** Logs a set of the strength routine and clears the quest once every target is hit. */
+export async function logSet(exercise: ExerciseKey, amount: number, source: 'camera' | 'manual'): Promise<void> {
+  amount = Math.floor(amount)
+  if (!(amount > 0)) return
+  const { summary, quests } = await snapshot()
+  await db.sets.add({ id: newId(), userId: LOCAL_USER, exercise, amount, day: summary.today, source, createdAt: Date.now() })
+  const after = await snapshot()
+  const routine = after.summary.routine
+  if (!routine) return
+  emit({ type: 'workout.set', exercise, amount, total: routine.done[exercise] ?? 0, target: routine.targets[exercise] ?? 0 })
+
+  const quest = quests.find(q => q.kind === 'daily' && q.active && q.templateId === 'str-routine')
+  if (quest && !after.summary.todayDone.has(quest.id) && routineLevel(routine.targets, routine.done) === 'full') {
+    await completeQuest(quest, 'full')
+  }
+}
+
+export async function deleteSet(id: string): Promise<void> {
+  await db.sets.delete(id)
+}
+
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets]
+/** The record lists a save file holds, in order. */
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings] = await Promise.all(tables().map(t => t.toArray()))
-  return { format: SAVE_FORMAT, version: 2, players, quests, completions, rewards, purchases, savings }
+  const [players, quests, completions, rewards, purchases, savings, sets] = await Promise.all(tables().map(t => t.toArray()))
+  return { format: SAVE_FORMAT, version: 3, players, quests, completions, rewards, purchases, savings, sets }
 }
 
 export async function exportSave(): Promise<string> {
@@ -371,6 +440,7 @@ export async function importSave(json: string): Promise<void> {
     await db.rewards.bulkPut(data.rewards ?? [])
     await db.purchases.bulkPut(data.purchases ?? [])
     await db.savings.bulkPut(data.savings ?? [])
+    await db.sets.bulkPut(data.sets ?? [])
   })
 }
 

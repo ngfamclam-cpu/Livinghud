@@ -10,6 +10,14 @@ This is **Phase 2**. On top of Phase 1 (the Awakening signup, the player HUD, da
 - **Special rewards**: dates earn CHA XP; a rave or big night out grants a Recovery Day for the next day (streaks and stats are protected).
 - **Side quests** (reset every Monday) and **main quests** cleared stage by stage. The first suggested main quest is Side income.
 
+## Workout rep counter
+
+Tap **Workout** on the strength routine. Prop your phone up side-on, tap **Start camera**, and the counter tracks pushups, squats and glute bridges, and times your plank while your body is straight. It counts out loud and clears the quest when you hit every target. The tracking runs entirely on your phone; no video leaves it. Pull-ups, or anything the camera misses, can be added by hand.
+
+## Auto-complete with your phone
+
+Settings → **Auto-complete** gives every quest a private link. Put it in an Android automation app such as MacroDroid (trigger: NFC sticker, arriving at the gym, home Wi-Fi, a time of day; action: HTTP Request) and the quest clears itself, even with LivingHUD closed. It counts for the moment the link was opened.
+
 ## Cloud sync
 
 Your progress saves to the cloud by itself, stored in this project's own Vercel Blob storage (no other service). Each character has a secret **sync code**, shown in Settings. Enter it on another phone or computer to load the same character there.
@@ -39,7 +47,9 @@ Other commands:
 | --- | --- |
 | `src/engine/` | The game rules: XP, levels, pay, stats, ranks, events. No screens, so the phone app, glasses and AI System can reuse it later. |
 | `src/db/` | Saving to the browser's database, every action that changes data (complete a quest, undo, save file), and cloud sync. |
-| `api/` | The Vercel Function that stores cloud saves. |
+| `api/` | Vercel Functions: cloud saves (`sync.ts`) and auto-complete links (`trigger.ts`). |
+| `server/` | Storage helpers the functions share. |
+| `src/capture/` | Phone-camera body tracking for the rep counter. |
 | `src/ui/` | The screens: Awakening signup, HUD, Quest board, Reward Shop, settings and System pop-ups. |
 
 Every action is announced on an event bus (`src/engine/events.ts`), such as `quest.completed` or `level.up`. Screens only listen, which is how the smart-glasses notifications will plug in later.

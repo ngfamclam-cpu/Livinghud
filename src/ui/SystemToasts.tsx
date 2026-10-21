@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { onGameEvent, type GameEvent } from '../engine'
+import { EXERCISES, onGameEvent, type GameEvent } from '../engine'
 
 interface Toast {
   id: number
@@ -13,7 +13,7 @@ const MAX_VISIBLE = 2
 function toastFor(event: GameEvent): Toast | null {
   switch (event.type) {
     case 'quest.completed':
-      return { id: nextId++, text: `Quest cleared: ${event.questTitle}  +${event.completion.xp} XP  +$${event.completion.dollars.toFixed(2)}` }
+      return { id: nextId++, text: `${event.via === 'automation' ? 'Auto-cleared' : 'Quest cleared'}: ${event.questTitle}  +${event.completion.xp} XP  +$${event.completion.dollars.toFixed(2)}` }
     case 'level.up':
       return { id: nextId++, text: `LEVEL UP! You are now level ${event.level}.`, big: true }
     case 'wallet.full':
@@ -33,6 +33,11 @@ function toastFor(event: GameEvent): Toast | null {
       return { id: nextId++, text: 'Recovery Day token granted for tomorrow. Your streaks are safe.', big: true }
     case 'savings.logged':
       return { id: nextId++, text: `${event.kind === 'saved' ? 'Savings' : 'Income'} logged: $${event.amount.toFixed(2)}` }
+    case 'workout.set': {
+      const name = EXERCISES.find(e => e.key === event.exercise)?.name ?? event.exercise
+      const unit = event.exercise === 'plankSeconds' ? 's' : ''
+      return { id: nextId++, text: `${name} +${event.amount}${unit}  (${Math.min(event.total, event.target)}/${event.target}${unit})` }
+    }
     case 'savings.goalMet':
       return { id: nextId++, text: `Savings goal met: $${event.target.toFixed(2)}. The Reward Shop is open.`, big: true }
     default:
