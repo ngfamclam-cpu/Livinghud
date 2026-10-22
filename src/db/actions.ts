@@ -6,6 +6,7 @@ import {
   DATE_XP,
   MAIN_TEMPLATES,
   REWARD_TEMPLATES,
+  REWARD_IDEAS,
   SIDE_TEMPLATES,
   addDays,
   dayKey,
@@ -333,7 +334,7 @@ function newReward(input: RewardInput, at: number): Reward {
 }
 
 function rewardFromTemplate(templateId: string, at: number): Reward {
-  const t = REWARD_TEMPLATES.find(t => t.id === templateId)!
+  const t = [...REWARD_TEMPLATES, ...REWARD_IDEAS].find(t => t.id === templateId)!
   return newReward({ ...t, templateId: t.id }, at)
 }
 
@@ -346,6 +347,38 @@ export async function addSuggestedRewards(templateIds: string[]): Promise<void> 
   const existing = new Set((await db.rewards.where('userId').equals(LOCAL_USER).toArray()).filter(r => r.active).map(r => r.templateId))
   const now = Date.now()
   await db.rewards.bulkAdd(templateIds.filter(id => !existing.has(id)).map((id, i) => rewardFromTemplate(id, now + i)))
+}
+
+/** Changes a reward's name, price, category or type. Its rank follows the new price. */
+export async function updateReward(id: string, patch: Pick<RewardInput, 'title' | 'price' | 'category' | 'special'>): Promise<void> {
+  await db.rewards.update(id, {
+    title: patch.title.trim(),
+    price: Math.max(0, Math.round(patch.price * 100) / 100),
+    category: patch.category.trim() || 'Other',
+    special: patch.special,
+    updatedAt: Date.now(),
+  })
+}
+
+/**
+ * Buys something that isn't on the list, as needed. Same gates as any reward
+ * (savings goal, level for its rank, wallet or Vault). Kept in the shop only if
+ * asked; otherwise it's just in the purchase history. Returns why not if it can't.
+ */
+export async function buyOneOff(input: RewardInput, keep: boolean): Promise<string | null> {
+  const reward = newReward(input, Date.now())
+  const { summary } = await snapshot()
+  const check = checkPurchase(reward, {
+    level: summary.level.level,
+    stats: summary.stats,
+    wallet: summary.wallet.available,
+    vault: summary.wallet.vault,
+    savingsMet: summary.savings.met,
+    mainQuestsCleared: summary.mainQuestsCleared,
+  })
+  if (!check.ok) return check.reason
+  await db.rewards.add({ ...reward, active: keep })
+  return buyReward(reward)
 }
 
 export async function removeReward(reward: Reward): Promise<void> {

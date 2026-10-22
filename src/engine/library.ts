@@ -141,6 +141,9 @@ export interface RewardTemplate {
   category: string
   special: RewardSpecial
   statGate?: { stat: StatKey; min: number }
+  /** Ideas only: why it fits, and the stat it goes with (ideas for your stats show first). */
+  why?: string
+  stat?: StatKey
 }
 
 /** The starter reward list from the design doc, one or more per rank. */
@@ -168,4 +171,47 @@ export const REWARD_TEMPLATES: RewardTemplate[] = [
   { id: 'rw-trip', title: 'Trip', price: 1000, category: 'Travel', special: 'none' },
   { id: 'rw-festival-weekend', title: 'Festival weekend', price: 800, category: 'Travel', special: 'bigNight' },
   { id: 'rw-big-tech', title: 'Big tech purchase', price: 1200, category: 'Gear', special: 'none' },
+]
+
+/**
+ * More reward ideas, picked to go with the rest of the game (training, posture,
+ * automations, side income, social life). Prices are typical, not quotes: edit
+ * them after adding. Shown in the Shop, one tap to add.
+ */
+export const REWARD_IDEAS: RewardTemplate[] = [
+  // Training and posture
+  { id: 'idea-tripod', title: 'Phone tripod with clip', price: 20, category: 'Training gear', special: 'none', stat: 'STR', why: 'Props the phone for the rep counter and posture scans.' },
+  { id: 'idea-bands', title: 'Resistance band set', price: 25, category: 'Training gear', special: 'none', stat: 'STR', why: 'Face pulls and band pull-aparts, two of the best moves for forward head posture.' },
+  { id: 'idea-foam-roller', title: 'Foam roller', price: 30, category: 'Training gear', special: 'none', stat: 'STR', why: 'Upper-back extension over the roller after long desk days.' },
+  { id: 'idea-pullup-bar', title: 'Doorway pull-up bar', price: 35, category: 'Training gear', special: 'none', stat: 'STR', why: 'Pull days, dead hangs and pull-up negatives at home.' },
+  { id: 'idea-dip-bars', title: 'Parallettes / dip bars', price: 60, category: 'Training gear', special: 'none', stat: 'STR', why: 'Proper dips and L-sits for push days.' },
+  { id: 'idea-massage', title: 'Sports massage', price: 80, category: 'Recovery', special: 'none', stat: 'STR', why: 'A reward for a 30-day streak; good for tight hips and upper back.' },
+  { id: 'idea-dumbbells', title: 'Adjustable dumbbells', price: 250, category: 'Training gear', special: 'none', stat: 'STR', why: 'The next step once bodyweight targets get easy.', statGate: { stat: 'STR', min: 60 } },
+  // Desk setup (forward head posture)
+  { id: 'idea-laptop-stand', title: 'Laptop stand', price: 35, category: 'Desk setup', special: 'none', stat: 'STR', why: 'Screen at eye level: the simplest fix for screen-time head posture.' },
+  { id: 'idea-lumbar', title: 'Lumbar support cushion', price: 30, category: 'Desk setup', special: 'none', stat: 'STR', why: 'Helps you sit stacked instead of slumped.' },
+  { id: 'idea-monitor-arm', title: 'Monitor arm', price: 70, category: 'Desk setup', special: 'none', stat: 'STR', why: 'Puts the monitor at the right height and distance.' },
+  // Automations
+  { id: 'idea-nfc', title: 'NFC sticker pack', price: 12, category: 'Automation', special: 'none', stat: 'AGI', why: 'Tap-to-clear quests: vitamins, bedside reset, desk.' },
+  { id: 'idea-macrodroid-pro', title: 'MacroDroid Pro', price: 5, category: 'Automation', special: 'none', stat: 'AGI', why: 'Unlimited automations and no ads (one-time; check the Play Store price).' },
+  { id: 'idea-smartwatch', title: 'Fitness smartwatch', price: 300, category: 'Tech', special: 'none', stat: 'VIT', why: 'Steps and sleep for VIT quests, ready for the native app phase.' },
+  { id: 'idea-glasses', title: 'Smart glasses', price: 800, category: 'Tech', special: 'none', stat: 'INT', why: 'The end-game HUD. S-rank, so it needs the Vault and a cleared main quest.' },
+  // Vitality
+  { id: 'idea-bottle', title: 'Good water bottle', price: 30, category: 'Health', special: 'none', stat: 'VIT', why: 'Makes the 8-glasses part of your daily easier.' },
+  { id: 'idea-sleep-kit', title: 'Sleep mask and earplugs', price: 20, category: 'Health', special: 'none', stat: 'VIT', why: 'Cheap help for the 7.5-hour sleep target.' },
+  { id: 'idea-meal-kit', title: 'Healthy meal kit for a week', price: 70, category: 'Health', special: 'none', stat: 'VIT', why: 'A week of nutrition-checklist wins without the planning.' },
+  // Learning and side income
+  { id: 'idea-book', title: 'A new book', price: 18, category: 'Learning', special: 'none', stat: 'INT', why: 'Feeds "Read 10 pages" and the finish-a-book main quest.' },
+  { id: 'idea-course', title: 'Online course', price: 50, category: 'Learning', special: 'none', stat: 'INT', why: 'A skill for the side-income chain.' },
+  { id: 'idea-domain', title: 'Domain and site for my side hustle', price: 20, category: 'Side income', special: 'none', stat: 'WLT', why: 'The "Prepare" stage of your side-income main quest.' },
+  { id: 'idea-business-cards', title: 'Business cards', price: 25, category: 'Side income', special: 'none', stat: 'WLT', why: 'For "First contact": put it in front of 10 people.' },
+  // Social
+  { id: 'idea-escape-room', title: 'Escape room with friends', price: 35, category: 'Social', special: 'none', stat: 'CHA', why: 'A group activity that clears CHA side quests.' },
+  { id: 'idea-board-game', title: 'Board game for game night', price: 45, category: 'Social', special: 'none', stat: 'CHA', why: 'For the "Host a game night" stage of Grow your circle.' },
+  { id: 'idea-climbing', title: 'Climbing gym day pass', price: 25, category: 'Social', special: 'none', stat: 'CHA', why: 'Fun with a friend, and great for grip and back strength.' },
+  { id: 'idea-haircut', title: 'Fresh haircut', price: 35, category: 'Self-care', special: 'none', stat: 'CHA', why: 'Before a big date or night out.' },
+  { id: 'idea-outfit', title: 'New outfit', price: 120, category: 'Self-care', special: 'none', stat: 'CHA', why: 'For dates, raves and events.' },
+  // Gaming
+  { id: 'idea-game-pass', title: 'A month of a game subscription', price: 17, category: 'Gaming', special: 'none', why: 'A month of games for a month of streaks.' },
+  { id: 'idea-controller', title: 'New game controller', price: 60, category: 'Gaming', special: 'none' },
 ]
