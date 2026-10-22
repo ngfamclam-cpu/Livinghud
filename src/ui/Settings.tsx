@@ -5,6 +5,7 @@ import { forgetSync } from '../db/sync'
 import { SystemWindow } from './SystemWindow'
 import { SyncPanel } from './CloudSync'
 import { Automations } from './Automations'
+import { APP_VERSION } from '../pwa'
 
 export function Settings({ player, quests, onClose }: { player: Player; quests: Quest[]; onClose: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null)
@@ -99,6 +100,7 @@ export function Settings({ player, quests, onClose }: { player: Player; quests: 
           <button onClick={onClose}>Back to HUD</button>
         </div>
       </SystemWindow>
+      <p className="muted version">LivingHUD version {APP_VERSION}</p>
     </main>
   )
 }
