@@ -14,6 +14,7 @@ import { Party } from './ui/Party'
 import { Focus, type FocusPreset } from './ui/Focus'
 import { Journal } from './ui/Journal'
 import { Report } from './ui/Report'
+import { Plans } from './ui/Plans'
 import { Briefing } from './ui/Briefing'
 import { briefingSeen } from './ui/briefingSeen'
 import { dayKey, featureOn } from './engine'
@@ -31,11 +32,12 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
-  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | null>(null)
+  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | null>(null)
+  const [planId, setPlanId] = useState<string | null>(null)
   const [briefingDone, setBriefingDone] = useState(false)
   const [focusPreset, setFocusPreset] = useState<FocusPreset>({})
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
@@ -50,8 +52,10 @@ export default function App() {
       db.bosses.where('userId').equals(LOCAL_USER).toArray(),
       db.journal.where('userId').equals(LOCAL_USER).toArray(),
       db.surprises.where('userId').equals(LOCAL_USER).toArray(),
+      db.plans.where('userId').equals(LOCAL_USER).toArray(),
+      db.planFunds.where('userId').equals(LOCAL_USER).toArray(),
     ])
-    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises }
+    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds }
   })
 
   if (!data) return null
@@ -65,7 +69,7 @@ export default function App() {
   }
 
   const { player, quests, rewards, purchases, savings, sets, people, contacts, focusRuns, bosses } = data
-  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises })
+  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises, plans: data.plans, planFunds: data.planFunds })
   const reportInput = {
     stats: player.stats,
     quests,
@@ -82,6 +86,10 @@ export default function App() {
   // Not on signup day: the Awakening already says hello.
   const signupDay = dayKey(new Date(player.createdAt), player.settings.resetHour) === summary.today
   const showBriefing = !briefingDone && !signupDay && featureOn(player, 'briefing') && !briefingSeen(summary.today)
+  const openPlans = (id: string | null = null) => {
+    setPlanId(id)
+    setScreen('plans')
+  }
   const openFocus = (preset: FocusPreset = {}) => {
     setFocusPreset(preset)
     setScreen('focus')
@@ -96,6 +104,7 @@ export default function App() {
           <Workout summary={summary} sets={sets} player={player} onClose={() => setScreen(null)} onScan={() => setScreen('scan')} />
         )}
         {screen === 'scan' && <PostureScan scans={data.scans} onClose={() => setScreen('workout')} />}
+        {screen === 'plans' && <Plans summary={summary} openId={planId} onClose={() => setScreen(null)} />}
         {screen === 'report' && <Report summary={summary} input={reportInput} onClose={() => setScreen(null)} />}
         {screen === 'journal' && (
           <Journal summary={summary} entries={data.journal} completions={data.completions} quests={quests} onClose={() => setScreen(null)} />
@@ -118,9 +127,9 @@ export default function App() {
         ))}
       </nav>
       {current === 'party' && <Party summary={summary} contacts={contacts} />}
-      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} />}
+      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} />}
       {current === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} onFight={bossId => openFocus({ bossId })} />}
-      {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} />}
+      {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} onPlans={() => openPlans()} />}
       {current === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setTab('hud')} />}
       {showBriefing && (
         <Briefing player={player} quests={quests} summary={summary} onClose={() => setBriefingDone(true)} onReport={() => { setBriefingDone(true); setScreen('report') }} />

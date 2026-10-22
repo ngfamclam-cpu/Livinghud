@@ -24,6 +24,10 @@ import {
   STREAK_BONUS,
   THEMES,
   SURPRISE_XP,
+  PLAN_TEMPLATES,
+  bookingBlock,
+  expeditionStages,
+  savedStageReached,
   dailySurprise,
   surpriseState,
   DEFAULT_BOND_DAYS,
@@ -45,6 +49,7 @@ import {
   type FitnessBaseline,
   type PlayerSettings,
   type Player,
+  type Plan,
   type Purchase,
   type Quest,
   type QuestStage,
@@ -137,15 +142,19 @@ async function snapshot() {
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
     db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const [people, contacts, focusRuns, bosses, journal, surprises] = await Promise.all([
+  const [people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds] = await Promise.all([
     db.people.where('userId').equals(LOCAL_USER).toArray(),
     db.contacts.where('userId').equals(LOCAL_USER).toArray(),
     db.focusRuns.where('userId').equals(LOCAL_USER).toArray(),
     db.bosses.where('userId').equals(LOCAL_USER).toArray(),
     db.journal.where('userId').equals(LOCAL_USER).toArray(),
     db.surprises.where('userId').equals(LOCAL_USER).toArray(),
+    db.plans.where('userId').equals(LOCAL_USER).toArray(),
+    db.planFunds.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const summary = summarize(player, quests, completions, new Date(), { purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises })
+  const summary = summarize(player, quests, completions, new Date(), {
+    purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds,
+  })
   return { player, quests, completions, purchases, savings, sets, people, contacts, focusRuns, bosses, summary }
 }
 
@@ -221,6 +230,11 @@ export async function completeQuest(
     emit({ type: 'mainQuest.cleared', questId: quest.id, questTitle: quest.title })
   }
   await announceProgress(summary)
+  // Clearing an Expedition stage by hand can make the next saving milestones due.
+  if (stage) {
+    const plan = await db.plans.where('userId').equals(LOCAL_USER).filter(p => p.questId === quest.id).first()
+    if (plan) await advancePlanQuest(plan.id)
+  }
   return true
 }
 
@@ -799,6 +813,138 @@ export async function clearSurprise(): Promise<void> {
   await announceProgress(summary)
 }
 
+// ---- Plans: raves, festivals, trips ----
+
+/** Starts a plan from a template (or blank), optionally with an Expedition main quest. */
+export async function createPlan(input: { templateId: string | null; name: string; date: string; withQuest: boolean }): Promise<string> {
+  const now = Date.now()
+  const t = PLAN_TEMPLATES.find(t => t.id === input.templateId)
+  const kind = t?.kind ?? 'trip'
+  const id = newId()
+  let questId: string | null = null
+  if (input.withQuest) {
+    questId = newId()
+    await db.quests.add({
+      id: questId,
+      userId: LOCAL_USER,
+      kind: 'main',
+      stat: 'WLT',
+      title: `Expedition: ${input.name.trim()}`,
+      description: `Save for and book ${input.name.trim()}. The saving stages clear themselves as the plan fills up.`,
+      minVersion: '',
+      active: true,
+      templateId: null,
+      stages: expeditionStages(kind),
+      createdAt: now,
+      updatedAt: now,
+    })
+  }
+  await db.plans.add({
+    id,
+    userId: LOCAL_USER,
+    name: input.name.trim(),
+    kind,
+    date: input.date,
+    items: (t?.items ?? []).map(i => ({ ...i, id: newId(), purchaseId: null })),
+    questId,
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+  })
+  return id
+}
+
+export async function updatePlan(id: string, patch: Partial<Pick<Plan, 'name' | 'date' | 'items' | 'status'>>): Promise<void> {
+  await db.plans.update(id, { ...patch, updatedAt: Date.now() })
+  await advancePlanQuest(id)
+}
+
+/** Moves money from the free Vault into a plan (negative returns it to the Vault). */
+export async function fundPlan(planId: string, amount: number): Promise<string | null> {
+  const { summary } = await snapshot()
+  const plan = await db.plans.get(planId)
+  const status = summary.plans.find(p => p.plan.id === planId)
+  if (!plan || !status) return 'Plan not found'
+  amount = Math.round(amount * 100) / 100
+  if (amount > 0 && amount > summary.wallet.vault) return `The Vault only has $${summary.wallet.vault.toFixed(2)} free`
+  if (amount < 0 && -amount > status.fund) return `The plan only has $${status.fund.toFixed(2)} unspent`
+  if (amount === 0) return null
+  await db.planFunds.add({ id: newId(), userId: LOCAL_USER, planId, amount, day: summary.today, createdAt: Date.now() })
+  if (amount > 0) emit({ type: 'plan.funded', name: plan.name, amount })
+  await advancePlanQuest(planId)
+  return null
+}
+
+/** Books one part of a plan, paid from the plan's fund. The money is the gate: no level needed. */
+export async function bookPlanItem(planId: string, itemId: string): Promise<string | null> {
+  const { summary } = await snapshot()
+  const plan = await db.plans.get(planId)
+  const status = summary.plans.find(p => p.plan.id === planId)
+  const item = plan?.items.find(i => i.id === itemId)
+  if (!plan || !status || !item || item.purchaseId) return 'Already booked'
+  const block = bookingBlock(item.cost, status.fund, summary.savings.met)
+  if (block) return block
+  const purchaseId = newId()
+  const bigNight = plan.kind !== 'trip' && item.kind === 'ticket'
+  await db.transaction('rw', db.purchases, db.planFunds, db.plans, async () => {
+    await db.purchases.add({
+      id: purchaseId,
+      userId: LOCAL_USER,
+      rewardId: `plan:${planId}`,
+      title: `${plan.name}: ${item.label}`,
+      price: item.cost,
+      rank: rewardRank(item.cost),
+      special: bigNight ? 'bigNight' : 'none',
+      day: summary.today,
+      ...(bigNight && plan.date ? { forDay: plan.date } : {}),
+      fromWallet: 0,
+      fromVault: item.cost,
+      xp: 0,
+      stat: null,
+      planId,
+      createdAt: Date.now(),
+    })
+    await db.planFunds.add({ id: newId(), userId: LOCAL_USER, planId, amount: -item.cost, day: summary.today, createdAt: Date.now() })
+    await db.plans.update(planId, { items: plan.items.map(i => (i.id === itemId ? { ...i, purchaseId } : i)), updatedAt: Date.now() })
+  })
+  emit({ type: 'plan.booked', name: plan.name, label: item.label, cost: item.cost })
+  await advancePlanQuest(planId)
+  return null
+}
+
+/** Un-books a part (e.g. a cancelled booking): the money goes back into the plan's fund. */
+export async function unbookPlanItem(planId: string, itemId: string): Promise<void> {
+  const { summary } = await snapshot()
+  const plan = await db.plans.get(planId)
+  const item = plan?.items.find(i => i.id === itemId)
+  if (!plan || !item?.purchaseId) return
+  await db.transaction('rw', db.purchases, db.planFunds, db.plans, async () => {
+    await db.purchases.delete(item.purchaseId!)
+    await db.planFunds.add({ id: newId(), userId: LOCAL_USER, planId, amount: item.cost, day: summary.today, createdAt: Date.now() })
+    await db.plans.update(planId, { items: plan.items.map(i => (i.id === itemId ? { ...i, purchaseId: null } : i)), updatedAt: Date.now() })
+  })
+}
+
+/** Ends a plan. Cancelling returns its unspent fund to the Vault; bookings stay as purchases. */
+export async function closePlan(planId: string, status: 'done' | 'cancelled'): Promise<void> {
+  const { summary } = await snapshot()
+  const fund = summary.plans.find(p => p.plan.id === planId)?.fund ?? 0
+  if (fund > 0) await db.planFunds.add({ id: newId(), userId: LOCAL_USER, planId, amount: -fund, day: summary.today, createdAt: Date.now() })
+  await db.plans.update(planId, { status, updatedAt: Date.now() })
+}
+
+/** Clears the plan's Expedition "save" stages the fund has reached, in order. */
+async function advancePlanQuest(planId: string): Promise<void> {
+  for (let guard = 0; guard < 6; guard++) {
+    const { summary, quests } = await snapshot()
+    const plan = summary.plans.find(p => p.plan.id === planId)
+    const quest = plan?.plan.questId ? quests.find(q => q.id === plan.plan.questId && q.active) : undefined
+    const current = quest ? summary.mainProgress.get(quest.id)?.current : null
+    if (!plan || !quest || !current || !savedStageReached(current, plan.progress)) return
+    await completeQuest(quest)
+  }
+}
+
 // ---- Titles and themes ----
 
 export async function setTitle(title: string | null): Promise<void> {
@@ -822,19 +968,19 @@ export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises] = await Promise.all(
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds] = await Promise.all(
     tables().map(t => t.toArray()),
   )
   return {
     format: SAVE_FORMAT,
-    version: 8,
-    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises,
+    version: 9,
+    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds,
   }
 }
 
@@ -864,6 +1010,8 @@ export async function importSave(json: string): Promise<void> {
     await db.bosses.bulkPut(data.bosses ?? [])
     await db.journal.bulkPut(data.journal ?? [])
     await db.surprises.bulkPut(data.surprises ?? [])
+    await db.plans.bulkPut(data.plans ?? [])
+    await db.planFunds.bulkPut(data.planFunds ?? [])
   })
 }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  featureOn,
   RANK_MIN_LEVEL,
   REWARD_RANKS,
   REWARD_TEMPLATES,
@@ -26,9 +27,10 @@ interface Props {
   purchases: Purchase[]
   savings: SavingsEntry[]
   summary: Summary
+  onPlans: () => void
 }
 
-export function Shop({ player, rewards, purchases, savings, summary }: Props) {
+export function Shop({ player, rewards, purchases, savings, summary, onPlans }: Props) {
   const [message, setMessage] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
   const active = rewards.filter(r => r.active).sort((a, b) => a.price - b.price)
@@ -80,6 +82,12 @@ export function Shop({ player, rewards, purchases, savings, summary }: Props) {
           E–B rewards spend the wallet first, then the Vault if the wallet is short. Wallet money left at the end of the month rolls into the Vault.
         </p>
         {message && <p className="system-line">{message}</p>}
+        {featureOn(player, 'plans') && (
+          <div className="row">
+            <span className="muted grow">{wallet.inPlans > 0 ? `${money(wallet.inPlans)} is set aside in plans.` : 'Saving for a rave, festival or trip?'}</span>
+            <button className="ghost small" onClick={onPlans}>Plans</button>
+          </div>
+        )}
       </SystemWindow>
 
       <SavingsGate player={player} savings={savings} summary={summary} />
@@ -147,7 +155,7 @@ export function Shop({ player, rewards, purchases, savings, summary }: Props) {
                 <span className="quest-title">
                   {p.title} <small className="muted">{p.day} · {money(p.price)}{p.xp > 0 && ` · +${p.xp} ${p.stat} XP`}</small>
                 </span>
-                {p.day === summary.today && <button className="ghost small" onClick={() => refundPurchase(p)}>Refund</button>}
+                {p.day === summary.today && !p.planId && <button className="ghost small" onClick={() => refundPurchase(p)}>Refund</button>}
               </li>
             ))}
           </ul>
