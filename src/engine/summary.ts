@@ -8,7 +8,8 @@ import { addDays, dayKey, daysBetween, monthOf, weekOf } from './time'
 import { dayExercises, planDay, playerPlan, progressionDue, raisePlan, routineDone, routineTargets, type RoutineTargets } from './workout'
 import { partyBonds, type Bond } from './party'
 import { BOSS_XP, bossStatus, type BossStatus } from './focus'
-import type { Boss, Completion, Contact, DayKind, FocusRun, Person, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
+import { earnedBadges, longestStreak, streakBonuses, unlockedThemes, type Badge } from './badges'
+import type { Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
 export const STAT_WINDOW_DAYS = 30
 
@@ -75,6 +76,12 @@ export interface Summary {
   bosses: BossStatus[]
   /** Minutes in focus sessions today. */
   focusToday: number
+  /** Earned badges (titles). */
+  badges: Badge[]
+  /** Stats whose quests earn +10% XP while a 30-day streak holds. */
+  streakBonus: Set<StatKey>
+  /** Unlocked HUD themes (loot). */
+  themes: string[]
   /** The plan with raised targets the System offers after 3 clean weeks; null when not due. */
   routineOffer: TrainingPlan | null
 }
@@ -87,6 +94,7 @@ export interface Logs {
   contacts?: Contact[]
   focusRuns?: FocusRun[]
   bosses?: Boss[]
+  journal?: JournalEntry[]
 }
 
 const weight = (c: Completion) => (c.version === 'full' ? 1 : 0.5)
@@ -96,7 +104,7 @@ export function summarize(
   quests: Quest[],
   completions: Completion[],
   now: Date,
-  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [] }: Logs = {},
+  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [] }: Logs = {},
 ): Summary {
   const today = dayKey(now, player.settings.resetHour)
   const week = weekOf(today)
@@ -207,6 +215,25 @@ export function summarize(
     streaks.set(q.id, streak)
   }
 
+  // Badges: best-ever and current streak per stat, from every daily of that stat.
+  const bestStreak: Partial<Record<StatKey, number>> = {}
+  const currentStreak: Partial<Record<StatKey, number>> = {}
+  for (const q of dailies) {
+    const days = new Set(completions.filter(c => c.questId === q.id).map(c => c.day))
+    bestStreak[q.stat] = Math.max(bestStreak[q.stat] ?? 0, longestStreak(days, recoveryDays, addDays))
+    currentStreak[q.stat] = Math.max(currentStreak[q.stat] ?? 0, streaks.get(q.id) ?? 0)
+  }
+  const level = levelFromXp(totalXp)
+  const badgeInput = {
+    level: level.level,
+    bestStreak,
+    currentStreak,
+    bossesDefeated: bosses.filter(b => b.defeatedAt).length,
+    focusMinutes: focusRuns.reduce((sum, r) => sum + r.minutes, 0),
+    journalEntries: journal.length,
+    hangouts: contacts.filter(c => c.kind === 'hangout').length,
+  }
+
   const plan = playerPlan(player, startDay)
   const routineQuestIds = new Set(quests.filter(q => q.templateId === 'str-routine').map(q => q.id))
   const routineDone_ = completions.filter(c => routineQuestIds.has(c.questId))
@@ -219,7 +246,10 @@ export function summarize(
     today,
     week,
     totalXp,
-    level: levelFromXp(totalXp),
+    level,
+    badges: earnedBadges(badgeInput),
+    streakBonus: streakBonuses(badgeInput),
+    themes: unlockedThemes(badgeInput),
     wallet,
     savings: savingsStatus(player.settings.savingsGoal, savings, month),
     stats,

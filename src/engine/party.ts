@@ -55,6 +55,8 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'party', name: 'Party list', description: 'Your people, days since contact, bond warnings, hangouts and dates.' },
   { key: 'focus', name: 'Focus dungeons', description: 'Timed work sessions that earn XP per minute and clear linked quests.' },
   { key: 'bosses', name: 'Dreaded-task bosses', description: 'Turn a task you keep avoiding into a boss; focus minutes do damage.' },
+  { key: 'badges', name: 'Titles and streak bonuses', description: 'Earn titles from streaks and milestones; a 30-day streak adds 10% XP for that stat.' },
+  { key: 'loot', name: 'Loot themes', description: 'HUD colour themes that drop at levels and milestones.' },
   { key: 'journal', name: 'Reflection journal', description: 'Three prompts a day, mood and energy, and the patterns over time.' },
 ]
 

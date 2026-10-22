@@ -55,6 +55,10 @@ export interface Player {
   dismissedNotices?: string[]
   /** Optional features switched off in Settings. Missing means on. */
   features?: Partial<Record<FeatureKey, boolean>>
+  /** The title shown under the player's name, chosen from earned badges. */
+  title?: string | null
+  /** The HUD colour theme, chosen from unlocked loot. */
+  theme?: string
   settings: PlayerSettings
   createdAt: number
   updatedAt: number
