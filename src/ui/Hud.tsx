@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { STATS, formatAmount, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
+import { DAY_NAMES, STATS, dayExercises, formatAmount, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
 import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
@@ -58,12 +58,12 @@ export function Hud({ player, quests, summary, onStartWorkout }: { player: Playe
         </SystemWindow>
       )}
 
-      {summary.routineOffer && summary.routine && (
+      {summary.routineOffer && (
         <SystemWindow title="Routine level up" className="offer">
-          <p className="system-line">Three weeks of full routines. The System offers harder targets:</p>
+          <p className="system-line">Three weeks of full routines. The System offers about 25% harder targets on every day. Today's, for example:</p>
           <ul className="offer-list">
             {summary.routine.exercises.map(e => {
-              const next = summary.routineOffer!.find(o => o.key === e.key)
+              const next = dayExercises(summary.routineOffer!, summary.routine.kind).find(o => o.key === e.key)
               return (
                 <li key={e.key}>
                   {e.name}: {formatAmount(e, e.target)} → <b>{next ? formatAmount(e, next.target) : formatAmount(e, e.target)}</b>
@@ -132,14 +132,18 @@ interface RowProps {
   quest: Quest
   done?: Completion
   streak?: number
-  routine?: Summary['routine']
+  routine?: Summary['routine'] | null
   onStartWorkout?: () => void
 }
 
 function QuestRow({ quest, done, streak = 0, routine, onStartWorkout }: RowProps) {
   const [open, setOpen] = useState(false)
   const routineParts = routine
-    ? routine.exercises.map(e => `${e.name} ${Math.min(routine.done[e.key] ?? 0, e.target)}/${formatAmount(e, e.target)}`)
+    ? [
+        `${DAY_NAMES[routine.kind]} day${routine.kind === 'rest' ? ' (posture only)' : ''}`,
+        `${routine.exercises.filter(e => (routine.done[e.key] ?? 0) >= e.target).length}/${routine.exercises.length} exercises done`,
+        `next: ${DAY_NAMES[routine.upcoming[0]]}`,
+      ]
     : []
   return (
     <li className={`quest ${done ? 'done' : ''}`}>

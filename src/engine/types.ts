@@ -45,7 +45,9 @@ export interface Player {
   stats: StatKey[]
   /** The Awakening fitness test, kept as the starting point. */
   fitness: FitnessBaseline | null
-  /** The strength routine as edited by the player; until then it comes from the fitness test. */
+  /** The training plan as edited by the player; until then a Push/Pull/Legs plan built from the fitness test. */
+  plan?: TrainingPlan
+  /** A single every-day routine saved before training plans existed; used only when there is no plan. */
   routine?: RoutineExercise[]
   /** Game day the player last accepted or declined raising the routine's targets. */
   routineReviewedOn?: string
@@ -157,6 +159,24 @@ export interface SavingsEntry {
 export type ExerciseKey = string
 
 export type ExerciseUnit = 'reps' | 'seconds' | 'minutes'
+
+/** A training day. 'full' is a single every-day workout (the older, non-split routine). */
+export type WorkoutKind = 'push' | 'pull' | 'legs' | 'full'
+export type DayKind = WorkoutKind | 'rest'
+
+/**
+ * The strength plan: a repeating cycle of workout days, the exercises for each,
+ * and a posture routine done every day, rest days included.
+ * The cycle moves on when a day is trained (or when a rest day passes), not by the calendar.
+ */
+export interface TrainingPlan {
+  cycle: DayKind[]
+  workouts: Partial<Record<WorkoutKind, RoutineExercise[]>>
+  posture: RoutineExercise[]
+  /** Game day the cycle was last set, starting at cycle[startIndex]. */
+  startedOn: string
+  startIndex: number
+}
 
 /** One exercise in the player's strength routine, with today's target. */
 export interface RoutineExercise {

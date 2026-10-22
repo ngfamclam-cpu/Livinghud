@@ -279,6 +279,23 @@ button.icon { padding: 2px 8px; font-size: 1.1rem; line-height: 1; border-color:
 .offer { border-color: var(--gold); box-shadow: 0 0 18px rgba(255, 207, 92, 0.35); }
 .offer-list { margin: 0 0 8px; padding-left: 1.2em; }
 
+/* ---- Training plan ---- */
+.tabs-inline { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.banner { border: 1px solid var(--gold); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 12px; }
+.cycle-list { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 6px; }
+.cycle-list li { display: flex; gap: 8px; align-items: center; }
+.cycle-day {
+  flex: 1; display: flex; justify-content: space-between; text-align: left;
+  background: rgba(5, 10, 20, 0.6); color: var(--text); border: 1px solid rgba(47, 143, 255, 0.3);
+  box-shadow: none; font-weight: 400; letter-spacing: 0; padding: 8px 12px;
+}
+.cycle-list li.today .cycle-day { border-color: var(--accent); box-shadow: 0 0 10px var(--glow); }
+.cycle-day small { color: var(--accent); }
+.link-like { background: none; border: none; box-shadow: none; padding: 0; color: var(--text); text-align: left; font-weight: 400; letter-spacing: 0; }
+.routine-edit .how { grid-column: 1 / -1; margin: 0; }
+.hold-timer { margin: 4px 0 8px; }
+.timer-display { font-size: 2rem; font-weight: 700; color: var(--accent); min-width: 4ch; }
+
 /* ---- Auto-complete ---- */
 .howto { margin: 0 0 12px; border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 8px 12px; }
 .howto summary { cursor: pointer; color: var(--accent); font-weight: 600; }

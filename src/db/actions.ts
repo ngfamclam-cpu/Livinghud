@@ -13,10 +13,10 @@ import {
   checkPurchase,
   emit,
   questReward,
-  routineDescription,
+  planDescription,
   routineLevel,
   rewardRank,
-  strengthDescription,
+  defaultPlan,
   summarize,
   type Completion,
   type CompletionVersion,
@@ -26,7 +26,7 @@ import {
   type Purchase,
   type Quest,
   type QuestStage,
-  type RoutineExercise,
+  type TrainingPlan,
   type Reward,
   type RewardSpecial,
   type StatKey,
@@ -54,7 +54,7 @@ export async function awaken(answers: AwakeningAnswers): Promise<void> {
       kind: 'daily',
       stat: t.stat,
       title: t.title,
-      description: t.id === 'str-routine' && answers.fitness ? strengthDescription(answers.fitness) : t.description,
+      description: t.id === 'str-routine' ? planDescription(defaultPlan(answers.fitness, '')) : t.description,
       minVersion: t.minVersion,
       active: true,
       templateId: t.id,
@@ -434,17 +434,19 @@ async function syncRoutineQuest(): Promise<void> {
   }
 }
 
-/** Replaces the player's strength routine (targets, exercises) and updates the quest text to match. */
-export async function saveRoutine(exercises: RoutineExercise[]): Promise<void> {
-  const clean = exercises
-    .map(e => ({ ...e, name: e.name.trim(), target: Math.max(1, Math.round(e.target)) }))
-    .filter(e => e.name && e.target > 0)
-  if (clean.length === 0) return
+/** Saves the player's training plan (cycle, workouts, posture) and updates the quest text to match. */
+export async function savePlan(plan: TrainingPlan): Promise<void> {
+  const clean = (list: TrainingPlan['posture']) =>
+    list.map(e => ({ ...e, name: e.name.trim(), target: Math.max(1, Math.round(e.target)) })).filter(e => e.name)
+  const workouts: TrainingPlan['workouts'] = {}
+  for (const [kind, list] of Object.entries(plan.workouts)) workouts[kind as keyof TrainingPlan['workouts']] = clean(list ?? [])
+  const saved: TrainingPlan = { ...plan, workouts, posture: clean(plan.posture) }
+  if (saved.cycle.length === 0) return
   const now = Date.now()
-  await db.players.update(LOCAL_USER, { routine: clean, updatedAt: now })
+  await db.players.update(LOCAL_USER, { plan: saved, updatedAt: now })
   const quests = await db.quests.where('userId').equals(LOCAL_USER).toArray()
   for (const q of quests.filter(q => q.templateId === 'str-routine')) {
-    await db.quests.update(q.id, { description: routineDescription(clean), updatedAt: now })
+    await db.quests.update(q.id, { description: planDescription(saved), updatedAt: now })
   }
   await syncRoutineQuest()
 }
@@ -454,7 +456,7 @@ export async function acceptRoutineOffer(): Promise<void> {
   const { summary } = await snapshot()
   if (!summary.routineOffer) return
   await db.players.update(LOCAL_USER, { routineReviewedOn: summary.today })
-  await saveRoutine(summary.routineOffer)
+  await savePlan(summary.routineOffer)
   emit({ type: 'routine.raised' })
 }
 
