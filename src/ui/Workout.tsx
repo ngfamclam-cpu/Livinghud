@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PoseLandmarker } from '@mediapipe/tasks-vision'
-import { PROGRESSION_DAYS, countFrame, emit, exerciseInfo, formatAmount, newCounter, routineLevel, type BodyPoint, type CounterState, type ExerciseKey, type ExerciseSet, type Summary } from '../engine'
+import { DAY_NAMES, PROGRESSION_DAYS, countFrame, emit, exerciseInfo, formatAmount, newCounter, routineLevel, type BodyPoint, type CounterState, type ExerciseKey, type ExerciseSet, type FitnessBaseline, type Summary } from '../engine'
 import { correctTotal, deleteSet, logSet } from '../db/actions'
 import { RoutineEditor } from './RoutineEditor'
 import { BONES, closeCamera, detectBody, loadPoseTracker, openCamera } from '../capture/pose'
@@ -9,7 +9,7 @@ import { Bar } from './Bar'
 
 type CameraState = 'off' | 'loading' | 'on' | 'error'
 
-export function Workout({ summary, sets, onClose }: { summary: Summary; sets: ExerciseSet[]; onClose: () => void }) {
+export function Workout({ summary, sets, fitness, onClose }: { summary: Summary; sets: ExerciseSet[]; fitness: FitnessBaseline | null; onClose: () => void }) {
   const routine = summary.routine
   const exercises = routine?.exercises ?? []
   const firstOpen = exercises.find(e => (routine?.done[e.key] ?? 0) < e.target)
@@ -163,8 +163,21 @@ export function Workout({ summary, sets, onClose }: { summary: Summary; sets: Ex
     setManual('')
   }
 
-  if (editing || !routine || exercises.length === 0) {
-    return <RoutineEditor exercises={exercises} onDone={() => (routine && exercises.length > 0 ? setEditing(false) : onClose())} />
+  if (editing) {
+    return <RoutineEditor plan={routine.plan} index={routine.index} today={summary.today} fitness={fitness} onDone={() => setEditing(false)} />
+  }
+  if (exercises.length === 0) {
+    return (
+      <main className="hud">
+        <SystemWindow title={`${DAY_NAMES[routine.kind]} day`}>
+          <p>Nothing scheduled today. Next: {DAY_NAMES[routine.upcoming[0]]}.</p>
+          <div className="row">
+            <button className="ghost" onClick={() => setEditing(true)}>Edit plan</button>
+            <button onClick={onClose}>Back to HUD</button>
+          </div>
+        </SystemWindow>
+      </main>
+    )
   }
 
   const saveFix = async () => {
@@ -181,28 +194,38 @@ export function Workout({ summary, sets, onClose }: { summary: Summary; sets: Ex
 
   return (
     <main className="hud workout">
-      <SystemWindow title="Strength routine">
-        <ul className="routine-list">
-          {exercises.map(e => {
-            const d = routine.done[e.key] ?? 0
-            const t = e.target
-            return (
-              <li key={e.key}>
-                <button className={`routine-item ${e.key === exercise ? 'picked' : ''} ${d >= t ? 'done' : ''}`} onClick={() => setExercise(e.key)}>
-                  <span className="quest-title">{e.name}</span>
-                  <span className="routine-count">{Math.min(d, t)}/{formatAmount(e, t)}</span>
-                  <Bar value={d} max={t} thin />
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+      <SystemWindow title={`${DAY_NAMES[routine.kind]} day`}>
+        <p className="muted">Next: {routine.upcoming.map(k => DAY_NAMES[k]).join(' → ')}</p>
+        {(['workout', 'posture'] as const).map(part => {
+          const items = exercises.filter(e => e.part === part)
+          if (items.length === 0) return null
+          return (
+            <div key={part}>
+              <h3>{part === 'workout' ? `${DAY_NAMES[routine.kind]} workout` : 'Posture (every day)'}</h3>
+              <ul className="routine-list">
+                {items.map(e => {
+                  const d = routine.done[e.key] ?? 0
+                  const t = e.target
+                  return (
+                    <li key={e.key}>
+                      <button className={`routine-item ${e.key === exercise ? 'picked' : ''} ${d >= t ? 'done' : ''}`} onClick={() => setExercise(e.key)}>
+                        <span className="quest-title">{e.name}</span>
+                        <span className="routine-count">{Math.min(d, t)}/{formatAmount(e, t)}</span>
+                        <Bar value={d} max={t} thin />
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )
+        })}
         {level === 'full' && <p className="system-line clear">Routine complete. Quest cleared.</p>}
         {level === 'min' && <p className="muted">Half of every target done: you can claim the minimum version on the HUD, or keep going.</p>}
         <p className="muted">
           Targets start from your fitness test and are yours to change. After {PROGRESSION_DAYS} days in a row of the full routine, the System offers to raise them.
         </p>
-        <button className="ghost small" onClick={() => { stopCamera(); setEditing(true) }}>Edit routine</button>
+        <button className="ghost small" onClick={() => { stopCamera(); setEditing(true) }}>Edit plan</button>
       </SystemWindow>
 
       <SystemWindow title={info.name}>
@@ -239,6 +262,13 @@ export function Workout({ summary, sets, onClose }: { summary: Summary; sets: Ex
           </>
         )}
 
+        {info.tracking === 'manual' && (
+          <>
+            <p className="muted">{info.tip}</p>
+            {info.unit !== 'reps' && <HoldTimer key={exercise} unit={info.unit} onSave={amount => logSet(exercise, amount, 'manual')} />}
+          </>
+        )}
+
         <div className="inline-form manual">
           <input type="number" min={1} inputMode="numeric" placeholder={`Add ${info.unit} by hand`} value={manual} onChange={e => setManual(e.target.value)} />
           <button className="small ghost" disabled={!(Number(manual) > 0)} onClick={addManual}>Add</button>
@@ -272,6 +302,40 @@ export function Workout({ summary, sets, onClose }: { summary: Summary; sets: Ex
 
       <button className="ghost settings-button" onClick={() => { stopCamera(); onClose() }}>Back to HUD</button>
     </main>
+  )
+}
+
+/** A stopwatch for stretches and holds the camera doesn't follow; saves the time as a set. */
+function HoldTimer({ unit, onSave }: { unit: 'seconds' | 'minutes'; onSave: (amount: number) => void }) {
+  const [startedAt, setStartedAt] = useState<number | null>(null)
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    if (startedAt === null) return
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 250)
+    return () => clearInterval(timer)
+  }, [startedAt])
+
+  const stop = () => {
+    const seconds = startedAt === null ? 0 : Math.floor((Date.now() - startedAt) / 1000)
+    setStartedAt(null)
+    setElapsed(0)
+    const amount = unit === 'minutes' ? Math.round(seconds / 60) : seconds
+    if (amount > 0) onSave(amount)
+  }
+
+  const shown = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
+  return (
+    <div className="row hold-timer">
+      {startedAt === null ? (
+        <button onClick={() => { setElapsed(0); setStartedAt(Date.now()) }}>Start timer</button>
+      ) : (
+        <>
+          <span className="timer-display">{shown}</span>
+          <button onClick={stop}>Stop and save</button>
+        </>
+      )}
+    </div>
   )
 }
 

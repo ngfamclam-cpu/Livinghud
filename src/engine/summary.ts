@@ -5,8 +5,8 @@
 import { levelFromXp, type LevelInfo } from './leveling'
 import { playerRank, round2, savingsStatus, type SavingsStatus } from './economy'
 import { addDays, dayKey, daysBetween, monthOf, weekOf } from './time'
-import { playerRoutine, progressionOffer, routineDone, routineTargets, type RoutineTargets } from './workout'
-import type { Completion, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey } from './types'
+import { dayExercises, planDay, playerPlan, progressionDue, raisePlan, routineDone, routineTargets, type RoutineTargets } from './workout'
+import type { Completion, DayKind, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
 export const STAT_WINDOW_DAYS = 30
 
@@ -56,10 +56,19 @@ export interface Summary {
   streaks: Map<string, number>
   /** Today is a Recovery Day: streaks are protected and missed dailies don't count. */
   recoveryToday: boolean
-  /** The strength routine, its targets and today's logged progress; null without one. */
-  routine: { exercises: RoutineExercise[]; targets: RoutineTargets; done: RoutineTargets } | null
-  /** Raised targets the System offers after 3 clean weeks; null when not due. */
-  routineOffer: RoutineExercise[] | null
+  /** Today's training: where the plan's cycle is, today's exercises, targets and logged progress. */
+  routine: {
+    plan: TrainingPlan
+    kind: DayKind
+    /** Position of today in plan.cycle. */
+    index: number
+    upcoming: DayKind[]
+    exercises: (RoutineExercise & { part: 'workout' | 'posture' })[]
+    targets: RoutineTargets
+    done: RoutineTargets
+  }
+  /** The plan with raised targets the System offers after 3 clean weeks; null when not due. */
+  routineOffer: TrainingPlan | null
 }
 
 export interface Logs {
@@ -183,9 +192,13 @@ export function summarize(
     streaks.set(q.id, streak)
   }
 
-  const exercises = playerRoutine(player)
+  const plan = playerPlan(player, startDay)
   const routineQuestIds = new Set(quests.filter(q => q.templateId === 'str-routine').map(q => q.id))
-  const routineFullDays = new Set(completions.filter(c => routineQuestIds.has(c.questId) && c.version === 'full').map(c => c.day))
+  const routineDone_ = completions.filter(c => routineQuestIds.has(c.questId))
+  const trainedDays = new Set(routineDone_.map(c => c.day))
+  const routineFullDays = new Set(routineDone_.filter(c => c.version === 'full').map(c => c.day))
+  const { kind, index, upcoming } = planDay(plan, trainedDays, today)
+  const exercises = dayExercises(plan, kind)
 
   return {
     today,
@@ -203,7 +216,7 @@ export function summarize(
     mainQuestsCleared,
     streaks,
     recoveryToday: recoveryDays.has(today),
-    routine: exercises ? { exercises, targets: routineTargets(exercises), done: routineDone(sets, today) } : null,
-    routineOffer: exercises ? progressionOffer(exercises, routineFullDays, recoveryDays, today, player.routineReviewedOn) : null,
+    routine: { plan, kind, index, upcoming, exercises, targets: routineTargets(exercises), done: routineDone(sets, today) },
+    routineOffer: progressionDue(routineFullDays, recoveryDays, today, player.routineReviewedOn) ? raisePlan(plan) : null,
   }
 }

@@ -52,7 +52,7 @@ export default function App() {
   if (workout) {
     return (
       <>
-        <Workout summary={summary} sets={sets} onClose={() => setWorkout(false)} />
+        <Workout summary={summary} sets={sets} fitness={player.fitness} onClose={() => setWorkout(false)} />
         <SystemToasts />
       </>
     )
