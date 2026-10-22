@@ -104,7 +104,7 @@ export function PostureScan({ scans, onClose }: { scans: Scan[]; onClose: () => 
     }
     const timer = setTimeout(() => setCountdown(c => c - 1), 1000)
     return () => clearTimeout(timer)
-  }, [phase, countdown])
+  }, [phase, countdown, kind])
 
   const start = async () => {
     setError('')

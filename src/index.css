@@ -301,6 +301,19 @@ button.icon { padding: 2px 8px; font-size: 1.1rem; line-height: 1; border-color:
 .scan-result { text-align: center; margin: 12px 0; }
 .scan-history li { display: grid; grid-template-columns: 6.5em 1fr 3em auto; gap: 8px; align-items: center; }
 
+/* ---- Party ---- */
+.party-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 10px; }
+.person { border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 10px 12px; }
+.person .bar { margin-top: 8px; }
+.person.weakening { border-color: var(--gold); }
+.person.weakening .routine-count { color: var(--gold); }
+.person .quest-actions { justify-content: flex-start; flex-wrap: wrap; }
+.person-detail { margin-top: 10px; }
+.bond-warning { border-color: var(--gold); }
+.feature-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.feature-list .check { align-items: flex-start; color: var(--text); }
+.tabs button { letter-spacing: 0.06em; font-size: 0.82rem; }
+
 /* ---- Auto-complete ---- */
 .howto { margin: 0 0 12px; border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 8px 12px; }
 .howto summary { cursor: pointer; color: var(--accent); font-weight: 600; }

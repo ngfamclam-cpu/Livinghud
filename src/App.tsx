@@ -10,12 +10,15 @@ import { Settings } from './ui/Settings'
 import { SystemToasts } from './ui/SystemToasts'
 import { Workout } from './ui/Workout'
 import { PostureScan } from './ui/PostureScan'
+import { Party } from './ui/Party'
+import { featureOn } from './engine'
 
-type Tab = 'hud' | 'quests' | 'shop' | 'settings'
+type Tab = 'hud' | 'quests' | 'party' | 'shop' | 'settings'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'hud', label: 'Status' },
   { key: 'quests', label: 'Quests' },
+  { key: 'party', label: 'Party' },
   { key: 'shop', label: 'Shop' },
   { key: 'settings', label: 'Settings' },
 ]
@@ -25,7 +28,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('hud')
   const [screen, setScreen] = useState<'workout' | 'scan' | null>(null)
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings, sets, scans] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
@@ -34,8 +37,10 @@ export default function App() {
       db.savings.where('userId').equals(LOCAL_USER).toArray(),
       db.sets.where('userId').equals(LOCAL_USER).toArray(),
       db.scans.where('userId').equals(LOCAL_USER).toArray(),
+      db.people.where('userId').equals(LOCAL_USER).toArray(),
+      db.contacts.where('userId').equals(LOCAL_USER).toArray(),
     ])
-    return { player, quests, completions, rewards, purchases, savings, sets, scans }
+    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts }
   })
 
   if (!data) return null
@@ -48,8 +53,10 @@ export default function App() {
     )
   }
 
-  const { player, quests, rewards, purchases, savings, sets } = data
-  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets })
+  const { player, quests, rewards, purchases, savings, sets, people, contacts } = data
+  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts })
+  const tabs = TABS.filter(t => t.key !== 'party' || featureOn(player, 'party'))
+  const current = tabs.some(t => t.key === tab) ? tab : 'hud'
 
   if (screen) {
     return (
@@ -67,16 +74,17 @@ export default function App() {
   return (
     <>
       <nav className="tabs" aria-label="Screens">
-        {TABS.map(t => (
-          <button key={t.key} className={tab === t.key ? 'on' : ''} aria-current={tab === t.key ? 'page' : undefined} onClick={() => setTab(t.key)}>
+        {tabs.map(t => (
+          <button key={t.key} className={current === t.key ? 'on' : ''} aria-current={current === t.key ? 'page' : undefined} onClick={() => setTab(t.key)}>
             {t.label}
           </button>
         ))}
       </nav>
-      {tab === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} />}
-      {tab === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} />}
-      {tab === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} />}
-      {tab === 'settings' && <Settings player={player} quests={quests} onClose={() => setTab('hud')} />}
+      {current === 'party' && <Party summary={summary} contacts={contacts} />}
+      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} />}
+      {current === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} />}
+      {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} />}
+      {current === 'settings' && <Settings player={player} quests={quests} onClose={() => setTab('hud')} />}
       <SystemToasts />
     </>
   )

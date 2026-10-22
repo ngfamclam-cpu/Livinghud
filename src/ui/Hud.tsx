@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DAY_NAMES, STATS, dayExercises, formatAmount, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
+import { DAY_NAMES, STATS, featureOn, dayExercises, formatAmount, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
 import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
@@ -75,6 +75,17 @@ export function Hud({ player, quests, summary, onStartWorkout }: { player: Playe
             <button className="ghost" onClick={() => declineRoutineOffer()}>Not now</button>
             <button onClick={() => acceptRoutineOffer()}>Accept</button>
           </div>
+        </SystemWindow>
+      )}
+
+      {featureOn(player, 'party') && summary.party.some(b => b.weakening) && (
+        <SystemWindow title="Party" className="bond-warning">
+          {summary.party.filter(b => b.weakening).slice(0, 3).map(b => (
+            <p key={b.person.id} className="system-line">
+              Bond weakening: {b.person.name} ({b.lastDay ? `${b.daysSince} days` : 'no contact yet'})
+            </p>
+          ))}
+          <p className="muted">Reach out, then log it on the Party tab.</p>
         </SystemWindow>
       )}
 
