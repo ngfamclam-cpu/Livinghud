@@ -19,6 +19,14 @@ describe('trigger api', () => {
     expect(items.map(i => [i.questId, i.version, i.at])).toEqual([['quest-1', 'full', 1000], ['quest-2', 'min', 2000]])
   })
 
+  it('queues exercise to log, such as a posture check-in', async () => {
+    const store = memoryStore()
+    expect((await handle(new Request(`${base}?t=${T}&x=postureCheckins`), store, 5)).status).toBe(200)
+    expect((await handle(new Request(`${base}?t=${T}&x=chinTucks&n=10`), store, 6)).status).toBe(200)
+    expect((await handle(new Request(`${base}?t=${T}&x=chinTucks&n=0`), store)).status).toBe(400)
+    expect((await inbox(store)).map(i => [i.exercise, i.amount, i.at])).toEqual([['postureCheckins', 1, 5], ['chinTucks', 10, 6]])
+  })
+
   it('removes only the completions the app handled', async () => {
     const store = memoryStore()
     await fire(store, 'a')

@@ -2,7 +2,7 @@
 // while the app was closed, and applies them. Checks when the app opens,
 // comes back to the front or reconnects, and every 2 minutes while open.
 
-import { completeFromTrigger } from './actions'
+import { completeFromTrigger, logFromTrigger } from './actions'
 import { db, LOCAL_USER } from './db'
 
 const ENDPOINT = '/api/trigger'
@@ -10,8 +10,10 @@ const EVERY_MS = 2 * 60_000
 
 interface InboxItem {
   id: string
-  questId: string
-  version: 'full' | 'min'
+  questId?: string
+  version?: 'full' | 'min'
+  exercise?: string
+  amount?: number
   at: number
 }
 
@@ -39,7 +41,8 @@ export async function check(): Promise<void> {
     const { items } = (await res.json()) as { items: InboxItem[] }
     if (!items?.length) return
     for (const item of [...items].sort((a, b) => a.at - b.at)) {
-      await completeFromTrigger(item.questId, item.version === 'min' ? 'min' : 'full', item.at)
+      if (item.questId) await completeFromTrigger(item.questId, item.version === 'min' ? 'min' : 'full', item.at)
+      else if (item.exercise) await logFromTrigger(item.exercise, item.amount ?? 1, item.at)
     }
     await fetch(`${ENDPOINT}?t=${encodeURIComponent(token)}&ack=1`, {
       method: 'POST',

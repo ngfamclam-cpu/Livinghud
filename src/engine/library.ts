@@ -13,6 +13,8 @@ export interface SideTemplate {
 
 export const SIDE_TEMPLATES: SideTemplate[] = [
   { id: 'side-str-workouts', stat: 'STR', title: '3 workouts this week', description: 'Gym, a run, a class or a long home session.', minVersion: '2 workouts' },
+  { id: 'side-str-incline-walk', stat: 'STR', title: '3 incline walks', description: '10–15 minutes uphill or on an incline each time. Let the back leg finish behind you and push off through the big toe; uphill walking works the glutes harder.', minVersion: '1 walk' },
+  { id: 'side-str-posture-scan', stat: 'STR', title: 'Weekly posture scan', description: 'Take a side-on head scan and a walking scan in LivingHUD to track your posture over time.', minVersion: 'Head scan only' },
   { id: 'side-str-mobility', stat: 'STR', title: 'Mobility session', description: '20 minutes of stretching or yoga.', minVersion: '10 minutes' },
   { id: 'side-vit-cook', stat: 'VIT', title: 'Cook at home 4 times', description: 'Real meals made at home.', minVersion: '2 times' },
   { id: 'side-vit-prep', stat: 'VIT', title: 'Sunday meal prep', description: 'Prep lunches or ingredients for the week.', minVersion: 'Prep 2 meals' },

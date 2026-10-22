@@ -9,6 +9,7 @@ export function Automations({ player, quests }: { player: Player; quests: Quest[
   const [copied, setCopied] = useState('')
   const active = quests.filter(q => q.active).sort((a, b) => kindOrder(a) - kindOrder(b) || a.createdAt - b.createdAt)
 
+  const checkinLink = `${location.origin}/api/trigger?t=${token}&x=postureCheckins`
   const link = (q: Quest, min = false) => `${location.origin}/api/trigger?t=${token}&q=${q.id}${min ? '&v=min' : ''}`
   const copy = async (text: string, id: string) => {
     try {
@@ -63,6 +64,25 @@ export function Automations({ player, quests }: { player: Player; quests: Quest[
               </li>
             ))}
           </ul>
+          <h3>Posture check-in reminders</h3>
+          <p className="muted">
+            Habit is what changes posture, so let your phone nudge you a few times a day. Each tap on the reminder logs one posture check-in toward
+            your daily target.
+          </p>
+          <div className="row">
+            <button className="ghost small" onClick={() => copy(checkinLink, 'checkin')}>{copied === 'checkin' ? 'Copied' : 'Copy check-in link'}</button>
+          </div>
+          <details className="howto">
+            <summary>Set up the reminder in MacroDroid</summary>
+            <ol>
+              <li>Add Macro. Trigger: <b>Day/Time</b>, pick a few times (e.g. 10:00, 13:00, 16:00, 19:00) and your days.</li>
+              <li>Action: <b>Notification</b> with the text “Posture check: feet under hips, soft knees, ribs over pelvis, chin back.” Add an action button called “Done”.</li>
+              <li>For the Done button, add the action <b>HTTP Request</b> (GET) with the check-in link above.</li>
+              <li>Save. If your MacroDroid version has no notification buttons, make the HTTP Request run straight after the notification instead.</li>
+            </ol>
+            <p className="muted">This uses one of MacroDroid’s 5 free macros.</p>
+          </details>
+
           <button className="ghost small danger" onClick={reset}>Make new links</button>
         </>
       )}

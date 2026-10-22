@@ -14,6 +14,7 @@ import {
   emit,
   questReward,
   planDescription,
+  missingPostureMoves,
   routineLevel,
   rewardRank,
   defaultPlan,
@@ -21,12 +22,14 @@ import {
   type Completion,
   type CompletionVersion,
   type ExerciseKey,
+  type ExerciseSet,
   type FitnessBaseline,
   type PlayerSettings,
   type Purchase,
   type Quest,
   type QuestStage,
   type TrainingPlan,
+  type PostureScan,
   type Reward,
   type RewardSpecial,
   type StatKey,
@@ -375,6 +378,11 @@ export async function resetTriggerToken(): Promise<string> {
   return token
 }
 
+/** Logs exercise an automation sent (e.g. a posture check-in reminder tap). */
+export async function logFromTrigger(exercise: ExerciseKey, amount: number, at: number): Promise<void> {
+  await logSet(exercise, amount, 'link', at)
+}
+
 /** Applies a completion an automation sent while the app was closed. */
 export async function completeFromTrigger(questId: string, version: CompletionVersion, at: number): Promise<void> {
   const quest = await db.quests.get(questId)
@@ -391,11 +399,13 @@ export function randomCode(): string {
 // ---- Strength routine ----
 
 /** Logs a set of the strength routine, then keeps the quest in step with the targets. */
-export async function logSet(exercise: ExerciseKey, amount: number, source: 'camera' | 'manual' | 'correction'): Promise<void> {
+export async function logSet(exercise: ExerciseKey, amount: number, source: ExerciseSet['source'], at?: number): Promise<void> {
   amount = Math.round(amount)
   if (amount === 0 || (source !== 'correction' && amount < 0)) return
-  const { summary } = await snapshot()
-  await db.sets.add({ id: newId(), userId: LOCAL_USER, exercise, amount, day: summary.today, source, createdAt: Date.now() })
+  const { summary, player } = await snapshot()
+  // A reminder tap can arrive later: it counts for the game day it happened on.
+  const day = at ? dayKey(new Date(Math.min(at, Date.now())), player.settings.resetHour) : summary.today
+  await db.sets.add({ id: newId(), userId: LOCAL_USER, exercise, amount, day, source, createdAt: Date.now() })
   const routine = (await snapshot()).summary.routine
   if (routine && source !== 'correction') {
     const name = routine.exercises.find(e => e.key === exercise)?.name ?? exercise
@@ -466,20 +476,62 @@ export async function declineRoutineOffer(): Promise<void> {
   await db.players.update(LOCAL_USER, { routineReviewedOn: summary.today, updatedAt: Date.now() })
 }
 
+export const POSTURE_UPDATE = 'posture-research-2026-10'
+
+/**
+ * Adds the research-based posture additions to a player's own plan: pelvic control
+ * drills and posture check-ins, plus the incline walking and weekly scan side quests.
+ */
+export async function applyPostureUpdate(): Promise<void> {
+  const { summary, quests } = await snapshot()
+  const plan = summary.routine.plan
+  const missing = missingPostureMoves(plan)
+  if (missing.length > 0) await savePlan({ ...plan, posture: [...plan.posture, ...missing] })
+  const active = new Set(quests.filter(q => q.active).map(q => q.templateId))
+  for (const id of ['side-str-incline-walk', 'side-str-posture-scan']) if (!active.has(id)) await addSideFromTemplate(id)
+  await dismissNotice(POSTURE_UPDATE)
+}
+
+export async function dismissNotice(id: string): Promise<void> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player || player.dismissedNotices?.includes(id)) return
+  await db.players.update(LOCAL_USER, { dismissedNotices: [...(player.dismissedNotices ?? []), id], updatedAt: Date.now() })
+}
+
+/** Saves a posture scan, and clears the weekly scan side quest once both kinds are done this week. */
+export async function saveScan(kind: PostureScan['kind'], value: number): Promise<void> {
+  const { summary, quests } = await snapshot()
+  await db.scans.add({ id: newId(), userId: LOCAL_USER, kind, value: Math.round(value * 10) / 10, day: summary.today, createdAt: Date.now() })
+  const quest = quests.find(q => q.active && q.templateId === 'side-str-posture-scan')
+  if (!quest) return
+  const week = await db.scans.where('userId').equals(LOCAL_USER).filter(s => weekOf(s.day) === summary.week).toArray()
+  const kinds = new Set(week.map(s => s.kind))
+  const done = summary.weekDone.get(quest.id)
+  if (kinds.has('head') && kinds.has('walk')) {
+    // Upgrade a minimum clear (head scan only) once the walking scan is in too.
+    if (done?.version === 'min') await db.completions.delete(done.id)
+    if (done?.version !== 'full') await completeQuest(quest, 'full')
+  } else if (kinds.has('head') && !done) await completeQuest(quest, 'min')
+}
+
+export async function deleteScan(id: string): Promise<void> {
+  await db.scans.delete(id)
+}
+
 /** A unique id for a player-made exercise. */
 export const customExerciseKey = () => `custom-${newId().slice(0, 8)}`
 
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets] = await Promise.all(tables().map(t => t.toArray()))
-  return { format: SAVE_FORMAT, version: 3, players, quests, completions, rewards, purchases, savings, sets }
+  const [players, quests, completions, rewards, purchases, savings, sets, scans] = await Promise.all(tables().map(t => t.toArray()))
+  return { format: SAVE_FORMAT, version: 4, players, quests, completions, rewards, purchases, savings, sets, scans }
 }
 
 export async function exportSave(): Promise<string> {
@@ -501,6 +553,7 @@ export async function importSave(json: string): Promise<void> {
     await db.purchases.bulkPut(data.purchases ?? [])
     await db.savings.bulkPut(data.savings ?? [])
     await db.sets.bulkPut(data.sets ?? [])
+    await db.scans.bulkPut(data.scans ?? [])
   })
 }
 

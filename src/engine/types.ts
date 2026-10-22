@@ -51,6 +51,8 @@ export interface Player {
   routine?: RoutineExercise[]
   /** Game day the player last accepted or declined raising the routine's targets. */
   routineReviewedOn?: string
+  /** One-off System notices the player has answered, so they don't show again. */
+  dismissedNotices?: string[]
   settings: PlayerSettings
   createdAt: number
   updatedAt: number
@@ -196,6 +198,18 @@ export interface ExerciseSet {
   /** Game day, YYYY-MM-DD. */
   day: string
   /** 'correction' sets today's total by hand when the camera got it wrong. */
-  source: 'camera' | 'manual' | 'correction'
+  source: 'camera' | 'manual' | 'correction' | 'link'
+  createdAt: number
+}
+
+/** A side-on camera posture measurement, kept to show the trend over time. */
+export interface PostureScan {
+  id: string
+  userId: string
+  kind: 'head' | 'walk'
+  /** Degrees: head angle for 'head', peak hip extension for 'walk'. */
+  value: number
+  /** Game day, YYYY-MM-DD. */
+  day: string
   createdAt: number
 }

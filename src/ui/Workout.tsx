@@ -1,15 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PoseLandmarker } from '@mediapipe/tasks-vision'
-import { DAY_NAMES, PROGRESSION_DAYS, countFrame, emit, exerciseInfo, formatAmount, newCounter, routineLevel, type BodyPoint, type CounterState, type ExerciseKey, type ExerciseSet, type FitnessBaseline, type Summary } from '../engine'
-import { correctTotal, deleteSet, logSet } from '../db/actions'
+import { DAY_NAMES, PROGRESSION_DAYS, countFrame, missingPostureMoves, emit, exerciseInfo, formatAmount, newCounter, routineLevel, type CounterState, type ExerciseKey, type ExerciseSet, type Player, type Summary } from '../engine'
+import { POSTURE_UPDATE, applyPostureUpdate, correctTotal, deleteSet, dismissNotice, logSet } from '../db/actions'
 import { RoutineEditor } from './RoutineEditor'
-import { BONES, closeCamera, detectBody, loadPoseTracker, openCamera } from '../capture/pose'
+import { closeCamera, detectBody, drawBody, loadPoseTracker, openCamera, trueProportions } from '../capture/pose'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
 
 type CameraState = 'off' | 'loading' | 'on' | 'error'
 
-export function Workout({ summary, sets, fitness, onClose }: { summary: Summary; sets: ExerciseSet[]; fitness: FitnessBaseline | null; onClose: () => void }) {
+interface Props {
+  summary: Summary
+  sets: ExerciseSet[]
+  player: Player
+  onClose: () => void
+  onScan: () => void
+}
+
+export function Workout({ summary, sets, player, onClose, onScan }: Props) {
+  const fitness = player.fitness
   const routine = summary.routine
   const exercises = routine?.exercises ?? []
   const firstOpen = exercises.find(e => (routine?.done[e.key] ?? 0) < e.target)
@@ -80,9 +89,9 @@ export function Workout({ summary, sets, fitness, onClose }: { summary: Summary;
       lastVideoTime = video.currentTime
       const t = performance.now()
       const points = detectBody(tracker, video, t)
-      const next = countFrame(exercise, counterRef.current, points, t)
+      const next = countFrame(exercise, counterRef.current, trueProportions(points, video), t)
       counterRef.current = next
-      draw(canvasRef.current, video, points)
+      drawBody(canvasRef.current, video, points)
       setTracking(next.tracking)
 
       const amount = amountOf(next)
@@ -187,6 +196,8 @@ export function Workout({ summary, sets, fitness, onClose }: { summary: Summary;
     setFixValue('')
   }
 
+  const missing = missingPostureMoves(routine.plan)
+  const showUpdate = !player.dismissedNotices?.includes(POSTURE_UPDATE) && (missing.length > 0 || !player.plan)
   const level = routineLevel(routine.targets, routine.done)
   const pending = camera === 'on' ? live - savedRef.current : 0
   const shownTotal = done + Math.max(0, pending)
@@ -194,6 +205,23 @@ export function Workout({ summary, sets, fitness, onClose }: { summary: Summary;
 
   return (
     <main className="hud workout">
+      {showUpdate && (
+        <SystemWindow title="Research update" className="offer">
+          <p>
+            Posture research found stretching alone doesn't change posture; strength work and learning to feel and hold the position do. Add to your plan:
+          </p>
+          <ul className="offer-list">
+            {missing.map(e => <li key={e.key}>{e.name}</li>)}
+            <li>Side quest: 3 incline walks a week (walking correction)</li>
+            <li>Side quest: weekly posture scan with the camera</li>
+          </ul>
+          <div className="row end">
+            <button className="ghost" onClick={() => dismissNotice(POSTURE_UPDATE)}>No thanks</button>
+            <button onClick={() => applyPostureUpdate()}>Add them</button>
+          </div>
+        </SystemWindow>
+      )}
+
       <SystemWindow title={`${DAY_NAMES[routine.kind]} day`}>
         <p className="muted">Next: {routine.upcoming.map(k => DAY_NAMES[k]).join(' → ')}</p>
         {(['workout', 'posture'] as const).map(part => {
@@ -225,7 +253,10 @@ export function Workout({ summary, sets, fitness, onClose }: { summary: Summary;
         <p className="muted">
           Targets start from your fitness test and are yours to change. After {PROGRESSION_DAYS} days in a row of the full routine, the System offers to raise them.
         </p>
-        <button className="ghost small" onClick={() => { stopCamera(); setEditing(true) }}>Edit plan</button>
+        <div className="row">
+          <button className="ghost small" onClick={() => { stopCamera(); setEditing(true) }}>Edit plan</button>
+          <button className="ghost small" onClick={() => { stopCamera(); onScan() }}>Posture scan</button>
+        </div>
       </SystemWindow>
 
       <SystemWindow title={info.name}>
@@ -339,44 +370,10 @@ function HoldTimer({ unit, onSave }: { unit: 'seconds' | 'minutes'; onSave: (amo
   )
 }
 
-const SOURCE_LABEL: Record<ExerciseSet['source'], string> = { camera: 'camera', manual: 'by hand', correction: 'correction' }
+const SOURCE_LABEL: Record<ExerciseSet['source'], string> = { camera: 'camera', manual: 'by hand', correction: 'correction', link: 'reminder' }
 
 function say(text: string) {
   if (!('speechSynthesis' in window)) return
   speechSynthesis.cancel()
   speechSynthesis.speak(new SpeechSynthesisUtterance(text))
-}
-
-/** Draws the tracked body as a glowing stick figure over the video. */
-function draw(canvas: HTMLCanvasElement | null, video: HTMLVideoElement, points: BodyPoint[] | null) {
-  if (!canvas) return
-  if (canvas.width !== video.videoWidth) {
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-  }
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  if (!points) return
-  ctx.strokeStyle = '#5fd0ff'
-  ctx.fillStyle = '#ffcf5c'
-  ctx.lineWidth = 4
-  ctx.shadowColor = 'rgba(47, 143, 255, 0.9)'
-  ctx.shadowBlur = 8
-  for (const [a, b] of BONES) {
-    const p = points[a]
-    const q = points[b]
-    if (!p || !q || (p.visibility ?? 1) < 0.4 || (q.visibility ?? 1) < 0.4) continue
-    ctx.beginPath()
-    ctx.moveTo(p.x * canvas.width, p.y * canvas.height)
-    ctx.lineTo(q.x * canvas.width, q.y * canvas.height)
-    ctx.stroke()
-  }
-  for (const i of [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]) {
-    const p = points[i]
-    if (!p || (p.visibility ?? 1) < 0.4) continue
-    ctx.beginPath()
-    ctx.arc(p.x * canvas.width, p.y * canvas.height, 5, 0, Math.PI * 2)
-    ctx.fill()
-  }
 }

@@ -57,3 +57,47 @@ export const BONES: [number, number][] = [
   [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
   [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28],
 ]
+
+/**
+ * Body points with true proportions. The tracker gives x as a share of the frame's
+ * width and y of its height; a 4:3 frame would squash every angle without this.
+ */
+export function trueProportions(points: BodyPoint[] | null, video: HTMLVideoElement): BodyPoint[] | null {
+  if (!points || !video.videoHeight) return points
+  const aspect = video.videoWidth / video.videoHeight
+  return points.map(p => ({ ...p, x: p.x * aspect }))
+}
+
+/** Draws the tracked body as a glowing stick figure over the video. */
+export function drawBody(canvas: HTMLCanvasElement | null, video: HTMLVideoElement, points: BodyPoint[] | null) {
+  if (!canvas) return
+  if (canvas.width !== video.videoWidth) {
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+  }
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  if (!points) return
+  ctx.strokeStyle = '#5fd0ff'
+  ctx.fillStyle = '#ffcf5c'
+  ctx.lineWidth = 4
+  ctx.shadowColor = 'rgba(47, 143, 255, 0.9)'
+  ctx.shadowBlur = 8
+  for (const [a, b] of BONES) {
+    const p = points[a]
+    const q = points[b]
+    if (!p || !q || (p.visibility ?? 1) < 0.4 || (q.visibility ?? 1) < 0.4) continue
+    ctx.beginPath()
+    ctx.moveTo(p.x * canvas.width, p.y * canvas.height)
+    ctx.lineTo(q.x * canvas.width, q.y * canvas.height)
+    ctx.stroke()
+  }
+  for (const i of [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]) {
+    const p = points[i]
+    if (!p || (p.visibility ?? 1) < 0.4) continue
+    ctx.beginPath()
+    ctx.arc(p.x * canvas.width, p.y * canvas.height, 5, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
