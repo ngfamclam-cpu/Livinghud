@@ -12,9 +12,11 @@ interface HudProps {
   summary: Summary
   onStartWorkout: () => void
   onFocus: () => void
+  onJournal: () => void
+  journaledToday: boolean
 }
 
-export function Hud({ player, quests, summary, onStartWorkout, onFocus }: HudProps) {
+export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday }: HudProps) {
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
   const sides = active.filter(q => q.kind === 'side')
@@ -99,6 +101,15 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus }: HudPro
       )}
 
       {featureOn(player, 'focus') && <FocusPanel summary={summary} showBoss={featureOn(player, 'bosses')} onFocus={onFocus} />}
+
+      {featureOn(player, 'journal') && (
+        <SystemWindow title="Journal">
+          <div className="row">
+            <p className="muted grow">{journaledToday ? 'Today’s entry is saved. You can still add to it.' : 'Three questions, two taps. About two minutes.'}</p>
+            <button className="small" onClick={onJournal}>{journaledToday ? 'Open journal' : 'Write today’s entry'}</button>
+          </div>
+        </SystemWindow>
+      )}
 
       <SystemWindow title="Stats">
         <ul className="stats">

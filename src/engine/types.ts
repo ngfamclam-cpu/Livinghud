@@ -287,3 +287,20 @@ export interface Boss {
   createdAt: number
   updatedAt: number
 }
+
+/** One day's reflection journal entry. */
+export interface JournalEntry {
+  id: string
+  userId: string
+  /** Game day, YYYY-MM-DD. One entry per day. */
+  day: string
+  wentWell: string
+  drained: string
+  adjust: string
+  /** 1 (rough) to 5 (great). */
+  mood: number
+  /** 1 (empty) to 5 (charged). */
+  energy: number
+  createdAt: number
+  updatedAt: number
+}

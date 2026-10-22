@@ -12,6 +12,7 @@ import { Workout } from './ui/Workout'
 import { PostureScan } from './ui/PostureScan'
 import { Party } from './ui/Party'
 import { Focus, type FocusPreset } from './ui/Focus'
+import { Journal } from './ui/Journal'
 import { featureOn } from './engine'
 
 type Tab = 'hud' | 'quests' | 'party' | 'shop' | 'settings'
@@ -27,10 +28,10 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
-  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | null>(null)
+  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | null>(null)
   const [focusPreset, setFocusPreset] = useState<FocusPreset>({})
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
@@ -43,8 +44,9 @@ export default function App() {
       db.contacts.where('userId').equals(LOCAL_USER).toArray(),
       db.focusRuns.where('userId').equals(LOCAL_USER).toArray(),
       db.bosses.where('userId').equals(LOCAL_USER).toArray(),
+      db.journal.where('userId').equals(LOCAL_USER).toArray(),
     ])
-    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses }
+    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal }
   })
 
   if (!data) return null
@@ -73,6 +75,9 @@ export default function App() {
           <Workout summary={summary} sets={sets} player={player} onClose={() => setScreen(null)} onScan={() => setScreen('scan')} />
         )}
         {screen === 'scan' && <PostureScan scans={data.scans} onClose={() => setScreen('workout')} />}
+        {screen === 'journal' && (
+          <Journal summary={summary} entries={data.journal} completions={data.completions} quests={quests} onClose={() => setScreen(null)} />
+        )}
         {screen === 'focus' && (
           <Focus player={player} quests={quests} summary={summary} runs={focusRuns} preset={focusPreset} onClose={() => setScreen(null)} />
         )}
@@ -91,7 +96,7 @@ export default function App() {
         ))}
       </nav>
       {current === 'party' && <Party summary={summary} contacts={contacts} />}
-      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} />}
+      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} />}
       {current === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} onFight={bossId => openFocus({ bossId })} />}
       {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} />}
       {current === 'settings' && <Settings player={player} quests={quests} onClose={() => setTab('hud')} />}
