@@ -314,6 +314,12 @@ button.icon { padding: 2px 8px; font-size: 1.1rem; line-height: 1; border-color:
 .feature-list .check { align-items: flex-start; color: var(--text); }
 .tabs button { letter-spacing: 0.06em; font-size: 0.82rem; }
 
+/* ---- Focus and bosses ---- */
+.dungeon { border-color: #a46bff; box-shadow: 0 0 22px rgba(164, 107, 255, 0.45), inset 0 0 24px rgba(164, 107, 255, 0.12); }
+.boss { border-color: rgba(255, 207, 92, 0.5); }
+.boss.defeated { opacity: 0.6; }
+.boss .quest-main { display: flex; gap: 10px; align-items: center; }
+
 /* ---- Auto-complete ---- */
 .howto { margin: 0 0 12px; border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 8px 12px; }
 .howto summary { cursor: pointer; color: var(--accent); font-weight: 600; }

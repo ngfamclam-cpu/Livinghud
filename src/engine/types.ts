@@ -250,3 +250,40 @@ export interface Contact {
   xp: number
   createdAt: number
 }
+
+/** A focus "dungeon": a timed work session. */
+export interface FocusRun {
+  id: string
+  userId: string
+  label: string
+  stat: StatKey
+  /** The quest this session counts toward, if any. */
+  questId: string | null
+  /** The boss (dreaded task) this session damages, if any. */
+  bossId: string | null
+  plannedMin: number
+  /** Minutes actually focused. */
+  minutes: number
+  /** Ran the full planned time (or ended on purpose after it). */
+  cleared: boolean
+  /** Logged by hand ("I did 15 minutes") rather than timed. */
+  manual: boolean
+  /** Game day, YYYY-MM-DD. */
+  day: string
+  xp: number
+  startedAt: number
+  createdAt: number
+}
+
+/** A dreaded task as a boss. Each HP is 15 minutes of work on it. */
+export interface Boss {
+  id: string
+  userId: string
+  name: string
+  stat: StatKey
+  hp: number
+  active: boolean
+  defeatedAt: number | null
+  createdAt: number
+  updatedAt: number
+}

@@ -23,6 +23,7 @@ A Solo Leveling-style RPG HUD for real life. Real tasks are quests, progress sho
 - **Feature switches:** `player.features` (missing = on), listed in `FEATURES` (`src/engine/party.ts`) and shown in Settings. New optional features go behind one; switching off hides UI, never deletes records. Older code opens newer Dexie versions fine (tested), so rollbacks are safe.
 - **New XP sources pay XP only, not dollars** (keeps the $150 budget tuned to dailies).
 - **Party list (Phase 4, done):** `people` + `contacts` tables. Message/call/hangout/date earn 5/15/30/40 CHA XP; any contact clears "Reach out", a hangout clears the hangout side quest, a call with family clears "Call family". Bond warning after `bondDays` (21, family 14) without contact, on the HUD and Party tab.
+- **Focus dungeons and bosses (Phase 4, done):** `focusRuns` + `bosses` tables. A session earns 1 XP/min (+10 for a full clear); a linked daily/side quest clears at 30+ min (min at 10+), not if a strict session broke. The running session lives in localStorage (`src/db/focus.ts`, survives reloads); relaxed by default, strict breaks after 60s away (`startFocusWatch` is app-wide). Bosses: HP = 15-min hits; damage from linked sessions or a manual "Hit"; defeat = +100 XP; first hit is the min for "One dreaded task", defeat clears it full.
 - **Updates:** the service worker uses `skipWaiting`/`clientsClaim`, and `src/pwa.ts` checks for a new version on open/focus and reloads when it's ready (an installed Android app rarely closes fully, so a waiting worker would never take over). Settings shows the deployed commit (`VERCEL_GIT_COMMIT_SHA`) and build time.
 - **Penalties:** configurable Casual / Normal / Hardcore.
 - **Onboarding ("Awakening"):** every preference is asked at signup, not hard-coded. The quest and reward lists are a template library.
@@ -34,7 +35,7 @@ A Solo Leveling-style RPG HUD for real life. Real tasks are quests, progress sho
 1. **Done:** Awakening signup, HUD, dailies with complete/minimum/undo, XP/levels, stats, rank, wallet/Vault, save file, PWA.
 2. **Done:** reward shop with E–S ranks and level gates, savings gate, Vault spending, side and main quests (first main quest: side income), owner's real reward list.
 3. **Next:** stat decay, streak badges and multipliers, penalty modes in effect, unlockable INT/AGI dailies.
-4. Quest timers / focus sessions (in progress), Party list (done).
+4. **Done:** focus sessions and bosses, Party list.
 5. Real accounts (replace the sync code with logins) on Vercel storage.
 6. Loot and cosmetics.
 7. AI System quest master.

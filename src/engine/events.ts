@@ -20,6 +20,9 @@ export type GameEvent =
   | { type: 'workout.set'; exercise: ExerciseKey; name: string; amount: number; total: number; target: number }
   | { type: 'routine.raised' }
   | { type: 'contact.logged'; name: string; kind: ContactKind; xp: number }
+  | { type: 'focus.ended'; label: string; minutes: number; cleared: boolean; xp: number }
+  | { type: 'boss.hit'; name: string; damage: number; hpLeft: number }
+  | { type: 'boss.defeated'; name: string; xp: number }
 
 type Listener = (event: GameEvent) => void
 

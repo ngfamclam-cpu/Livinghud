@@ -14,6 +14,10 @@ import {
   emit,
   questReward,
   CONTACT_XP,
+  BOSS_XP,
+  MINUTES_PER_HIT,
+  focusQuestVersion,
+  focusXp,
   DEFAULT_BOND_DAYS,
   planDescription,
   missingPostureMoves,
@@ -108,12 +112,14 @@ async function snapshot() {
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
     db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const [people, contacts] = await Promise.all([
+  const [people, contacts, focusRuns, bosses] = await Promise.all([
     db.people.where('userId').equals(LOCAL_USER).toArray(),
     db.contacts.where('userId').equals(LOCAL_USER).toArray(),
+    db.focusRuns.where('userId').equals(LOCAL_USER).toArray(),
+    db.bosses.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const summary = summarize(player, quests, completions, new Date(), { purchases, savings, sets, people, contacts })
-  return { player, quests, completions, purchases, savings, sets, people, contacts, summary }
+  const summary = summarize(player, quests, completions, new Date(), { purchases, savings, sets, people, contacts, focusRuns, bosses })
+  return { player, quests, completions, purchases, savings, sets, people, contacts, focusRuns, bosses, summary }
 }
 
 /** Announces level-ups, a full wallet and a met savings goal after any change. */
@@ -584,6 +590,104 @@ export async function deleteContact(id: string): Promise<void> {
   await db.contacts.delete(id)
 }
 
+// ---- Focus dungeons and bosses ----
+
+export interface FocusResult {
+  label: string
+  stat: StatKey
+  questId: string | null
+  bossId: string | null
+  plannedMin: number
+  minutes: number
+  cleared: boolean
+  startedAt: number
+  manual?: boolean
+}
+
+/**
+ * Saves a finished focus session: XP per minute (plus a bonus for a full clear),
+ * the linked quest (30+ min full, 10+ min minimum, only if not broken), and damage
+ * to a linked boss.
+ */
+export async function saveFocusRun(r: FocusResult): Promise<void> {
+  const { summary, player, quests } = await snapshot()
+  const minutes = Math.max(0, Math.floor(r.minutes))
+  if (minutes === 0 && !r.manual) return
+  const xp = focusXp(minutes, r.cleared)
+  const day = dayKey(new Date(r.startedAt), player.settings.resetHour)
+  await db.focusRuns.add({
+    id: newId(),
+    userId: LOCAL_USER,
+    label: r.label.trim() || 'Focus',
+    stat: r.stat,
+    questId: r.questId,
+    bossId: r.bossId,
+    plannedMin: r.plannedMin,
+    minutes,
+    cleared: r.cleared,
+    manual: !!r.manual,
+    day,
+    xp,
+    startedAt: r.startedAt,
+    createdAt: Date.now(),
+  })
+  if (!r.manual) emit({ type: 'focus.ended', label: r.label, minutes, cleared: r.cleared, xp })
+  await announceProgress(summary)
+
+  // A broken session still counts its minutes, but doesn't clear a quest.
+  const quest = r.questId ? quests.find(q => q.id === r.questId) : undefined
+  const version = r.cleared || r.manual ? focusQuestVersion(minutes) : null
+  if (quest && version) await completeQuest(quest, version, { at: r.startedAt })
+  if (r.bossId) await damageBoss(r.bossId)
+}
+
+/** Logs a 15-minute hit on a boss done without the timer (honour system). */
+export async function hitBoss(bossId: string): Promise<void> {
+  const boss = await db.bosses.get(bossId)
+  if (!boss) return
+  await saveFocusRun({ label: boss.name, stat: boss.stat, questId: null, bossId, plannedMin: MINUTES_PER_HIT, minutes: MINUTES_PER_HIT, cleared: true, startedAt: Date.now(), manual: true })
+}
+
+/** After damage: announce it, clear the dreaded-task side quest, and mark the boss defeated at 0 HP. */
+async function damageBoss(bossId: string): Promise<void> {
+  const { summary, quests } = await snapshot()
+  const status = summary.bosses.find(b => b.boss.id === bossId)
+  if (!status || status.boss.defeatedAt) return
+  emit({ type: 'boss.hit', name: status.boss.name, damage: status.damage, hpLeft: status.hpLeft })
+  const dread = quests.find(q => q.active && q.templateId === 'side-agi-dread')
+  if (status.hpLeft === 0) {
+    await db.bosses.update(bossId, { defeatedAt: Date.now(), updatedAt: Date.now() })
+    emit({ type: 'boss.defeated', name: status.boss.name, xp: BOSS_XP })
+    const done = dread && summary.weekDone.get(dread.id)
+    if (dread && done?.version === 'min') await db.completions.delete(done.id)
+    if (dread && done?.version !== 'full') await completeQuest(dread, 'full')
+    await announceProgress(summary)
+  } else if (dread && !summary.weekDone.has(dread.id)) {
+    // "First 15 minutes of it" is the dreaded task's minimum version.
+    await completeQuest(dread, 'min')
+  }
+}
+
+export async function addBoss(input: { name: string; stat: StatKey; hours: number }): Promise<void> {
+  const now = Date.now()
+  await db.bosses.add({
+    id: newId(),
+    userId: LOCAL_USER,
+    name: input.name.trim(),
+    stat: input.stat,
+    hp: Math.max(1, Math.round((input.hours * 60) / MINUTES_PER_HIT)),
+    active: true,
+    defeatedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  })
+}
+
+/** Removes a boss from the board. Its sessions and XP stay. */
+export async function removeBoss(id: string): Promise<void> {
+  await db.bosses.update(id, { active: false, updatedAt: Date.now() })
+}
+
 // ---- Feature switches ----
 
 export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
@@ -595,14 +699,16 @@ export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts] = await Promise.all(tables().map(t => t.toArray()))
-  return { format: SAVE_FORMAT, version: 5, players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts }
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses] = await Promise.all(
+    tables().map(t => t.toArray()),
+  )
+  return { format: SAVE_FORMAT, version: 6, players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses }
 }
 
 export async function exportSave(): Promise<string> {
@@ -627,6 +733,8 @@ export async function importSave(json: string): Promise<void> {
     await db.scans.bulkPut(data.scans ?? [])
     await db.people.bulkPut(data.people ?? [])
     await db.contacts.bulkPut(data.contacts ?? [])
+    await db.focusRuns.bulkPut(data.focusRuns ?? [])
+    await db.bosses.bulkPut(data.bosses ?? [])
   })
 }
 
