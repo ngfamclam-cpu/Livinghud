@@ -14,9 +14,10 @@ interface HudProps {
   onFocus: () => void
   onJournal: () => void
   journaledToday: boolean
+  onReport: () => void
 }
 
-export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday }: HudProps) {
+export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport }: HudProps) {
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
   const sides = active.filter(q => q.kind === 'side')
@@ -47,6 +48,11 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
         </div>
         <Bar value={level.xpIntoLevel} max={level.xpForNext} label={`${level.xpIntoLevel} / ${level.xpForNext} XP`} />
         {summary.penalty && <PenaltyLine summary={summary} difficulty={player.settings.difficulty} />}
+        {featureOn(player, 'report') && (
+          <div className="row end">
+            <button className="ghost small" onClick={onReport}>Weekly report</button>
+          </div>
+        )}
 
         <div className="wallet">
           <div>

@@ -58,6 +58,8 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'badges', name: 'Titles and streak bonuses', description: 'Earn titles from streaks and milestones; a 30-day streak adds 10% XP for that stat.' },
   { key: 'loot', name: 'Loot themes', description: 'HUD colour themes that drop at levels and milestones.' },
   { key: 'penalties', name: 'Penalty modes', description: 'Casual pauses streaks; Normal costs 5 XP per missed daily; Hardcore uses HP and can cost wallet money.' },
+  { key: 'briefing', name: 'Morning briefing', description: 'A System message the first time you open the app each day.' },
+  { key: 'report', name: 'Weekly report card', description: 'A grade, stat changes and one suggestion for each week, shown on Mondays.' },
   { key: 'journal', name: 'Reflection journal', description: 'Three prompts a day, mood and energy, and the patterns over time.' },
 ]
 
