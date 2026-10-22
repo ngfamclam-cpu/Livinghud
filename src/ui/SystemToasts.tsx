@@ -45,6 +45,10 @@ function toastFor(event: GameEvent): Toast | null {
       return { id: nextId++, text: `${event.name} takes a hit: ${event.hpLeft} HP left` }
     case 'boss.defeated':
       return { id: nextId++, text: `BOSS DEFEATED: ${event.name}  +${event.xp} XP`, big: true }
+    case 'badge.earned':
+      return { id: nextId++, text: `TITLE EARNED: ${event.title}. ${event.description}.`, big: true }
+    case 'loot.dropped':
+      return { id: nextId++, text: `LOOT DROP: ${event.name} theme. Equip it in Settings.`, big: true }
     case 'routine.raised':
       return { id: nextId++, text: 'Routine levelled up. New targets start today.', big: true }
     case 'savings.goalMet':

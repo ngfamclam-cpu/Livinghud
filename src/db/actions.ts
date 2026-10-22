@@ -19,6 +19,9 @@ import {
   focusQuestVersion,
   focusXp,
   journalVersion,
+  featureOn,
+  STREAK_BONUS,
+  THEMES,
   DEFAULT_BOND_DAYS,
   planDescription,
   missingPostureMoves,
@@ -114,13 +117,14 @@ async function snapshot() {
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
     db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const [people, contacts, focusRuns, bosses] = await Promise.all([
+  const [people, contacts, focusRuns, bosses, journal] = await Promise.all([
     db.people.where('userId').equals(LOCAL_USER).toArray(),
     db.contacts.where('userId').equals(LOCAL_USER).toArray(),
     db.focusRuns.where('userId').equals(LOCAL_USER).toArray(),
     db.bosses.where('userId').equals(LOCAL_USER).toArray(),
+    db.journal.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const summary = summarize(player, quests, completions, new Date(), { purchases, savings, sets, people, contacts, focusRuns, bosses })
+  const summary = summarize(player, quests, completions, new Date(), { purchases, savings, sets, people, contacts, focusRuns, bosses, journal })
   return { player, quests, completions, purchases, savings, sets, people, contacts, focusRuns, bosses, summary }
 }
 
@@ -134,6 +138,16 @@ async function announceProgress(before: Summary): Promise<void> {
   }
   if (after.savings.target > 0 && !before.savings.met && after.savings.met) {
     emit({ type: 'savings.goalMet', month: after.wallet.month, target: after.savings.target })
+  }
+  const player = await db.players.get(LOCAL_USER)
+  if (player && featureOn(player, 'badges')) {
+    const had = new Set(before.badges.map(b => b.id))
+    for (const b of after.badges) if (!had.has(b.id)) emit({ type: 'badge.earned', title: b.title, description: b.description })
+  }
+  if (player && featureOn(player, 'loot')) {
+    for (const id of after.themes) {
+      if (!before.themes.includes(id)) emit({ type: 'loot.dropped', name: THEMES.find(t => t.id === id)?.name ?? id })
+    }
   }
 }
 
@@ -164,7 +178,10 @@ export async function completeQuest(
   }
 
   const activeDailies = before.quests.filter(q => q.kind === 'daily' && q.active).length
-  const reward = questReward(quest, version, player.settings.monthlyBudget, activeDailies, stage)
+  const base = questReward(quest, version, player.settings.monthlyBudget, activeDailies, stage)
+  // A 30-day streak on this stat's dailies adds 10% XP (never dollars) while it holds.
+  const bonus = featureOn(player, 'badges') && summary.streakBonus.has(quest.stat) ? 1 + STREAK_BONUS : 1
+  const reward = { ...base, xp: Math.round(base.xp * bonus) }
   const completion: Completion = {
     id: newId(),
     userId: LOCAL_USER,
@@ -710,6 +727,16 @@ export async function saveJournal(input: Pick<JournalEntry, 'wentWell' | 'draine
   const done = summary.todayDone.get(quest.id)
   if (done?.version === 'min' && version === 'full') await db.completions.delete(done.id)
   if (!done || (done.version === 'min' && version === 'full')) await completeQuest(quest, version)
+}
+
+// ---- Titles and themes ----
+
+export async function setTitle(title: string | null): Promise<void> {
+  await db.players.update(LOCAL_USER, { title, updatedAt: Date.now() })
+}
+
+export async function setTheme(theme: string): Promise<void> {
+  await db.players.update(LOCAL_USER, { theme, updatedAt: Date.now() })
 }
 
 // ---- Feature switches ----

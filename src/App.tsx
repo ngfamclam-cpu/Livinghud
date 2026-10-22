@@ -60,7 +60,7 @@ export default function App() {
   }
 
   const { player, quests, rewards, purchases, savings, sets, people, contacts, focusRuns, bosses } = data
-  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses })
+  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal })
   const openFocus = (preset: FocusPreset = {}) => {
     setFocusPreset(preset)
     setScreen('focus')
@@ -99,10 +99,19 @@ export default function App() {
       {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} />}
       {current === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} onFight={bossId => openFocus({ bossId })} />}
       {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} />}
-      {current === 'settings' && <Settings player={player} quests={quests} onClose={() => setTab('hud')} />}
+      {current === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setTab('hud')} />}
       <SystemToasts />
+      <ThemeApplier theme={featureOn(player, 'loot') && player.theme && summary.themes.includes(player.theme) ? player.theme : 'system'} />
     </>
   )
+}
+
+/** Puts the equipped loot theme on the page (CSS picks colours from data-theme). */
+function ThemeApplier({ theme }: { theme: string }) {
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+  }, [theme])
+  return null
 }
 
 /** Re-renders every minute so dailies reset at the right time without a reload. */

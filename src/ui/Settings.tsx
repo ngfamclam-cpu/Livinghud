@@ -1,15 +1,16 @@
 import { useRef, useState } from 'react'
-import type { Difficulty, Player, Quest, SavingsGoal } from '../engine'
+import type { Difficulty, Player, Quest, SavingsGoal, Summary } from '../engine'
 import { exportSave, importSave, resetEverything, updateSettings } from '../db/actions'
 import { forgetSync } from '../db/sync'
 import { SystemWindow } from './SystemWindow'
 import { SyncPanel } from './CloudSync'
 import { Automations } from './Automations'
+import { TitlesLoot } from './TitlesLoot'
 import { FEATURES, featureOn } from '../engine'
 import { setFeature } from '../db/actions'
 import { APP_VERSION } from '../pwa'
 
-export function Settings({ player, quests, onClose }: { player: Player; quests: Quest[]; onClose: () => void }) {
+export function Settings({ player, quests, summary, onClose }: { player: Player; quests: Quest[]; summary: Summary; onClose: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState('')
   const [budget, setBudget] = useState(String(player.settings.monthlyBudget))
@@ -84,6 +85,8 @@ export function Settings({ player, quests, onClose }: { player: Player; quests: 
         </div>
         {saved && <p className="system-line">{saved}</p>}
       </SystemWindow>
+
+      <TitlesLoot player={player} summary={summary} />
 
       <SystemWindow title="Features">
         <p className="muted">Switch off anything you don't want. Switching a feature off hides it; its history is kept and comes back if you switch it on again.</p>

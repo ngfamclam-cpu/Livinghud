@@ -32,6 +32,12 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
         <div className="player-line">
           <div>
             <div className="player-name">{player.name}</div>
+            {featureOn(player, 'badges') && player.title && summary.badges.some(b => b.title === player.title) && (
+              <div className="player-title">{player.title}</div>
+            )}
+            {featureOn(player, 'badges') && summary.streakBonus.size > 0 && (
+              <div className="muted">Streak bonus: +10% XP on {[...summary.streakBonus].join(', ')}</div>
+            )}
             <div className="muted">Rank {summary.rank} · {Math.round(summary.completionRate * 100)}% over 30 days</div>
           </div>
           <div className="level">

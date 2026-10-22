@@ -23,6 +23,8 @@ export type GameEvent =
   | { type: 'focus.ended'; label: string; minutes: number; cleared: boolean; xp: number }
   | { type: 'boss.hit'; name: string; damage: number; hpLeft: number }
   | { type: 'boss.defeated'; name: string; xp: number }
+  | { type: 'badge.earned'; title: string; description: string }
+  | { type: 'loot.dropped'; name: string }
 
 type Listener = (event: GameEvent) => void
 
