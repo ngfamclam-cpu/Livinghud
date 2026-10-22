@@ -13,7 +13,9 @@ import { PostureScan } from './ui/PostureScan'
 import { Party } from './ui/Party'
 import { Focus, type FocusPreset } from './ui/Focus'
 import { Journal } from './ui/Journal'
-import { featureOn } from './engine'
+import { Report } from './ui/Report'
+import { Briefing, briefingSeen } from './ui/Briefing'
+import { dayKey, featureOn } from './engine'
 
 type Tab = 'hud' | 'quests' | 'party' | 'shop' | 'settings'
 
@@ -28,7 +30,8 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
-  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | null>(null)
+  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | null>(null)
+  const [briefingDone, setBriefingDone] = useState(false)
   const [focusPreset, setFocusPreset] = useState<FocusPreset>({})
   const data = useLiveQuery(async () => {
     const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal] = await Promise.all([
@@ -61,6 +64,22 @@ export default function App() {
 
   const { player, quests, rewards, purchases, savings, sets, people, contacts, focusRuns, bosses } = data
   const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal })
+  const reportInput = {
+    stats: player.stats,
+    quests,
+    completions: data.completions,
+    purchases,
+    contacts,
+    focusRuns,
+    bosses,
+    journal: data.journal,
+    restDays: summary.restDays,
+    resetHour: player.settings.resetHour,
+    weakening: summary.party.filter(b => b.weakening).map(b => b.person.name),
+  }
+  // Not on signup day: the Awakening already says hello.
+  const signupDay = dayKey(new Date(player.createdAt), player.settings.resetHour) === summary.today
+  const showBriefing = !briefingDone && !signupDay && featureOn(player, 'briefing') && !briefingSeen(summary.today)
   const openFocus = (preset: FocusPreset = {}) => {
     setFocusPreset(preset)
     setScreen('focus')
@@ -75,6 +94,7 @@ export default function App() {
           <Workout summary={summary} sets={sets} player={player} onClose={() => setScreen(null)} onScan={() => setScreen('scan')} />
         )}
         {screen === 'scan' && <PostureScan scans={data.scans} onClose={() => setScreen('workout')} />}
+        {screen === 'report' && <Report summary={summary} input={reportInput} onClose={() => setScreen(null)} />}
         {screen === 'journal' && (
           <Journal summary={summary} entries={data.journal} completions={data.completions} quests={quests} onClose={() => setScreen(null)} />
         )}
@@ -96,10 +116,13 @@ export default function App() {
         ))}
       </nav>
       {current === 'party' && <Party summary={summary} contacts={contacts} />}
-      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} />}
+      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} />}
       {current === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} onFight={bossId => openFocus({ bossId })} />}
       {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} />}
       {current === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setTab('hud')} />}
+      {showBriefing && (
+        <Briefing player={player} quests={quests} summary={summary} onClose={() => setBriefingDone(true)} onReport={() => { setBriefingDone(true); setScreen('report') }} />
+      )}
       <SystemToasts />
       <ThemeApplier theme={featureOn(player, 'loot') && player.theme && summary.themes.includes(player.theme) ? player.theme : 'system'} />
     </>

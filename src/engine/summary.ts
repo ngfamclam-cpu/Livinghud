@@ -85,6 +85,8 @@ export interface Summary {
   themes: string[]
   /** Penalty mode results; null when penalties are off or haven't started. */
   penalty: Penalties | null
+  /** Recovery Days (from big-night rewards). */
+  restDays: Set<string>
   /** The plan with raised targets the System offers after 3 clean weeks; null when not due. */
   routineOffer: TrainingPlan | null
 }
@@ -283,6 +285,7 @@ export function summarize(
     streakBonus: streakBonuses(badgeInput),
     themes: unlockedThemes(badgeInput),
     penalty,
+    restDays: recoveryDays,
     wallet,
     savings: savingsStatus(player.settings.savingsGoal, savings, month),
     stats,
