@@ -43,7 +43,12 @@ export interface Player {
   userId: string
   name: string
   stats: StatKey[]
+  /** The Awakening fitness test, kept as the starting point. */
   fitness: FitnessBaseline | null
+  /** The strength routine as edited by the player; until then it comes from the fitness test. */
+  routine?: RoutineExercise[]
+  /** Game day the player last accepted or declined raising the routine's targets. */
+  routineReviewedOn?: string
   settings: PlayerSettings
   createdAt: number
   updatedAt: number
@@ -145,18 +150,32 @@ export interface SavingsEntry {
   createdAt: number
 }
 
-/** One of the strength routine's exercises; plankSeconds is timed, the rest are reps. */
-export type ExerciseKey = keyof FitnessBaseline
+/**
+ * An exercise id. The camera-tracked ones match the fitness test (pushups,
+ * squats, plankSeconds, pullups, gluteBridges); players can add their own.
+ */
+export type ExerciseKey = string
+
+export type ExerciseUnit = 'reps' | 'seconds' | 'minutes'
+
+/** One exercise in the player's strength routine, with today's target. */
+export interface RoutineExercise {
+  key: ExerciseKey
+  name: string
+  unit: ExerciseUnit
+  target: number
+}
 
 /** A set of the strength routine. Today's progress is the sum of today's sets. */
 export interface ExerciseSet {
   id: string
   userId: string
   exercise: ExerciseKey
-  /** Reps, or seconds for the plank. */
+  /** Reps, seconds or minutes. Negative for a correction that lowers the count. */
   amount: number
   /** Game day, YYYY-MM-DD. */
   day: string
-  source: 'camera' | 'manual'
+  /** 'correction' sets today's total by hand when the camera got it wrong. */
+  source: 'camera' | 'manual' | 'correction'
   createdAt: number
 }

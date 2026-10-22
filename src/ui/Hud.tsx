@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { EXERCISES, STATS, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
-import { completeQuest, undoQuest } from '../db/actions'
+import { STATS, formatAmount, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
+import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
 import { money, monthName } from './format'
@@ -55,6 +55,26 @@ export function Hud({ player, quests, summary, onStartWorkout }: { player: Playe
         <SystemWindow title="Recovery Day" className="recovery">
           <p className="system-line">Today's quests: hydrate, eat well, rest.</p>
           <p className="muted">Your streaks are protected and skipped dailies won't lower your stats. Dailies you still do count as normal.</p>
+        </SystemWindow>
+      )}
+
+      {summary.routineOffer && summary.routine && (
+        <SystemWindow title="Routine level up" className="offer">
+          <p className="system-line">Three weeks of full routines. The System offers harder targets:</p>
+          <ul className="offer-list">
+            {summary.routine.exercises.map(e => {
+              const next = summary.routineOffer!.find(o => o.key === e.key)
+              return (
+                <li key={e.key}>
+                  {e.name}: {formatAmount(e, e.target)} → <b>{next ? formatAmount(e, next.target) : formatAmount(e, e.target)}</b>
+                </li>
+              )
+            })}
+          </ul>
+          <div className="row end">
+            <button className="ghost" onClick={() => declineRoutineOffer()}>Not now</button>
+            <button onClick={() => acceptRoutineOffer()}>Accept</button>
+          </div>
         </SystemWindow>
       )}
 
@@ -119,7 +139,7 @@ interface RowProps {
 function QuestRow({ quest, done, streak = 0, routine, onStartWorkout }: RowProps) {
   const [open, setOpen] = useState(false)
   const routineParts = routine
-    ? EXERCISES.filter(e => routine.targets[e.key]).map(e => `${e.name} ${Math.min(routine.done[e.key] ?? 0, routine.targets[e.key]!)}/${routine.targets[e.key]}`)
+    ? routine.exercises.map(e => `${e.name} ${Math.min(routine.done[e.key] ?? 0, e.target)}/${formatAmount(e, e.target)}`)
     : []
   return (
     <li className={`quest ${done ? 'done' : ''}`}>

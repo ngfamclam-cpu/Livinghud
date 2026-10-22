@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { angleAt, countFrame, newCounter, routineDone, routineLevel, routineTargets, type BodyPoint, type ExerciseKey, type ExerciseSet } from './index'
+import { addDays, angleAt, countFrame, defaultRoutine, newCounter, nextTarget, playerRoutine, progressionOffer, routineDone, routineLevel, routineTargets, type BodyPoint, type ExerciseKey, type ExerciseSet } from './index'
 
 // Synthetic camera frames: 33 body points, only the left side visible.
 const blank = (): BodyPoint[] => Array.from({ length: 33 }, () => ({ x: 0, y: 0, visibility: 0 }))
@@ -112,7 +112,20 @@ describe('routine', () => {
   })
 
   it('skips exercises with no target', () => {
-    expect(routineTargets(fitness)).toEqual({ pushups: 20, squats: 40, plankSeconds: 60, gluteBridges: 12 })
+    expect(routineTargets(defaultRoutine(fitness))).toEqual({ pushups: 20, squats: 40, plankSeconds: 60, gluteBridges: 12 })
+  })
+
+  it('uses the edited routine once the player has one', () => {
+    expect(playerRoutine({ fitness, routine: undefined })!.map(e => e.key)).toEqual(['pushups', 'squats', 'plankSeconds', 'gluteBridges'])
+    const routine = [{ key: 'lunges', name: 'Lunges', unit: 'reps' as const, target: 20 }]
+    expect(playerRoutine({ fitness, routine })).toBe(routine)
+    expect(playerRoutine({ fitness: null })).toBe(null)
+  })
+
+  it('lets a correction lower the count, never below zero', () => {
+    const corrected = { ...set('pushups', -5), source: 'correction' as const }
+    expect(routineDone([set('pushups', 20), corrected], '2026-10-21')).toEqual({ pushups: 15 })
+    expect(routineDone([set('pushups', 3), { ...corrected, amount: -9 }], '2026-10-21')).toEqual({ pushups: 0 })
   })
 
   it('adds up sets split across the day', () => {
@@ -120,9 +133,43 @@ describe('routine', () => {
   })
 
   it('is full when every target is hit and minimum at half of each', () => {
-    const targets = routineTargets(fitness)
+    const targets = routineTargets(defaultRoutine(fitness))
     expect(routineLevel(targets, { pushups: 20, squats: 40, plankSeconds: 60 })).toBe(null)
     expect(routineLevel(targets, { pushups: 10, squats: 20, plankSeconds: 30, gluteBridges: 6 })).toBe('min')
     expect(routineLevel(targets, { pushups: 25, squats: 40, plankSeconds: 60, gluteBridges: 12 })).toBe('full')
+  })
+})
+
+describe('progression', () => {
+  const routine = defaultRoutine({ pushups: 20, squats: 40, plankSeconds: 60, pullups: 10, gluteBridges: 12 })
+  const today = '2026-11-30'
+  const daysBack = (n: number, from = today) => Array.from({ length: n }, (_, i) => addDays(from, -(i + 1)))
+
+  it('raises targets about 25% in sensible steps, like the design doc', () => {
+    expect(routine.map(e => nextTarget(e.target, e.unit))).toEqual([25, 50, 75, 12, 15])
+    expect(nextTarget(1, 'reps')).toBe(2)
+    expect(nextTarget(5, 'minutes')).toBe(6)
+  })
+
+  it('offers harder targets after 21 full days in a row', () => {
+    expect(progressionOffer(routine, new Set(daysBack(20)), new Set(), today)).toBe(null)
+    const offer = progressionOffer(routine, new Set(daysBack(21)), new Set(), today)
+    expect(offer?.map(e => e.target)).toEqual([25, 50, 75, 12, 15])
+  })
+
+  it('does not count today, which may not be done yet', () => {
+    expect(progressionOffer(routine, new Set([today, ...daysBack(20)]), new Set(), today)).toBe(null)
+  })
+
+  it('lets Recovery Days pass without breaking or adding to the run', () => {
+    const full = daysBack(22).filter(d => d !== addDays(today, -5))
+    expect(progressionOffer(routine, new Set(full), new Set([addDays(today, -5)]), today)).not.toBe(null)
+    expect(progressionOffer(routine, new Set(full), new Set(), today)).toBe(null)
+  })
+
+  it('waits another 3 weeks after an accept or "Not now"', () => {
+    const full = new Set(daysBack(40))
+    expect(progressionOffer(routine, full, new Set(), today, addDays(today, -10))).toBe(null)
+    expect(progressionOffer(routine, full, new Set(), today, addDays(today, -22))).not.toBe(null)
   })
 })

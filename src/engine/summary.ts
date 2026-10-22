@@ -5,8 +5,8 @@
 import { levelFromXp, type LevelInfo } from './leveling'
 import { playerRank, round2, savingsStatus, type SavingsStatus } from './economy'
 import { addDays, dayKey, daysBetween, monthOf, weekOf } from './time'
-import { routineDone, routineTargets, type RoutineTargets } from './workout'
-import type { Completion, ExerciseSet, Player, Purchase, Quest, RewardRank, SavingsEntry, StatKey } from './types'
+import { playerRoutine, progressionOffer, routineDone, routineTargets, type RoutineTargets } from './workout'
+import type { Completion, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey } from './types'
 
 export const STAT_WINDOW_DAYS = 30
 
@@ -56,8 +56,10 @@ export interface Summary {
   streaks: Map<string, number>
   /** Today is a Recovery Day: streaks are protected and missed dailies don't count. */
   recoveryToday: boolean
-  /** Strength routine targets and today's logged progress; null without a fitness test. */
-  routine: { targets: RoutineTargets; done: RoutineTargets } | null
+  /** The strength routine, its targets and today's logged progress; null without one. */
+  routine: { exercises: RoutineExercise[]; targets: RoutineTargets; done: RoutineTargets } | null
+  /** Raised targets the System offers after 3 clean weeks; null when not due. */
+  routineOffer: RoutineExercise[] | null
 }
 
 export interface Logs {
@@ -181,6 +183,10 @@ export function summarize(
     streaks.set(q.id, streak)
   }
 
+  const exercises = playerRoutine(player)
+  const routineQuestIds = new Set(quests.filter(q => q.templateId === 'str-routine').map(q => q.id))
+  const routineFullDays = new Set(completions.filter(c => routineQuestIds.has(c.questId) && c.version === 'full').map(c => c.day))
+
   return {
     today,
     week,
@@ -197,6 +203,7 @@ export function summarize(
     mainQuestsCleared,
     streaks,
     recoveryToday: recoveryDays.has(today),
-    routine: player.fitness ? { targets: routineTargets(player.fitness), done: routineDone(sets, today) } : null,
+    routine: exercises ? { exercises, targets: routineTargets(exercises), done: routineDone(sets, today) } : null,
+    routineOffer: exercises ? progressionOffer(exercises, routineFullDays, recoveryDays, today, player.routineReviewedOn) : null,
   }
 }

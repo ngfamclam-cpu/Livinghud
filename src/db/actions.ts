@@ -13,6 +13,7 @@ import {
   checkPurchase,
   emit,
   questReward,
+  routineDescription,
   routineLevel,
   rewardRank,
   strengthDescription,
@@ -25,6 +26,7 @@ import {
   type Purchase,
   type Quest,
   type QuestStage,
+  type RoutineExercise,
   type Reward,
   type RewardSpecial,
   type StatKey,
@@ -388,26 +390,82 @@ export function randomCode(): string {
 
 // ---- Strength routine ----
 
-/** Logs a set of the strength routine and clears the quest once every target is hit. */
-export async function logSet(exercise: ExerciseKey, amount: number, source: 'camera' | 'manual'): Promise<void> {
-  amount = Math.floor(amount)
-  if (!(amount > 0)) return
-  const { summary, quests } = await snapshot()
+/** Logs a set of the strength routine, then keeps the quest in step with the targets. */
+export async function logSet(exercise: ExerciseKey, amount: number, source: 'camera' | 'manual' | 'correction'): Promise<void> {
+  amount = Math.round(amount)
+  if (amount === 0 || (source !== 'correction' && amount < 0)) return
+  const { summary } = await snapshot()
   await db.sets.add({ id: newId(), userId: LOCAL_USER, exercise, amount, day: summary.today, source, createdAt: Date.now() })
-  const after = await snapshot()
-  const routine = after.summary.routine
-  if (!routine) return
-  emit({ type: 'workout.set', exercise, amount, total: routine.done[exercise] ?? 0, target: routine.targets[exercise] ?? 0 })
-
-  const quest = quests.find(q => q.kind === 'daily' && q.active && q.templateId === 'str-routine')
-  if (quest && !after.summary.todayDone.has(quest.id) && routineLevel(routine.targets, routine.done) === 'full') {
-    await completeQuest(quest, 'full')
+  const routine = (await snapshot()).summary.routine
+  if (routine && source !== 'correction') {
+    const name = routine.exercises.find(e => e.key === exercise)?.name ?? exercise
+    emit({ type: 'workout.set', exercise, name, amount, total: routine.done[exercise] ?? 0, target: routine.targets[exercise] ?? 0 })
   }
+  await syncRoutineQuest()
+}
+
+/** Sets today's total for an exercise by hand, e.g. when the camera miscounted. Honour system. */
+export async function correctTotal(exercise: ExerciseKey, total: number): Promise<void> {
+  const { summary } = await snapshot()
+  const current = summary.routine?.done[exercise] ?? 0
+  await logSet(exercise, Math.max(0, Math.round(total)) - current, 'correction')
 }
 
 export async function deleteSet(id: string): Promise<void> {
   await db.sets.delete(id)
+  await syncRoutineQuest()
 }
+
+/**
+ * Clears the strength quest once every target is hit, and un-clears an automatic
+ * clear if a correction, deleted set or raised target means it no longer is.
+ */
+async function syncRoutineQuest(): Promise<void> {
+  const { summary, quests } = await snapshot()
+  const routine = summary.routine
+  const quest = quests.find(q => q.kind === 'daily' && q.active && q.templateId === 'str-routine')
+  if (!routine || !quest) return
+  const full = routineLevel(routine.targets, routine.done) === 'full'
+  const done = summary.todayDone.get(quest.id)
+  if (full && !done) await completeQuest(quest, 'full')
+  if (!full && done?.version === 'full') {
+    await db.completions.delete(done.id)
+    emit({ type: 'quest.undone', questId: quest.id, questTitle: quest.title })
+  }
+}
+
+/** Replaces the player's strength routine (targets, exercises) and updates the quest text to match. */
+export async function saveRoutine(exercises: RoutineExercise[]): Promise<void> {
+  const clean = exercises
+    .map(e => ({ ...e, name: e.name.trim(), target: Math.max(1, Math.round(e.target)) }))
+    .filter(e => e.name && e.target > 0)
+  if (clean.length === 0) return
+  const now = Date.now()
+  await db.players.update(LOCAL_USER, { routine: clean, updatedAt: now })
+  const quests = await db.quests.where('userId').equals(LOCAL_USER).toArray()
+  for (const q of quests.filter(q => q.templateId === 'str-routine')) {
+    await db.quests.update(q.id, { description: routineDescription(clean), updatedAt: now })
+  }
+  await syncRoutineQuest()
+}
+
+/** Takes the System's offer of harder targets after 3 clean weeks. */
+export async function acceptRoutineOffer(): Promise<void> {
+  const { summary } = await snapshot()
+  if (!summary.routineOffer) return
+  await db.players.update(LOCAL_USER, { routineReviewedOn: summary.today })
+  await saveRoutine(summary.routineOffer)
+  emit({ type: 'routine.raised' })
+}
+
+/** "Not now": the System asks again after another 3 clean weeks. */
+export async function declineRoutineOffer(): Promise<void> {
+  const { summary } = await snapshot()
+  await db.players.update(LOCAL_USER, { routineReviewedOn: summary.today, updatedAt: Date.now() })
+}
+
+/** A unique id for a player-made exercise. */
+export const customExerciseKey = () => `custom-${newId().slice(0, 8)}`
 
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
