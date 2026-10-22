@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DAY_NAMES, STATS, featureOn, dayExercises, formatAmount, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
+import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
 import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { activeFocus, focusedMinutes } from '../db/focus'
@@ -46,6 +46,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
           </div>
         </div>
         <Bar value={level.xpIntoLevel} max={level.xpForNext} label={`${level.xpIntoLevel} / ${level.xpForNext} XP`} />
+        {summary.penalty && <PenaltyLine summary={summary} difficulty={player.settings.difficulty} />}
 
         <div className="wallet">
           <div>
@@ -276,4 +277,30 @@ function FocusPanel({ summary, showBoss, onFocus }: { summary: Summary; showBoss
       </div>
     </SystemWindow>
   )
+}
+
+function PenaltyLine({ summary, difficulty }: { summary: Summary; difficulty: Player['settings']['difficulty'] }) {
+  const p = summary.penalty!
+  const missed = p.missedYesterday
+  if (difficulty === 'hardcore' && p.hp !== null) {
+    const knockedOut = p.knockouts.find(k => k.day === addDays(summary.today, -1))
+    return (
+      <div className="hp">
+        <Bar value={p.hp} max={MAX_HP} label={`HP ${p.hp} / ${MAX_HP}`} variant="hp" />
+        {knockedOut && (
+          <p className="system-line danger-line">
+            HP hit 0 yesterday{knockedOut.dollars > 0 ? `: $${knockedOut.dollars.toFixed(2)} was taken from your wallet` : ', but your wallet was empty'}. HP restored to 50.
+          </p>
+        )}
+        {!knockedOut && p.hp <= LOW_HP && <p className="system-line danger-line">HP low. Clear every daily today to recover {HP_PER_CLEAN_DAY} HP. At 0 you lose ${KNOCKOUT_DOLLARS}.</p>}
+      </div>
+    )
+  }
+  if (difficulty === 'normal' && missed > 0) {
+    return <p className="muted penalty-line">Missed {missed} dail{missed === 1 ? 'y' : 'ies'} yesterday: −{missed * NORMAL_XP_PER_MISS} XP.</p>
+  }
+  if (difficulty === 'casual' && missed > 0) {
+    return <p className="muted penalty-line">Missed {missed} yesterday. Casual mode: your streaks are paused, not broken.</p>
+  }
+  return null
 }

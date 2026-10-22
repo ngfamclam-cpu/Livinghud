@@ -8,6 +8,7 @@ import { addDays, dayKey, daysBetween, monthOf, weekOf } from './time'
 import { dayExercises, planDay, playerPlan, progressionDue, raisePlan, routineDone, routineTargets, type RoutineTargets } from './workout'
 import { partyBonds, type Bond } from './party'
 import { BOSS_XP, bossStatus, type BossStatus } from './focus'
+import { CASUAL_PAUSE_DAYS, penalties, type Penalties } from './penalties'
 import { earnedBadges, longestStreak, streakBonuses, unlockedThemes, type Badge } from './badges'
 import type { Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
@@ -82,6 +83,8 @@ export interface Summary {
   streakBonus: Set<StatKey>
   /** Unlocked HUD themes (loot). */
   themes: string[]
+  /** Penalty mode results; null when penalties are off or haven't started. */
+  penalty: Penalties | null
   /** The plan with raised targets the System offers after 3 clean weeks; null when not due. */
   routineOffer: TrainingPlan | null
 }
@@ -111,8 +114,10 @@ export function summarize(
   const startDay = dayKey(new Date(player.createdAt), player.settings.resetHour)
   const budget = player.settings.monthlyBudget
   const month = monthOf(today)
+  // A big night out grants a Recovery Day token for the next day.
+  const recoveryDays = new Set(purchases.filter(p => p.special === 'bigNight').map(p => addDays(p.day, 1)))
 
-  const totalXp =
+  const rawXp =
     completions.reduce((sum, c) => sum + c.xp, 0) + purchases.reduce((sum, p) => sum + p.xp, 0) + contacts.reduce((sum, c) => sum + c.xp, 0) +
     focusRuns.reduce((sum, r) => sum + r.xp, 0) +
     bosses.filter(b => b.defeatedAt).length * BOSS_XP
@@ -121,6 +126,28 @@ export function summarize(
   // When a month ends, whatever the wallet didn't spend rolls into the Vault too.
   const earnedBy = new Map<string, number>()
   for (const c of completions) earnedBy.set(monthOf(c.day), (earnedBy.get(monthOf(c.day)) ?? 0) + c.dollars)
+  // Penalties (if on) come off XP and that month's earnings.
+  const resetHour = player.settings.resetHour
+  const doneOn = new Map<string, Set<string>>()
+  for (const c of completions) {
+    if (!doneOn.has(c.day)) doneOn.set(c.day, new Set())
+    doneOn.get(c.day)!.add(c.questId)
+  }
+  const penalty =
+    player.features?.penalties !== false && player.penaltiesSince
+      ? penalties({
+          difficulty: player.settings.difficulty,
+          since: player.penaltiesSince,
+          today,
+          dailies: quests.filter(q => q.kind === 'daily' && q.active).map(q => ({ id: q.id, since: dayKey(new Date(q.createdAt), resetHour) })),
+          doneOn,
+          restDays: recoveryDays,
+          earnedBy,
+        })
+      : null
+  for (const [m, lost] of penalty?.dollarsLost ?? []) earnedBy.set(m, (earnedBy.get(m) ?? 0) - lost)
+  const totalXp = Math.max(0, rawXp - (penalty?.xpLost ?? 0))
+
   const spentBy = new Map<string, number>()
   let vaultSpent = 0
   for (const p of purchases) {
@@ -143,8 +170,6 @@ export function summarize(
     vault: round2(Math.max(0, vault)),
   }
 
-  // A big night out grants a Recovery Day token for the next day.
-  const recoveryDays = new Set(purchases.filter(p => p.special === 'bigNight').map(p => addDays(p.day, 1)))
 
   const byId = new Map(quests.map(q => [q.id, q]))
   const todayDone = new Map<string, Completion>()
@@ -203,13 +228,20 @@ export function summarize(
   // Streaks count back from today (or yesterday if today isn't done yet).
   // A Recovery Day neither breaks a streak nor adds to it.
   const streaks = new Map<string, number>()
+  const casualPause = !!penalty && player.settings.difficulty === 'casual'
   for (const q of dailies) {
     const days = new Set(completions.filter(c => c.questId === q.id).map(c => c.day))
     let day = days.has(today) ? today : addDays(today, -1)
     let streak = 0
+    let gap = 0
     for (let guard = 0; guard < 3650; guard++) {
-      if (days.has(day)) streak++
-      else if (!recoveryDays.has(day)) break
+      if (days.has(day)) {
+        streak++
+        gap = 0
+      } else if (!recoveryDays.has(day)) {
+        // Casual mode pauses a streak over a couple of missed days instead of breaking it.
+        if (!casualPause || day < (player.penaltiesSince ?? today) || ++gap > CASUAL_PAUSE_DAYS) break
+      }
       day = addDays(day, -1)
     }
     streaks.set(q.id, streak)
@@ -250,6 +282,7 @@ export function summarize(
     badges: earnedBadges(badgeInput),
     streakBonus: streakBonuses(badgeInput),
     themes: unlockedThemes(badgeInput),
+    penalty,
     wallet,
     savings: savingsStatus(player.settings.savingsGoal, savings, month),
     stats,

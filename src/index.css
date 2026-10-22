@@ -356,6 +356,12 @@ button.icon { padding: 2px 8px; font-size: 1.1rem; line-height: 1; border-color:
 :root[data-theme='jade'] { --line: #19c98a; --glow: rgba(25, 201, 138, 0.45); --accent: #6dffc4; }
 :root[data-theme='abyss'] { --bg: #04020c; --bg-2: #0d0820; --line: #6c5ce7; --glow: rgba(108, 92, 231, 0.5); --accent: #e0e0ff; }
 
+/* ---- Penalties ---- */
+.hp { margin-top: 8px; }
+.bar.hp .fill { background: linear-gradient(90deg, #c4243a, var(--danger)); box-shadow: 0 0 10px rgba(255, 95, 109, 0.5); }
+.danger-line { color: var(--danger); text-shadow: 0 0 8px rgba(255, 95, 109, 0.4); margin: 6px 0 0; }
+.penalty-line { margin: 6px 0 0; }
+
 /* ---- Auto-complete ---- */
 .howto { margin: 0 0 12px; border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 8px 12px; }
 .howto summary { cursor: pointer; color: var(--accent); font-weight: 600; }

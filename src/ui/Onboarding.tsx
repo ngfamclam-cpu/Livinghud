@@ -24,9 +24,9 @@ const MIN_STATS = 3
 const MIN_DAILIES = 3
 
 const DIFFICULTIES: { key: Difficulty; name: string; text: string }[] = [
-  { key: 'casual', name: 'Casual', text: 'Missed dailies pause your streak. Nothing is lost.' },
-  { key: 'normal', name: 'Normal', text: 'Missed dailies break streaks and your stats slip.' },
-  { key: 'hardcore', name: 'Hardcore', text: 'Missed dailies cost HP. At 0 HP you lose wallet money or a level.' },
+  { key: 'casual', name: 'Casual', text: 'Nothing is lost. A missed day pauses your streaks (up to 2 days in a row).' },
+  { key: 'normal', name: 'Normal', text: 'Missed dailies break streaks and cost 5 XP each.' },
+  { key: 'hardcore', name: 'Hardcore', text: 'You have 100 HP. Each missed daily costs 10; a perfect day heals 10. At 0 HP you lose $10 from your wallet.' },
 ]
 
 type Step = 'welcome' | 'stats' | 'fitness' | 'dailies' | 'main' | 'budget' | 'rewards' | 'difficulty' | 'day' | 'status'

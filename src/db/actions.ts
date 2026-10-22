@@ -88,6 +88,7 @@ export async function awaken(answers: AwakeningAnswers): Promise<void> {
     await db.players.put({
       id: LOCAL_USER,
       userId: LOCAL_USER,
+      penaltiesSince: dayKey(new Date(now), answers.settings.resetHour),
       name: answers.name,
       stats: answers.stats,
       fitness: answers.fitness,
@@ -104,7 +105,21 @@ export async function awaken(answers: AwakeningAnswers): Promise<void> {
 export async function updateSettings(patch: Partial<PlayerSettings>): Promise<void> {
   const player = await db.players.get(LOCAL_USER)
   if (!player) return
-  await db.players.update(LOCAL_USER, { settings: { ...player.settings, ...patch }, updatedAt: Date.now() })
+  const settings = { ...player.settings, ...patch }
+  // A new difficulty applies from today, never to days already past.
+  const restart = patch.difficulty && patch.difficulty !== player.settings.difficulty
+  await db.players.update(LOCAL_USER, {
+    settings,
+    ...(restart ? { penaltiesSince: dayKey(new Date(), settings.resetHour) } : {}),
+    updatedAt: Date.now(),
+  })
+}
+
+/** Starts counting penalties from today for a player who doesn't have a start day yet. */
+export async function ensurePenaltyStart(): Promise<void> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player || player.penaltiesSince || !featureOn(player, 'penalties')) return
+  await db.players.update(LOCAL_USER, { penaltiesSince: dayKey(new Date(), player.settings.resetHour) })
 }
 
 async function snapshot() {
@@ -744,7 +759,9 @@ export async function setTheme(theme: string): Promise<void> {
 export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
   const player = await db.players.get(LOCAL_USER)
   if (!player) return
-  await db.players.update(LOCAL_USER, { features: { ...player.features, [key]: on }, updatedAt: Date.now() })
+  // Switching penalties back on starts a fresh count from today.
+  const restart = key === 'penalties' && on ? { penaltiesSince: dayKey(new Date(), player.settings.resetHour) } : {}
+  await db.players.update(LOCAL_USER, { features: { ...player.features, [key]: on }, ...restart, updatedAt: Date.now() })
 }
 
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
