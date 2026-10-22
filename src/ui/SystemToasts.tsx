@@ -35,6 +35,8 @@ function toastFor(event: GameEvent): Toast | null {
       return { id: nextId++, text: `${event.kind === 'saved' ? 'Savings' : 'Income'} logged: $${event.amount.toFixed(2)}` }
     case 'workout.set':
       return { id: nextId++, text: `${event.name} +${event.amount}  (${Math.min(event.total, event.target)}/${event.target})` }
+    case 'contact.logged':
+      return { id: nextId++, text: `${event.name}: ${event.kind} logged  +${event.xp} CHA XP` }
     case 'routine.raised':
       return { id: nextId++, text: 'Routine levelled up. New targets start today.', big: true }
     case 'savings.goalMet':

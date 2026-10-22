@@ -13,6 +13,8 @@ import {
   checkPurchase,
   emit,
   questReward,
+  CONTACT_XP,
+  DEFAULT_BOND_DAYS,
   planDescription,
   missingPostureMoves,
   routineLevel,
@@ -21,6 +23,10 @@ import {
   summarize,
   type Completion,
   type CompletionVersion,
+  type Circle,
+  type ContactKind,
+  type FeatureKey,
+  type Person,
   type ExerciseKey,
   type ExerciseSet,
   type FitnessBaseline,
@@ -102,8 +108,12 @@ async function snapshot() {
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
     db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const summary = summarize(player, quests, completions, new Date(), { purchases, savings, sets })
-  return { player, quests, completions, purchases, savings, sets, summary }
+  const [people, contacts] = await Promise.all([
+    db.people.where('userId').equals(LOCAL_USER).toArray(),
+    db.contacts.where('userId').equals(LOCAL_USER).toArray(),
+  ])
+  const summary = summarize(player, quests, completions, new Date(), { purchases, savings, sets, people, contacts })
+  return { player, quests, completions, purchases, savings, sets, people, contacts, summary }
 }
 
 /** Announces level-ups, a full wallet and a met savings goal after any change. */
@@ -521,17 +531,78 @@ export async function deleteScan(id: string): Promise<void> {
 /** A unique id for a player-made exercise. */
 export const customExerciseKey = () => `custom-${newId().slice(0, 8)}`
 
+// ---- Party list ----
+
+export async function addPerson(input: { name: string; circle: Circle; bondDays?: number; note?: string }): Promise<void> {
+  const now = Date.now()
+  await db.people.add({
+    id: newId(),
+    userId: LOCAL_USER,
+    name: input.name.trim(),
+    circle: input.circle,
+    bondDays: Math.max(1, Math.round(input.bondDays ?? DEFAULT_BOND_DAYS)),
+    note: input.note?.trim() ?? '',
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+  })
+}
+
+export async function updatePerson(id: string, patch: Partial<Pick<Person, 'name' | 'circle' | 'bondDays' | 'note'>>): Promise<void> {
+  await db.people.update(id, { ...patch, updatedAt: Date.now() })
+}
+
+/** Takes someone off the list. Their contact history (and the XP it earned) stays. */
+export async function removePerson(id: string): Promise<void> {
+  await db.people.update(id, { active: false, updatedAt: Date.now() })
+}
+
+/**
+ * Logs contact with someone: earns CHA XP and clears the matching CHA quests
+ * (any contact clears "Reach out to 1 person"; a hangout clears the weekly
+ * hangout quest; a call with family clears "Call family").
+ */
+export async function logContact(personId: string, kind: ContactKind, note = ''): Promise<void> {
+  const { summary, quests } = await snapshot()
+  const person = await db.people.get(personId)
+  if (!person) return
+  const xp = CONTACT_XP[kind]
+  await db.contacts.add({ id: newId(), userId: LOCAL_USER, personId, kind, note: note.trim(), day: summary.today, xp, createdAt: Date.now() })
+  emit({ type: 'contact.logged', name: person.name, kind, xp })
+  await announceProgress(summary)
+
+  const clears = (templateId: string) => quests.find(q => q.active && q.templateId === templateId)
+  const reach = clears('cha-reach')
+  if (reach) await completeQuest(reach, 'full')
+  const hangout = clears('side-cha-hangout')
+  if (hangout && kind === 'hangout') await completeQuest(hangout, 'full')
+  const family = clears('side-cha-family')
+  if (family && kind === 'call' && person.circle === 'family') await completeQuest(family, 'full')
+}
+
+export async function deleteContact(id: string): Promise<void> {
+  await db.contacts.delete(id)
+}
+
+// ---- Feature switches ----
+
+export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player) return
+  await db.players.update(LOCAL_USER, { features: { ...player.features, [key]: on }, updatedAt: Date.now() })
+}
+
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans] = await Promise.all(tables().map(t => t.toArray()))
-  return { format: SAVE_FORMAT, version: 4, players, quests, completions, rewards, purchases, savings, sets, scans }
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts] = await Promise.all(tables().map(t => t.toArray()))
+  return { format: SAVE_FORMAT, version: 5, players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts }
 }
 
 export async function exportSave(): Promise<string> {
@@ -554,6 +625,8 @@ export async function importSave(json: string): Promise<void> {
     await db.savings.bulkPut(data.savings ?? [])
     await db.sets.bulkPut(data.sets ?? [])
     await db.scans.bulkPut(data.scans ?? [])
+    await db.people.bulkPut(data.people ?? [])
+    await db.contacts.bulkPut(data.contacts ?? [])
   })
 }
 

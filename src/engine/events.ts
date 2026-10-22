@@ -1,7 +1,7 @@
 // Every game action is announced as an event. Screens, notifications and
 // (later) the glasses and AI System only listen; none of them own the rules.
 
-import type { Completion, ExerciseKey, Purchase, StatKey } from './types'
+import type { Completion, ContactKind, ExerciseKey, Purchase, StatKey } from './types'
 
 export type GameEvent =
   | { type: 'quest.completed'; completion: Completion; questTitle: string; via?: 'automation' }
@@ -19,6 +19,7 @@ export type GameEvent =
   | { type: 'workout.rep'; exercise: ExerciseKey; count: number }
   | { type: 'workout.set'; exercise: ExerciseKey; name: string; amount: number; total: number; target: number }
   | { type: 'routine.raised' }
+  | { type: 'contact.logged'; name: string; kind: ContactKind; xp: number }
 
 type Listener = (event: GameEvent) => void
 

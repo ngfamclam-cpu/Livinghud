@@ -2,7 +2,7 @@
 // Phase 5 adds Supabase sync on top; records already carry userId + timestamps.
 
 import Dexie, { type EntityTable } from 'dexie'
-import type { Completion, ExerciseSet, Player, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
+import type { Completion, Contact, ExerciseSet, Person, Player, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
 
 export const LOCAL_USER = 'local'
 
@@ -15,6 +15,8 @@ export const db = new Dexie('livinghud') as Dexie & {
   savings: EntityTable<SavingsEntry, 'id'>
   sets: EntityTable<ExerciseSet, 'id'>
   scans: EntityTable<PostureScan, 'id'>
+  people: EntityTable<Person, 'id'>
+  contacts: EntityTable<Contact, 'id'>
 }
 
 db.version(1).stores({
@@ -40,4 +42,10 @@ db.version(3).stores({
 // Side-on camera posture scans (head angle, walking hip extension).
 db.version(4).stores({
   scans: 'id, userId, day',
+})
+
+// The Party list: people and logged contact with them.
+db.version(5).stores({
+  people: 'id, userId',
+  contacts: 'id, userId, personId, day',
 })

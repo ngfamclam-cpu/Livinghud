@@ -53,6 +53,8 @@ export interface Player {
   routineReviewedOn?: string
   /** One-off System notices the player has answered, so they don't show again. */
   dismissedNotices?: string[]
+  /** Optional features switched off in Settings. Missing means on. */
+  features?: Partial<Record<FeatureKey, boolean>>
   settings: PlayerSettings
   createdAt: number
   updatedAt: number
@@ -211,5 +213,40 @@ export interface PostureScan {
   value: number
   /** Game day, YYYY-MM-DD. */
   day: string
+  createdAt: number
+}
+
+/** Optional parts of the game the player can switch off in Settings. */
+export type FeatureKey = 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises'
+
+export type Circle = 'friend' | 'family' | 'dating' | 'work'
+
+/** Someone in the Party list. */
+export interface Person {
+  id: string
+  userId: string
+  name: string
+  circle: Circle
+  /** Days without contact before the System warns the bond is weakening. */
+  bondDays: number
+  note: string
+  active: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export type ContactKind = 'message' | 'call' | 'hangout' | 'date'
+
+/** A logged contact with someone in the Party list. */
+export interface Contact {
+  id: string
+  userId: string
+  personId: string
+  kind: ContactKind
+  note: string
+  /** Game day, YYYY-MM-DD. */
+  day: string
+  /** CHA XP this contact earned. */
+  xp: number
   createdAt: number
 }

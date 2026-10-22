@@ -5,6 +5,8 @@ import { forgetSync } from '../db/sync'
 import { SystemWindow } from './SystemWindow'
 import { SyncPanel } from './CloudSync'
 import { Automations } from './Automations'
+import { FEATURES, featureOn } from '../engine'
+import { setFeature } from '../db/actions'
 import { APP_VERSION } from '../pwa'
 
 export function Settings({ player, quests, onClose }: { player: Player; quests: Quest[]; onClose: () => void }) {
@@ -81,6 +83,20 @@ export function Settings({ player, quests, onClose }: { player: Player; quests: 
           <button onClick={saveSettings}>Save settings</button>
         </div>
         {saved && <p className="system-line">{saved}</p>}
+      </SystemWindow>
+
+      <SystemWindow title="Features">
+        <p className="muted">Switch off anything you don't want. Switching a feature off hides it; its history is kept and comes back if you switch it on again.</p>
+        <ul className="feature-list">
+          {FEATURES.map(f => (
+            <li key={f.key}>
+              <label className="check">
+                <input type="checkbox" checked={featureOn(player, f.key)} onChange={e => setFeature(f.key, e.target.checked)} />
+                <span><b>{f.name}</b><br /><small className="muted">{f.description}</small></span>
+              </label>
+            </li>
+          ))}
+        </ul>
       </SystemWindow>
 
       <Automations player={player} quests={quests} />
