@@ -2,7 +2,7 @@
 // Phase 5 adds Supabase sync on top; records already carry userId + timestamps.
 
 import Dexie, { type EntityTable } from 'dexie'
-import type { Boss, Completion, Contact, ExerciseSet, FocusRun, Person, Player, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
+import type { Boss, Completion, Contact, ExerciseSet, FocusRun, JournalEntry, Person, Player, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
 
 export const LOCAL_USER = 'local'
 
@@ -19,6 +19,7 @@ export const db = new Dexie('livinghud') as Dexie & {
   contacts: EntityTable<Contact, 'id'>
   focusRuns: EntityTable<FocusRun, 'id'>
   bosses: EntityTable<Boss, 'id'>
+  journal: EntityTable<JournalEntry, 'id'>
 }
 
 db.version(1).stores({
@@ -56,4 +57,9 @@ db.version(5).stores({
 db.version(6).stores({
   focusRuns: 'id, userId, day, bossId, questId',
   bosses: 'id, userId',
+})
+
+// The reflection journal, one entry per game day.
+db.version(7).stores({
+  journal: 'id, userId, day',
 })

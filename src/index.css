@@ -320,6 +320,14 @@ button.icon { padding: 2px 8px; font-size: 1.1rem; line-height: 1; border-color:
 .boss.defeated { opacity: 0.6; }
 .boss .quest-main { display: flex; gap: 10px; align-items: center; }
 
+/* ---- Journal ---- */
+.rating { margin-bottom: 10px; }
+.rating .row { margin-top: 4px; }
+.grow { flex: 1; margin: 0; }
+.weekday-moods li { grid-template-columns: 3em 1fr 2.2em; }
+.journal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.journal-list .quest-main { justify-content: space-between; }
+
 /* ---- Auto-complete ---- */
 .howto { margin: 0 0 12px; border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 8px 12px; }
 .howto summary { cursor: pointer; color: var(--accent); font-weight: 600; }

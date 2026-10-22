@@ -18,6 +18,7 @@ import {
   MINUTES_PER_HIT,
   focusQuestVersion,
   focusXp,
+  journalVersion,
   DEFAULT_BOND_DAYS,
   planDescription,
   missingPostureMoves,
@@ -30,6 +31,7 @@ import {
   type Circle,
   type ContactKind,
   type FeatureKey,
+  type JournalEntry,
   type Person,
   type ExerciseKey,
   type ExerciseSet,
@@ -688,6 +690,28 @@ export async function removeBoss(id: string): Promise<void> {
   await db.bosses.update(id, { active: false, updatedAt: Date.now() })
 }
 
+// ---- Reflection journal ----
+
+/**
+ * Saves today's journal entry (one per day; saving again updates it) and clears
+ * the journal daily: all three prompts is the full quest, one line the minimum.
+ */
+export async function saveJournal(input: Pick<JournalEntry, 'wentWell' | 'drained' | 'adjust' | 'mood' | 'energy'>): Promise<void> {
+  const { summary, quests } = await snapshot()
+  const now = Date.now()
+  const existing = await db.journal.where('userId').equals(LOCAL_USER).filter(e => e.day === summary.today).first()
+  const entry = { ...input, wentWell: input.wentWell.trim(), drained: input.drained.trim(), adjust: input.adjust.trim(), updatedAt: now }
+  if (existing) await db.journal.update(existing.id, entry)
+  else await db.journal.add({ id: newId(), userId: LOCAL_USER, day: summary.today, createdAt: now, ...entry })
+
+  const quest = quests.find(q => q.active && q.kind === 'daily' && q.templateId === 'int-journal')
+  const version = journalVersion(entry)
+  if (!quest || !version) return
+  const done = summary.todayDone.get(quest.id)
+  if (done?.version === 'min' && version === 'full') await db.completions.delete(done.id)
+  if (!done || (done.version === 'min' && version === 'full')) await completeQuest(quest, version)
+}
+
 // ---- Feature switches ----
 
 export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
@@ -699,16 +723,16 @@ export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses] = await Promise.all(
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal] = await Promise.all(
     tables().map(t => t.toArray()),
   )
-  return { format: SAVE_FORMAT, version: 6, players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses }
+  return { format: SAVE_FORMAT, version: 7, players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal }
 }
 
 export async function exportSave(): Promise<string> {
@@ -735,6 +759,7 @@ export async function importSave(json: string): Promise<void> {
     await db.contacts.bulkPut(data.contacts ?? [])
     await db.focusRuns.bulkPut(data.focusRuns ?? [])
     await db.bosses.bulkPut(data.bosses ?? [])
+    await db.journal.bulkPut(data.journal ?? [])
   })
 }
 

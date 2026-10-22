@@ -55,6 +55,7 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'party', name: 'Party list', description: 'Your people, days since contact, bond warnings, hangouts and dates.' },
   { key: 'focus', name: 'Focus dungeons', description: 'Timed work sessions that earn XP per minute and clear linked quests.' },
   { key: 'bosses', name: 'Dreaded-task bosses', description: 'Turn a task you keep avoiding into a boss; focus minutes do damage.' },
+  { key: 'journal', name: 'Reflection journal', description: 'Three prompts a day, mood and energy, and the patterns over time.' },
 ]
 
 export const featureOn = (player: { features?: Partial<Record<FeatureKey, boolean>> }, key: FeatureKey) => player.features?.[key] !== false
