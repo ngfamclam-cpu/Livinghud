@@ -79,7 +79,12 @@ export function Settings({ player, quests, summary, onClose }: { player: Player;
             <option value="hardcore">Hardcore</option>
           </select>
         </label>
-        <p className="muted">Penalty modes take effect in a later update.</p>
+        <p className="muted">
+          {difficulty === 'casual' && 'Nothing is lost. A missed day pauses your streaks (up to 2 days in a row).'}
+          {difficulty === 'normal' && 'Missed dailies break streaks and cost 5 XP each.'}
+          {difficulty === 'hardcore' && 'You have 100 HP. Each missed daily costs 10; a perfect day heals 10. At 0 HP you lose $10 from your wallet.'}{' '}
+          A new difficulty counts from today. Recovery Days always protect you.
+        </p>
         <div className="row end">
           <button onClick={saveSettings}>Save settings</button>
         </div>

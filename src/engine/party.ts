@@ -57,6 +57,7 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'bosses', name: 'Dreaded-task bosses', description: 'Turn a task you keep avoiding into a boss; focus minutes do damage.' },
   { key: 'badges', name: 'Titles and streak bonuses', description: 'Earn titles from streaks and milestones; a 30-day streak adds 10% XP for that stat.' },
   { key: 'loot', name: 'Loot themes', description: 'HUD colour themes that drop at levels and milestones.' },
+  { key: 'penalties', name: 'Penalty modes', description: 'Casual pauses streaks; Normal costs 5 XP per missed daily; Hardcore uses HP and can cost wallet money.' },
   { key: 'journal', name: 'Reflection journal', description: 'Three prompts a day, mood and energy, and the patterns over time.' },
 ]
 

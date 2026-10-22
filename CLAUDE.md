@@ -27,7 +27,7 @@ A Solo Leveling-style RPG HUD for real life. Real tasks are quests, progress sho
 - **Reflection journal:** `journal` table, one entry per game day (editable): went well / drained me / adjust tomorrow + mood and energy (1-5). All three prompts = full "Reflection journal" daily, one line = min (upgrades min to full). Patterns in `src/engine/journal.ts`: streak, mood by weekday, frequent drain words, mood on 80%-dailies days vs other days (needs 3+ of each).
 - **Titles, streak bonuses, loot (Phase 3/6 pieces):** all derived in `src/engine/badges.ts`. A 30-day streak on any daily of a stat earns that stat's title (Iron Will, Unbreakable, Seeker, Bond Keeper, Clockwork, Gold Hunter) for good and +10% XP (never dollars) on that stat's quests while a 30-day streak holds. Milestone titles for levels, bosses, focus hours, journal entries, hangouts. Loot = HUD colour themes (`data-theme` on `<html>`) dropping at levels/milestones. `player.title`, `player.theme`; announcements come from `announceProgress` comparing before/after.
 - **Updates:** the service worker uses `skipWaiting`/`clientsClaim`, and `src/pwa.ts` checks for a new version on open/focus and reloads when it's ready (an installed Android app rarely closes fully, so a waiting worker would never take over). Settings shows the deployed commit (`VERCEL_GIT_COMMIT_SHA`) and build time.
-- **Penalties:** configurable Casual / Normal / Hardcore.
+- **Penalties (Phase 3, done):** `src/engine/penalties.ts`, derived from `player.penaltiesSince` (set at signup, on first load for existing players, when switched back on, and when difficulty changes, so a mode never applies to past days). Casual: nothing lost, streaks pause over up to 2 missed days. Normal: streaks break, −5 XP per missed daily. Hardcore: 100 HP, −10 per missed daily, +10 for a perfect day; at 0 HP lose up to $10 of that month's earnings, HP back to 50. Recovery Days always skip.
 - **Onboarding ("Awakening"):** every preference is asked at signup, not hard-coded. The quest and reward lists are a template library.
 - **Smart glasses** (Meta Ray-Ban Display style): Phase 8. Keep the event bus clean so notifications, a mini-HUD and voice check-off plug in.
 - **AI System:** Phase 7 add-on, not core.
@@ -36,7 +36,7 @@ A Solo Leveling-style RPG HUD for real life. Real tasks are quests, progress sho
 ## Phases
 1. **Done:** Awakening signup, HUD, dailies with complete/minimum/undo, XP/levels, stats, rank, wallet/Vault, save file, PWA.
 2. **Done:** reward shop with E–S ranks and level gates, savings gate, Vault spending, side and main quests (first main quest: side income), owner's real reward list.
-3. **Next:** stat decay, streak badges and multipliers, penalty modes in effect, unlockable INT/AGI dailies.
+3. **Done:** streak badges and multipliers, penalty modes. Still open: unlockable INT/AGI dailies (stats already decay over the 30-day window).
 4. **Done:** focus sessions and bosses, Party list.
 5. Real accounts (replace the sync code with logins) on Vercel storage.
 6. Loot and cosmetics.

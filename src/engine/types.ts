@@ -59,6 +59,8 @@ export interface Player {
   title?: string | null
   /** The HUD colour theme, chosen from unlocked loot. */
   theme?: string
+  /** Game day penalties started counting (set when they're switched on). */
+  penaltiesSince?: string
   settings: PlayerSettings
   createdAt: number
   updatedAt: number
