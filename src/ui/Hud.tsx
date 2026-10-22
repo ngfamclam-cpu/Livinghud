@@ -18,9 +18,10 @@ interface HudProps {
   onReport: () => void
   surprises: SurpriseClear[]
   now: Date
+  onPlans: (id?: string | null) => void
 }
 
-export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now }: HudProps) {
+export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans }: HudProps) {
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
   const sides = active.filter(q => q.kind === 'side')
@@ -117,6 +118,8 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
           <p className="muted">Reach out, then log it on the Party tab.</p>
         </SystemWindow>
       )}
+
+      {featureOn(player, 'plans') && <AdventurePanel summary={summary} onPlans={onPlans} />}
 
       {featureOn(player, 'focus') && <FocusPanel summary={summary} showBoss={featureOn(player, 'bosses')} onFocus={onFocus} />}
 
@@ -314,4 +317,29 @@ function PenaltyLine({ summary, difficulty }: { summary: Summary; difficulty: Pl
     return <p className="muted penalty-line">Missed {missed} yesterday. Casual mode: your streaks are paused, not broken.</p>
   }
   return null
+}
+
+function AdventurePanel({ summary, onPlans }: { summary: Summary; onPlans: (id?: string | null) => void }) {
+  const next = summary.plans[0]
+  if (!next) {
+    return (
+      <SystemWindow title="Next adventure">
+        <div className="row">
+          <p className="muted grow">Raves, festivals, the Asia trip: plan one and save for it from the Vault.</p>
+          <button className="small" onClick={() => onPlans(null)}>Plan one</button>
+        </div>
+      </SystemWindow>
+    )
+  }
+  const { plan, daysLeft, progress } = next
+  return (
+    <SystemWindow title="Next adventure" className="adventure">
+      <button className="quest-main" onClick={() => onPlans(plan.id)}>
+        <span className="quest-title">{plan.name}</span>
+        <span className="routine-count">{daysLeft === null ? 'no date' : daysLeft > 0 ? `${daysLeft} days` : daysLeft === 0 ? 'today!' : 'past'}</span>
+      </button>
+      <Bar value={progress} max={1} variant="gold" label={`${Math.round(progress * 100)}% funded`} />
+      {summary.plans.length > 1 && <p className="muted">+{summary.plans.length - 1} more plan{summary.plans.length > 2 ? 's' : ''}</p>}
+    </SystemWindow>
+  )
 }

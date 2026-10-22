@@ -148,6 +148,10 @@ export interface Purchase {
   /** XP the purchase grants (dates earn CHA XP). */
   xp: number
   stat: StatKey | null
+  /** For tickets booked ahead: the event day (a big night's Recovery Day is the day after it). */
+  forDay?: string
+  /** Set when this is a booked part of a plan. */
+  planId?: string
   createdAt: number
 }
 
@@ -223,7 +227,7 @@ export interface PostureScan {
 }
 
 /** Optional parts of the game the player can switch off in Settings. */
-export type FeatureKey = 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises'
+export type FeatureKey = 'plans' | 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises'
 
 export type Circle = 'friend' | 'family' | 'dating' | 'work'
 
@@ -319,5 +323,45 @@ export interface SurpriseClear {
   day: string
   challengeId: string
   xp: number
+  createdAt: number
+}
+
+export type PlanKind = 'rave' | 'festival' | 'trip'
+export type PlanItemKind = 'ticket' | 'travel' | 'stay' | 'food' | 'gear' | 'other'
+
+/** One cost in a plan: a ticket, flights, a place to stay... */
+export interface PlanItem {
+  id: string
+  label: string
+  kind: PlanItemKind
+  cost: number
+  /** The purchase made when it was booked, if it has been. */
+  purchaseId: string | null
+}
+
+/** A rave, festival or trip you're saving for and booking piece by piece. */
+export interface Plan {
+  id: string
+  userId: string
+  name: string
+  kind: PlanKind
+  /** Event or departure day, YYYY-MM-DD, or '' if not set yet. */
+  date: string
+  items: PlanItem[]
+  /** The Expedition main quest made for this plan, if any. */
+  questId: string | null
+  status: 'active' | 'done' | 'cancelled'
+  createdAt: number
+  updatedAt: number
+}
+
+/** Money moved from the Vault into a plan (or back, when negative). */
+export interface PlanFund {
+  id: string
+  userId: string
+  planId: string
+  amount: number
+  /** Game day, YYYY-MM-DD. */
+  day: string
   createdAt: number
 }

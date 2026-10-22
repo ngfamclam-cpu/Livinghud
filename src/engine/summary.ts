@@ -8,9 +8,10 @@ import { addDays, dayKey, daysBetween, monthOf, weekOf } from './time'
 import { dayExercises, planDay, playerPlan, progressionDue, raisePlan, routineDone, routineTargets, type RoutineTargets } from './workout'
 import { partyBonds, type Bond } from './party'
 import { BOSS_XP, bossStatus, type BossStatus } from './focus'
+import { planStatus, type PlanStatus } from './plans'
 import { CASUAL_PAUSE_DAYS, penalties, type Penalties } from './penalties'
 import { earnedBadges, longestStreak, streakBonuses, unlockedThemes, type Badge } from './badges'
-import type { Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
+import type { Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, Plan, PlanFund, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
 export const STAT_WINDOW_DAYS = 30
 
@@ -25,9 +26,14 @@ export interface WalletSummary {
   available: number
   /**
    * Overflow from every month beyond its budget, plus wallet money left unspent
-   * when a month ends, minus Vault purchases. The only way to pay for A/S rewards.
+   * when a month ends, minus Vault purchases and money set aside for plans.
+   * The only way to pay for A/S rewards.
    */
   vault: number
+  /** Vault money set aside in plans (raves, festivals, trips). */
+  inPlans: number
+  /** Average the Vault grew by in recent full months; null before the first month ends. */
+  perMonth: number | null
 }
 
 export interface MainQuestProgress {
@@ -87,6 +93,8 @@ export interface Summary {
   penalty: Penalties | null
   /** Recovery Days (from big-night rewards). */
   restDays: Set<string>
+  /** Active plans (raves, festivals, trips), soonest first. */
+  plans: PlanStatus[]
   /** The plan with raised targets the System offers after 3 clean weeks; null when not due. */
   routineOffer: TrainingPlan | null
 }
@@ -101,6 +109,8 @@ export interface Logs {
   bosses?: Boss[]
   journal?: JournalEntry[]
   surprises?: SurpriseClear[]
+  plans?: Plan[]
+  planFunds?: PlanFund[]
 }
 
 const weight = (c: Completion) => (c.version === 'full' ? 1 : 0.5)
@@ -110,7 +120,7 @@ export function summarize(
   quests: Quest[],
   completions: Completion[],
   now: Date,
-  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [], surprises = [] }: Logs = {},
+  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [], surprises = [], plans = [], planFunds = [] }: Logs = {},
 ): Summary {
   const today = dayKey(now, player.settings.resetHour)
   const week = weekOf(today)
@@ -118,7 +128,7 @@ export function summarize(
   const budget = player.settings.monthlyBudget
   const month = monthOf(today)
   // A big night out grants a Recovery Day token for the next day.
-  const recoveryDays = new Set(purchases.filter(p => p.special === 'bigNight').map(p => addDays(p.day, 1)))
+  const recoveryDays = new Set(purchases.filter(p => p.special === 'bigNight').map(p => addDays(p.forDay ?? p.day, 1)))
 
   const rawXp =
     completions.reduce((sum, c) => sum + c.xp, 0) + purchases.reduce((sum, p) => sum + p.xp, 0) + contacts.reduce((sum, c) => sum + c.xp, 0) +
@@ -159,10 +169,15 @@ export function summarize(
     vaultSpent += p.fromVault
   }
   let vault = -vaultSpent
-  for (const [m, total] of earnedBy) {
-    vault += Math.max(0, total - budget)
-    if (m < month) vault += Math.max(0, Math.min(budget, total) - (spentBy.get(m) ?? 0))
+  const inflow: number[] = []
+  for (const [m, total] of [...earnedBy].sort()) {
+    const overflow = Math.max(0, total - budget)
+    const rollover = m < month ? Math.max(0, Math.min(budget, total) - (spentBy.get(m) ?? 0)) : 0
+    vault += overflow + rollover
+    if (m < month && m >= monthOf(startDay)) inflow.push(overflow + rollover)
   }
+  const recent = inflow.slice(-3)
+  const inPlans = Math.max(0, planFunds.reduce((sum, f) => sum + f.amount, 0))
   const earned = round2(Math.min(budget, earnedBy.get(month) ?? 0))
   const spent = round2(spentBy.get(month) ?? 0)
   const wallet: WalletSummary = {
@@ -171,7 +186,9 @@ export function summarize(
     earned,
     spent,
     available: round2(Math.max(0, earned - spent)),
-    vault: round2(Math.max(0, vault)),
+    vault: round2(Math.max(0, vault - inPlans)),
+    inPlans: round2(inPlans),
+    perMonth: recent.length ? round2(recent.reduce((a, b) => a + b, 0) / recent.length) : null,
   }
 
 
@@ -288,6 +305,10 @@ export function summarize(
     themes: unlockedThemes(badgeInput),
     penalty,
     restDays: recoveryDays,
+    plans: plans
+      .filter(p => p.status === 'active')
+      .map(p => planStatus(p, planFunds, purchases, today, wallet.perMonth))
+      .sort((a, b) => (a.plan.date || '9999').localeCompare(b.plan.date || '9999')),
     wallet,
     savings: savingsStatus(player.settings.savingsGoal, savings, month),
     stats,

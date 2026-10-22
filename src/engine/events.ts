@@ -26,6 +26,8 @@ export type GameEvent =
   | { type: 'badge.earned'; title: string; description: string }
   | { type: 'loot.dropped'; name: string }
   | { type: 'surprise.appeared'; text: string }
+  | { type: 'plan.funded'; name: string; amount: number }
+  | { type: 'plan.booked'; name: string; label: string; cost: number }
   | { type: 'surprise.cleared'; text: string; xp: number }
 
 type Listener = (event: GameEvent) => void

@@ -379,6 +379,11 @@ button.icon { padding: 2px 8px; font-size: 1.1rem; line-height: 1; border-color:
 .ideas .reward-info small:last-child { color: var(--text); opacity: 0.8; }
 .edit-reward { grid-column: 1 / -1; }
 
+/* ---- Plans ---- */
+.adventure { border-color: var(--gold); }
+.plan-card .bar, .adventure .bar { margin-top: 8px; }
+.rewards li.booked { border-color: rgba(77, 255, 166, 0.5); background: rgba(77, 255, 166, 0.06); }
+
 /* ---- Auto-complete ---- */
 .howto { margin: 0 0 12px; border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 8px 12px; }
 .howto summary { cursor: pointer; color: var(--accent); font-weight: 600; }
