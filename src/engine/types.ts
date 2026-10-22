@@ -310,3 +310,14 @@ export interface JournalEntry {
   createdAt: number
   updatedAt: number
 }
+
+/** A cleared surprise challenge. */
+export interface SurpriseClear {
+  id: string
+  userId: string
+  /** Game day, YYYY-MM-DD. */
+  day: string
+  challengeId: string
+  xp: number
+  createdAt: number
+}

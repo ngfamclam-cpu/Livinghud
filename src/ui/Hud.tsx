@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
+import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, type Completion, type Player, type Quest, type Summary, type SurpriseClear } from '../engine'
 import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
+import { SurpriseCard } from './SurpriseCard'
 import { activeFocus, focusedMinutes } from '../db/focus'
 import { Bar } from './Bar'
 import { money, monthName } from './format'
@@ -15,9 +16,11 @@ interface HudProps {
   onJournal: () => void
   journaledToday: boolean
   onReport: () => void
+  surprises: SurpriseClear[]
+  now: Date
 }
 
-export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport }: HudProps) {
+export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now }: HudProps) {
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
   const sides = active.filter(q => q.kind === 'side')
@@ -74,6 +77,8 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
           </p>
         ) : null}
       </SystemWindow>
+
+      {featureOn(player, 'surprises') && <SurpriseCard player={player} summary={summary} cleared={surprises} now={now} />}
 
       {summary.recoveryToday && (
         <SystemWindow title="Recovery Day" className="recovery">

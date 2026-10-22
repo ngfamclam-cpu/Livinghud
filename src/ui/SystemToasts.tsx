@@ -49,6 +49,10 @@ function toastFor(event: GameEvent): Toast | null {
       return { id: nextId++, text: `TITLE EARNED: ${event.title}. ${event.description}.`, big: true }
     case 'loot.dropped':
       return { id: nextId++, text: `LOOT DROP: ${event.name} theme. Equip it in Settings.`, big: true }
+    case 'surprise.appeared':
+      return { id: nextId++, text: `SURPRISE QUEST: ${event.text}. One hour, +30 XP.`, big: true }
+    case 'surprise.cleared':
+      return { id: nextId++, text: `Surprise quest cleared  +${event.xp} XP` }
     case 'routine.raised':
       return { id: nextId++, text: 'Routine levelled up. New targets start today.', big: true }
     case 'savings.goalMet':
