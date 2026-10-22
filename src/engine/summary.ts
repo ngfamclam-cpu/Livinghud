@@ -10,7 +10,7 @@ import { partyBonds, type Bond } from './party'
 import { BOSS_XP, bossStatus, type BossStatus } from './focus'
 import { CASUAL_PAUSE_DAYS, penalties, type Penalties } from './penalties'
 import { earnedBadges, longestStreak, streakBonuses, unlockedThemes, type Badge } from './badges'
-import type { Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
+import type { Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
 export const STAT_WINDOW_DAYS = 30
 
@@ -100,6 +100,7 @@ export interface Logs {
   focusRuns?: FocusRun[]
   bosses?: Boss[]
   journal?: JournalEntry[]
+  surprises?: SurpriseClear[]
 }
 
 const weight = (c: Completion) => (c.version === 'full' ? 1 : 0.5)
@@ -109,7 +110,7 @@ export function summarize(
   quests: Quest[],
   completions: Completion[],
   now: Date,
-  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [] }: Logs = {},
+  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [], surprises = [] }: Logs = {},
 ): Summary {
   const today = dayKey(now, player.settings.resetHour)
   const week = weekOf(today)
@@ -122,7 +123,8 @@ export function summarize(
   const rawXp =
     completions.reduce((sum, c) => sum + c.xp, 0) + purchases.reduce((sum, p) => sum + p.xp, 0) + contacts.reduce((sum, c) => sum + c.xp, 0) +
     focusRuns.reduce((sum, r) => sum + r.xp, 0) +
-    bosses.filter(b => b.defeatedAt).length * BOSS_XP
+    bosses.filter(b => b.defeatedAt).length * BOSS_XP +
+    surprises.reduce((sum, s) => sum + s.xp, 0)
 
   // Wallet: each month caps at the budget and the overflow goes to the Vault.
   // When a month ends, whatever the wallet didn't spend rolls into the Vault too.

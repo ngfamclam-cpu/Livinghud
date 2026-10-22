@@ -18,6 +18,14 @@ Tap **Workout** on the strength routine. Prop your phone up side-on, tap **Start
 
 Settings → **Auto-complete** gives every quest a private link. Put it in an Android automation app such as MacroDroid (trigger: NFC sticker, arriving at the gym, home Wi-Fi, a time of day; action: HTTP Request) and the quest clears itself, even with LivingHUD closed. It counts for the moment the link was opened.
 
+## More of the game
+
+- **Party** tab: your people, days since contact, bond warnings; log messages, calls, hangouts and dates for CHA XP.
+- **Focus dungeons** (HUD): timed work sessions for XP that clear linked quests; **bosses** (Quests tab) for dreaded tasks.
+- **Journal** (HUD): three prompts plus mood and energy, with patterns over time.
+- **Titles, streak bonuses and loot themes**, **penalty modes**, a **morning briefing**, a **weekly report card** and daily **surprise quests**.
+- Every optional feature can be switched off in Settings → Features.
+
 ## Cloud sync
 
 Your progress saves to the cloud by itself, stored in this project's own Vercel Blob storage (no other service). Each character has a secret **sync code**, shown in Settings. Enter it on another phone or computer to load the same character there.

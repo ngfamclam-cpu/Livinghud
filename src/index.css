@@ -370,6 +370,11 @@ button.icon { padding: 2px 8px; font-size: 1.1rem; line-height: 1; border-color:
 .grade { font-size: 3.2rem; font-weight: 700; color: var(--gold); text-shadow: 0 0 16px rgba(255, 207, 92, 0.5); line-height: 1; }
 .report-list { margin-top: 14px; }
 
+/* ---- Surprise quest ---- */
+.surprise.open { border-color: var(--gold); box-shadow: 0 0 22px rgba(255, 207, 92, 0.5); animation: open 0.25s ease-out, pulse 2s ease-in-out infinite; }
+.surprise-missed { text-align: center; margin: 0; }
+@keyframes pulse { 50% { box-shadow: 0 0 34px rgba(255, 207, 92, 0.75); } }
+
 /* ---- Auto-complete ---- */
 .howto { margin: 0 0 12px; border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 8px 12px; }
 .howto summary { cursor: pointer; color: var(--accent); font-weight: 600; }

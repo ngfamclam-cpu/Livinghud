@@ -22,6 +22,9 @@ import {
   featureOn,
   STREAK_BONUS,
   THEMES,
+  SURPRISE_XP,
+  dailySurprise,
+  surpriseState,
   DEFAULT_BOND_DAYS,
   planDescription,
   missingPostureMoves,
@@ -40,6 +43,7 @@ import {
   type ExerciseSet,
   type FitnessBaseline,
   type PlayerSettings,
+  type Player,
   type Purchase,
   type Quest,
   type QuestStage,
@@ -132,14 +136,15 @@ async function snapshot() {
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
     db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const [people, contacts, focusRuns, bosses, journal] = await Promise.all([
+  const [people, contacts, focusRuns, bosses, journal, surprises] = await Promise.all([
     db.people.where('userId').equals(LOCAL_USER).toArray(),
     db.contacts.where('userId').equals(LOCAL_USER).toArray(),
     db.focusRuns.where('userId').equals(LOCAL_USER).toArray(),
     db.bosses.where('userId').equals(LOCAL_USER).toArray(),
     db.journal.where('userId').equals(LOCAL_USER).toArray(),
+    db.surprises.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const summary = summarize(player, quests, completions, new Date(), { purchases, savings, sets, people, contacts, focusRuns, bosses, journal })
+  const summary = summarize(player, quests, completions, new Date(), { purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises })
   return { player, quests, completions, purchases, savings, sets, people, contacts, focusRuns, bosses, summary }
 }
 
@@ -744,6 +749,23 @@ export async function saveJournal(input: Pick<JournalEntry, 'wentWell' | 'draine
   if (!done || (done.version === 'min' && version === 'full')) await completeQuest(quest, version)
 }
 
+// ---- Surprise challenges ----
+
+/** The seed that makes each day's surprise the same on every device. */
+export const surpriseSeed = (player: Player) => `${player.id}:${player.createdAt}`
+
+/** Marks today's surprise as done (honour system) while it's open: +30 XP. */
+export async function clearSurprise(): Promise<void> {
+  const { summary, player } = await snapshot()
+  const s = dailySurprise(summary.today, surpriseSeed(player), player.stats, player.settings.wakeTime, player.settings.bedTime)
+  if (!s) return
+  const already = await db.surprises.where('userId').equals(LOCAL_USER).filter(x => x.day === summary.today).count()
+  if (already > 0 || surpriseState(s, false, Date.now()) !== 'open') return
+  await db.surprises.add({ id: newId(), userId: LOCAL_USER, day: summary.today, challengeId: s.challenge.id, xp: SURPRISE_XP, createdAt: Date.now() })
+  emit({ type: 'surprise.cleared', text: s.challenge.text, xp: SURPRISE_XP })
+  await announceProgress(summary)
+}
+
 // ---- Titles and themes ----
 
 export async function setTitle(title: string | null): Promise<void> {
@@ -767,16 +789,20 @@ export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal] = await Promise.all(
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises] = await Promise.all(
     tables().map(t => t.toArray()),
   )
-  return { format: SAVE_FORMAT, version: 7, players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal }
+  return {
+    format: SAVE_FORMAT,
+    version: 8,
+    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises,
+  }
 }
 
 export async function exportSave(): Promise<string> {
@@ -804,6 +830,7 @@ export async function importSave(json: string): Promise<void> {
     await db.focusRuns.bulkPut(data.focusRuns ?? [])
     await db.bosses.bulkPut(data.bosses ?? [])
     await db.journal.bulkPut(data.journal ?? [])
+    await db.surprises.bulkPut(data.surprises ?? [])
   })
 }
 

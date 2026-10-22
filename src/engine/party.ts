@@ -60,6 +60,7 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'penalties', name: 'Penalty modes', description: 'Casual pauses streaks; Normal costs 5 XP per missed daily; Hardcore uses HP and can cost wallet money.' },
   { key: 'briefing', name: 'Morning briefing', description: 'A System message the first time you open the app each day.' },
   { key: 'report', name: 'Weekly report card', description: 'A grade, stat changes and one suggestion for each week, shown on Mondays.' },
+  { key: 'surprises', name: 'Surprise challenges', description: 'Once a day a small quest appears at a random moment; do it within an hour for 30 XP.' },
   { key: 'journal', name: 'Reflection journal', description: 'Three prompts a day, mood and energy, and the patterns over time.' },
 ]
 

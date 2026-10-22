@@ -1,24 +1,6 @@
 import { DAY_NAMES, NORMAL_XP_PER_MISS, daysBetween, dayKey, featureOn, type Player, type Quest, type Summary } from '../engine'
 import { SystemWindow } from './SystemWindow'
-
-const KEY = 'livinghud-briefing'
-
-/** Whether today's briefing has been seen on this device. */
-export function briefingSeen(today: string): boolean {
-  try {
-    return localStorage.getItem(KEY) === today
-  } catch {
-    return true
-  }
-}
-
-function markSeen(today: string) {
-  try {
-    localStorage.setItem(KEY, today)
-  } catch {
-    /* storage blocked: it just shows again next time */
-  }
-}
+import { markSeen } from './briefingSeen'
 
 /** The morning briefing: what today holds, the first time the app opens each day. */
 export function Briefing({ player, quests, summary, onClose, onReport }: {
@@ -58,6 +40,7 @@ export function Briefing({ player, quests, summary, onClose, onReport }: {
   const missed = summary.penalty?.missedYesterday ?? 0
   if (missed > 0 && player.settings.difficulty === 'normal') lines.push(`Yesterday's ${missed} missed dail${missed === 1 ? 'y' : 'ies'} cost ${missed * NORMAL_XP_PER_MISS} XP.`)
   if (toCap > 0) lines.push(`$${toCap.toFixed(2)} left to fill this month's wallet.`)
+  if (featureOn(player, 'surprises')) lines.push('A surprise quest will appear at some point today. Be ready.')
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Morning briefing">
