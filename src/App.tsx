@@ -9,6 +9,7 @@ import { Shop } from './ui/Shop'
 import { Settings } from './ui/Settings'
 import { SystemToasts } from './ui/SystemToasts'
 import { Workout } from './ui/Workout'
+import { PostureScan } from './ui/PostureScan'
 
 type Tab = 'hud' | 'quests' | 'shop' | 'settings'
 
@@ -22,9 +23,9 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
-  const [workout, setWorkout] = useState(false)
+  const [screen, setScreen] = useState<'workout' | 'scan' | null>(null)
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings, sets] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets, scans] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
@@ -32,8 +33,9 @@ export default function App() {
       db.purchases.where('userId').equals(LOCAL_USER).toArray(),
       db.savings.where('userId').equals(LOCAL_USER).toArray(),
       db.sets.where('userId').equals(LOCAL_USER).toArray(),
+      db.scans.where('userId').equals(LOCAL_USER).toArray(),
     ])
-    return { player, quests, completions, rewards, purchases, savings, sets }
+    return { player, quests, completions, rewards, purchases, savings, sets, scans }
   })
 
   if (!data) return null
@@ -49,10 +51,14 @@ export default function App() {
   const { player, quests, rewards, purchases, savings, sets } = data
   const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets })
 
-  if (workout) {
+  if (screen) {
     return (
       <>
-        <Workout summary={summary} sets={sets} fitness={player.fitness} onClose={() => setWorkout(false)} />
+        {screen === 'workout' ? (
+          <Workout summary={summary} sets={sets} player={player} onClose={() => setScreen(null)} onScan={() => setScreen('scan')} />
+        ) : (
+          <PostureScan scans={data.scans} onClose={() => setScreen('workout')} />
+        )}
         <SystemToasts />
       </>
     )
@@ -67,7 +73,7 @@ export default function App() {
           </button>
         ))}
       </nav>
-      {tab === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setWorkout(true)} />}
+      {tab === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} />}
       {tab === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} />}
       {tab === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} />}
       {tab === 'settings' && <Settings player={player} quests={quests} onClose={() => setTab('hud')} />}

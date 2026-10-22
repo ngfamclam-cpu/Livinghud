@@ -296,6 +296,11 @@ button.icon { padding: 2px 8px; font-size: 1.1rem; line-height: 1; border-color:
 .hold-timer { margin: 4px 0 8px; }
 .timer-display { font-size: 2rem; font-weight: 700; color: var(--accent); min-width: 4ch; }
 
+/* ---- Posture scan ---- */
+.countdown { position: absolute; inset: 0; display: grid; place-items: center; font-size: 5rem; font-weight: 700; color: var(--gold); text-shadow: 0 0 20px rgba(255, 207, 92, 0.7); }
+.scan-result { text-align: center; margin: 12px 0; }
+.scan-history li { display: grid; grid-template-columns: 6.5em 1fr 3em auto; gap: 8px; align-items: center; }
+
 /* ---- Auto-complete ---- */
 .howto { margin: 0 0 12px; border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 8px 12px; }
 .howto summary { cursor: pointer; color: var(--accent); font-weight: 600; }

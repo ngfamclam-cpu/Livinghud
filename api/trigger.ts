@@ -3,6 +3,7 @@
 // LivingHUD next opens, then counts for the moment the link was opened.
 //
 // GET  /api/trigger?t=TOKEN&q=QUEST_ID[&v=min]  queue a quest completion
+// GET  /api/trigger?t=TOKEN&x=EXERCISE[&n=1]    queue logged exercise (e.g. a posture check-in)
 // GET  /api/trigger?t=TOKEN&inbox=1             list waiting completions (the app)
 // POST /api/trigger?t=TOKEN&ack=1  {ids: [...]} remove handled completions (the app)
 //
@@ -13,8 +14,12 @@ import { blobStore, jsonResponse, normalizeKey, sha256, storageError, type Store
 
 export interface InboxItem {
   id: string
-  questId: string
-  version: 'full' | 'min'
+  /** A quest to clear... */
+  questId?: string
+  version?: 'full' | 'min'
+  /** ...or exercise to log. */
+  exercise?: string
+  amount?: number
   /** When the link was opened, in milliseconds. */
   at: number
 }
@@ -43,17 +48,21 @@ export async function handle(request: Request, store: Store = blobStore, now = D
     }
 
     if (request.method === 'GET' || request.method === 'POST') {
+      const id = /^[A-Za-z0-9-]{1,64}$/
       const questId = url.searchParams.get('q') ?? ''
-      if (!/^[A-Za-z0-9-]{1,64}$/.test(questId)) return jsonResponse({ error: 'bad-link', message: 'This link has no quest in it.' }, 400)
-      const item: InboxItem = {
-        id: crypto.randomUUID(),
-        questId,
-        version: url.searchParams.get('v') === 'min' ? 'min' : 'full',
-        at: now,
+      const exercise = url.searchParams.get('x') ?? ''
+      const amount = Math.round(Number(url.searchParams.get('n') ?? 1))
+      let item: InboxItem
+      if (id.test(questId)) {
+        item = { id: crypto.randomUUID(), questId, version: url.searchParams.get('v') === 'min' ? 'min' : 'full', at: now }
+      } else if (id.test(exercise) && amount >= 1 && amount <= 10_000) {
+        item = { id: crypto.randomUUID(), exercise, amount, at: now }
+      } else {
+        return jsonResponse({ error: 'bad-link', message: 'This link has no quest or exercise in it.' }, 400)
       }
       const ok = await update(store, path, items => [...items, item].slice(-MAX_ITEMS))
       return ok
-        ? jsonResponse({ ok: true, message: 'Quest sent to LivingHUD. It clears the next time the app is open.' })
+        ? jsonResponse({ ok: true, message: 'Sent to LivingHUD. It shows the next time the app is open.' })
         : jsonResponse({ error: 'busy', message: 'Busy, try again.' }, 503)
     }
 

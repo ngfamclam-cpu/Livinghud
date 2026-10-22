@@ -50,6 +50,10 @@ export const EXERCISES: ExerciseInfo[] = [
   { key: 'hipFlexorStretch', name: 'Hip flexor stretch', unit: 'seconds', tracking: 'manual', group: 'posture', tip: 'Half-kneeling. First tuck your pelvis under and squeeze the back glute, then shift forward a little. The tuck matters more than going deep. 60 s per side.' },
   { key: 'gluteBridges', name: 'Glute bridges', unit: 'reps', tracking: 'reps', group: 'posture', tip: 'Lie side-on to the phone with shoulders, hips and knees in view. Squeeze glutes to lift, ribs down, no lower-back arch.' },
   { key: 'deadBugs', name: 'Dead bugs', unit: 'reps', tracking: 'manual', group: 'posture', tip: 'On your back, press your lower back into the floor and keep it there while you slowly lower the opposite arm and leg. Both sides together.' },
+  { key: 'pelvicTiltPractice', name: 'Standing pelvic tilt practice', unit: 'reps', tracking: 'manual', group: 'posture', tip: 'Stand side-on to a mirror. Tip your pelvis forward (arch), then back (tuck) using your glutes and lower belly, then settle halfway: that is your neutral. Hold neutral 5 s while breathing normally. This trains you to feel and hold the position, which matters more than flexibility.' },
+  { key: 'splitStanceTilt', name: 'Split-stance tuck hold', unit: 'seconds', tracking: 'manual', group: 'posture', tip: 'Long split stance, back knee straight. Tuck your pelvis and squeeze the back glute until you feel the front of that hip open. Hold, breathe, switch sides. Count both sides together.' },
+  { key: 'wallCheck', name: 'Wall posture check', unit: 'seconds', tracking: 'manual', group: 'posture', tip: 'Heels a few cm from a wall; back of head, shoulder blades and backside touching, ribs down, chin level. Hold and memorise the feeling, then step away and keep it.' },
+  { key: 'postureCheckins', name: 'Posture check-ins', unit: 'reps', tracking: 'manual', group: 'posture', tip: 'A few times a day, wherever you are: feet under hips, knees soft, ribs stacked over pelvis, light glute and lower-belly tension, chin gently back, screen at eye level. Log each one (a MacroDroid reminder can do it with one tap).' },
 ]
 
 export const exerciseInfo = (key: ExerciseKey): ExerciseInfo | undefined => EXERCISES.find(e => e.key === key)
@@ -64,18 +68,31 @@ export const DAY_NAMES: Record<DayKind, string> = { push: 'Push', pull: 'Pull', 
 /** Push, Pull, Legs, Push, Pull, Rest: legs and rest take turns, so legs never come two days running. */
 export const DEFAULT_CYCLE: DayKind[] = ['push', 'pull', 'legs', 'push', 'pull', 'rest']
 
-/** About 10 minutes for forward head posture and anterior pelvic tilt, every day. */
+/**
+ * About 12 minutes for forward head posture and anterior pelvic tilt, every day.
+ * Weighted toward strength and control: reviews find stretching alone doesn't change
+ * posture, strengthening helps the neck and upper back, and pelvic tilt responds best
+ * to glute work plus learning to feel and hold the pelvis.
+ */
 export function defaultPosture(fitness: FitnessBaseline | null): RoutineExercise[] {
   return [
     move('chinTucks', 10),
     move('wallSlides', 10),
     move('proneY', 10),
     move('pecStretch', 60),
-    move('neckStretch', 30),
     move('hipFlexorStretch', 120),
     move('gluteBridges', Math.max(10, fitness?.gluteBridges ?? 0)),
     move('deadBugs', 10),
+    move('pelvicTiltPractice', 10),
+    move('splitStanceTilt', 60),
+    move('postureCheckins', 3),
   ]
+}
+
+/** Default posture moves a saved plan doesn't have yet (e.g. ones added after it was saved). */
+export function missingPostureMoves(plan: TrainingPlan): RoutineExercise[] {
+  const have = new Set([...plan.posture, ...Object.values(plan.workouts).flat()].map(e => e?.key))
+  return defaultPosture(null).filter(e => !have.has(e.key) && e.key !== 'gluteBridges')
 }
 
 /** A Push/Pull/Legs plan sized from the fitness test. */
