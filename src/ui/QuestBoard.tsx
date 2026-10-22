@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { MAIN_TEMPLATES, SIDE_TEMPLATES, SIDE_XP, SIDE_PAY_SHARE, type Player, type Quest, type StatKey, type Summary } from '../engine'
+import { featureOn, MAIN_TEMPLATES, SIDE_TEMPLATES, SIDE_XP, SIDE_PAY_SHARE, type Player, type Quest, type StatKey, type Summary } from '../engine'
 import { addCustomMain, addMainFromTemplate, addSideFromTemplate, addSideQuest, archiveQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
+import { Bosses } from './Bosses'
 import { money } from './format'
 
-export function QuestBoard({ player, quests, summary }: { player: Player; quests: Quest[]; summary: Summary }) {
+export function QuestBoard({ player, quests, summary, onFight }: { player: Player; quests: Quest[]; summary: Summary; onFight: (bossId: string) => void }) {
   const active = quests.filter(q => q.active)
   const activeTemplates = new Set(active.map(q => q.templateId))
   const sides = active.filter(q => q.kind === 'side')
@@ -24,6 +25,8 @@ export function QuestBoard({ player, quests, summary }: { player: Player; quests
           Side and main quest money comes on top of your dailies, so it usually lands in the Vault.
         </p>
       </SystemWindow>
+
+      {featureOn(player, 'bosses') && <Bosses player={player} summary={summary} onFight={onFight} />}
 
       <SystemWindow title={`Your side quests · ${sides.length}`}>
         {sides.length === 0 && <p className="muted">None yet. Pick a few below.</p>}

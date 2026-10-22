@@ -37,6 +37,14 @@ function toastFor(event: GameEvent): Toast | null {
       return { id: nextId++, text: `${event.name} +${event.amount}  (${Math.min(event.total, event.target)}/${event.target})` }
     case 'contact.logged':
       return { id: nextId++, text: `${event.name}: ${event.kind} logged  +${event.xp} CHA XP` }
+    case 'focus.ended':
+      return event.cleared
+        ? { id: nextId++, text: `DUNGEON CLEARED: ${event.label}  ${event.minutes} min  +${event.xp} XP`, big: true }
+        : { id: nextId++, text: `Dungeon left early: ${event.label}  ${event.minutes} min  +${event.xp} XP` }
+    case 'boss.hit':
+      return { id: nextId++, text: `${event.name} takes a hit: ${event.hpLeft} HP left` }
+    case 'boss.defeated':
+      return { id: nextId++, text: `BOSS DEFEATED: ${event.name}  +${event.xp} XP`, big: true }
     case 'routine.raised':
       return { id: nextId++, text: 'Routine levelled up. New targets start today.', big: true }
     case 'savings.goalMet':

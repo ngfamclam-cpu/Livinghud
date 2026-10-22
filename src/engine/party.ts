@@ -53,6 +53,8 @@ export interface FeatureInfo {
 /** Optional features, all on by default. Switching one off hides it; its records stay. */
 export const FEATURES: FeatureInfo[] = [
   { key: 'party', name: 'Party list', description: 'Your people, days since contact, bond warnings, hangouts and dates.' },
+  { key: 'focus', name: 'Focus dungeons', description: 'Timed work sessions that earn XP per minute and clear linked quests.' },
+  { key: 'bosses', name: 'Dreaded-task bosses', description: 'Turn a task you keep avoiding into a boss; focus minutes do damage.' },
 ]
 
 export const featureOn = (player: { features?: Partial<Record<FeatureKey, boolean>> }, key: FeatureKey) => player.features?.[key] !== false

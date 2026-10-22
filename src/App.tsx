@@ -11,6 +11,7 @@ import { SystemToasts } from './ui/SystemToasts'
 import { Workout } from './ui/Workout'
 import { PostureScan } from './ui/PostureScan'
 import { Party } from './ui/Party'
+import { Focus, type FocusPreset } from './ui/Focus'
 import { featureOn } from './engine'
 
 type Tab = 'hud' | 'quests' | 'party' | 'shop' | 'settings'
@@ -26,9 +27,10 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
-  const [screen, setScreen] = useState<'workout' | 'scan' | null>(null)
+  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | null>(null)
+  const [focusPreset, setFocusPreset] = useState<FocusPreset>({})
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
@@ -39,8 +41,10 @@ export default function App() {
       db.scans.where('userId').equals(LOCAL_USER).toArray(),
       db.people.where('userId').equals(LOCAL_USER).toArray(),
       db.contacts.where('userId').equals(LOCAL_USER).toArray(),
+      db.focusRuns.where('userId').equals(LOCAL_USER).toArray(),
+      db.bosses.where('userId').equals(LOCAL_USER).toArray(),
     ])
-    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts }
+    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses }
   })
 
   if (!data) return null
@@ -53,18 +57,24 @@ export default function App() {
     )
   }
 
-  const { player, quests, rewards, purchases, savings, sets, people, contacts } = data
-  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts })
+  const { player, quests, rewards, purchases, savings, sets, people, contacts, focusRuns, bosses } = data
+  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses })
+  const openFocus = (preset: FocusPreset = {}) => {
+    setFocusPreset(preset)
+    setScreen('focus')
+  }
   const tabs = TABS.filter(t => t.key !== 'party' || featureOn(player, 'party'))
   const current = tabs.some(t => t.key === tab) ? tab : 'hud'
 
   if (screen) {
     return (
       <>
-        {screen === 'workout' ? (
+        {screen === 'workout' && (
           <Workout summary={summary} sets={sets} player={player} onClose={() => setScreen(null)} onScan={() => setScreen('scan')} />
-        ) : (
-          <PostureScan scans={data.scans} onClose={() => setScreen('workout')} />
+        )}
+        {screen === 'scan' && <PostureScan scans={data.scans} onClose={() => setScreen('workout')} />}
+        {screen === 'focus' && (
+          <Focus player={player} quests={quests} summary={summary} runs={focusRuns} preset={focusPreset} onClose={() => setScreen(null)} />
         )}
         <SystemToasts />
       </>
@@ -81,8 +91,8 @@ export default function App() {
         ))}
       </nav>
       {current === 'party' && <Party summary={summary} contacts={contacts} />}
-      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} />}
-      {current === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} />}
+      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} />}
+      {current === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} onFight={bossId => openFocus({ bossId })} />}
       {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} />}
       {current === 'settings' && <Settings player={player} quests={quests} onClose={() => setTab('hud')} />}
       <SystemToasts />

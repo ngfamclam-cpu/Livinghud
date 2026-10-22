@@ -7,7 +7,8 @@ import { playerRank, round2, savingsStatus, type SavingsStatus } from './economy
 import { addDays, dayKey, daysBetween, monthOf, weekOf } from './time'
 import { dayExercises, planDay, playerPlan, progressionDue, raisePlan, routineDone, routineTargets, type RoutineTargets } from './workout'
 import { partyBonds, type Bond } from './party'
-import type { Completion, Contact, DayKind, Person, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
+import { BOSS_XP, bossStatus, type BossStatus } from './focus'
+import type { Boss, Completion, Contact, DayKind, FocusRun, Person, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
 export const STAT_WINDOW_DAYS = 30
 
@@ -70,6 +71,10 @@ export interface Summary {
   }
   /** Everyone in the Party list, most overdue first. */
   party: Bond[]
+  /** Dreaded-task bosses with the damage they've taken. */
+  bosses: BossStatus[]
+  /** Minutes in focus sessions today. */
+  focusToday: number
   /** The plan with raised targets the System offers after 3 clean weeks; null when not due. */
   routineOffer: TrainingPlan | null
 }
@@ -80,6 +85,8 @@ export interface Logs {
   sets?: ExerciseSet[]
   people?: Person[]
   contacts?: Contact[]
+  focusRuns?: FocusRun[]
+  bosses?: Boss[]
 }
 
 const weight = (c: Completion) => (c.version === 'full' ? 1 : 0.5)
@@ -89,7 +96,7 @@ export function summarize(
   quests: Quest[],
   completions: Completion[],
   now: Date,
-  { purchases = [], savings = [], sets = [], people = [], contacts = [] }: Logs = {},
+  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [] }: Logs = {},
 ): Summary {
   const today = dayKey(now, player.settings.resetHour)
   const week = weekOf(today)
@@ -98,7 +105,9 @@ export function summarize(
   const month = monthOf(today)
 
   const totalXp =
-    completions.reduce((sum, c) => sum + c.xp, 0) + purchases.reduce((sum, p) => sum + p.xp, 0) + contacts.reduce((sum, c) => sum + c.xp, 0)
+    completions.reduce((sum, c) => sum + c.xp, 0) + purchases.reduce((sum, p) => sum + p.xp, 0) + contacts.reduce((sum, c) => sum + c.xp, 0) +
+    focusRuns.reduce((sum, r) => sum + r.xp, 0) +
+    bosses.filter(b => b.defeatedAt).length * BOSS_XP
 
   // Wallet: each month caps at the budget and the overflow goes to the Vault.
   // When a month ends, whatever the wallet didn't spend rolls into the Vault too.
@@ -223,6 +232,8 @@ export function summarize(
     streaks,
     recoveryToday: recoveryDays.has(today),
     routine: { plan, kind, index, upcoming, exercises, targets: routineTargets(exercises), done: routineDone(sets, today) },
+    bosses: bossStatus(bosses, focusRuns),
+    focusToday: focusRuns.filter(r => r.day === today).reduce((sum, r) => sum + r.minutes, 0),
     party: partyBonds(people, contacts, today, at => dayKey(new Date(at), player.settings.resetHour)),
     routineOffer: progressionDue(routineFullDays, recoveryDays, today, player.routineReviewedOn) ? raisePlan(plan) : null,
   }

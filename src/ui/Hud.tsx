@@ -2,10 +2,19 @@ import { useState } from 'react'
 import { DAY_NAMES, STATS, featureOn, dayExercises, formatAmount, questReward, type Completion, type Player, type Quest, type Summary } from '../engine'
 import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
+import { activeFocus, focusedMinutes } from '../db/focus'
 import { Bar } from './Bar'
 import { money, monthName } from './format'
 
-export function Hud({ player, quests, summary, onStartWorkout }: { player: Player; quests: Quest[]; summary: Summary; onStartWorkout: () => void }) {
+interface HudProps {
+  player: Player
+  quests: Quest[]
+  summary: Summary
+  onStartWorkout: () => void
+  onFocus: () => void
+}
+
+export function Hud({ player, quests, summary, onStartWorkout, onFocus }: HudProps) {
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
   const sides = active.filter(q => q.kind === 'side')
@@ -88,6 +97,8 @@ export function Hud({ player, quests, summary, onStartWorkout }: { player: Playe
           <p className="muted">Reach out, then log it on the Party tab.</p>
         </SystemWindow>
       )}
+
+      {featureOn(player, 'focus') && <FocusPanel summary={summary} showBoss={featureOn(player, 'bosses')} onFocus={onFocus} />}
 
       <SystemWindow title="Stats">
         <ul className="stats">
@@ -227,5 +238,25 @@ function MainQuestRow({ quest, summary }: { quest: Quest; summary: Summary }) {
         {stage && <button className="small" onClick={() => completeQuest(quest)}>Clear stage</button>}
       </div>
     </li>
+  )
+}
+
+function FocusPanel({ summary, showBoss, onFocus }: { summary: Summary; showBoss: boolean; onFocus: () => void }) {
+  const run = activeFocus()
+  const boss = showBoss ? summary.bosses.find(b => !b.boss.defeatedAt) : undefined
+  const left = run ? Math.max(0, Math.ceil(run.plannedMin - focusedMinutes(run))) : 0
+  return (
+    <SystemWindow title="Focus" className={run ? 'dungeon' : ''}>
+      {run ? (
+        <p className="system-line">Dungeon in progress: {run.label}, {left} min left.</p>
+      ) : (
+        <p className="muted">
+          {summary.focusToday} min focused today.{boss && ` Boss: ${boss.boss.name} (${boss.hpLeft}/${boss.boss.hp} HP).`}
+        </p>
+      )}
+      <div className="row end">
+        <button className="small" onClick={onFocus}>{run ? 'Open dungeon' : 'Enter a focus dungeon'}</button>
+      </div>
+    </SystemWindow>
   )
 }
