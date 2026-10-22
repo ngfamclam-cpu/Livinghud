@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PoseLandmarker } from '@mediapipe/tasks-vision'
-import { EXERCISES, countFrame, emit, newCounter, routineLevel, type BodyPoint, type CounterState, type ExerciseKey, type ExerciseSet, type Summary } from '../engine'
-import { deleteSet, logSet } from '../db/actions'
+import { PROGRESSION_DAYS, countFrame, emit, exerciseInfo, formatAmount, newCounter, routineLevel, type BodyPoint, type CounterState, type ExerciseKey, type ExerciseSet, type Summary } from '../engine'
+import { correctTotal, deleteSet, logSet } from '../db/actions'
+import { RoutineEditor } from './RoutineEditor'
 import { BONES, closeCamera, detectBody, loadPoseTracker, openCamera } from '../capture/pose'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
@@ -10,9 +11,15 @@ type CameraState = 'off' | 'loading' | 'on' | 'error'
 
 export function Workout({ summary, sets, onClose }: { summary: Summary; sets: ExerciseSet[]; onClose: () => void }) {
   const routine = summary.routine
-  const exercises = EXERCISES.filter(e => routine?.targets[e.key])
-  const firstOpen = exercises.find(e => (routine?.done[e.key] ?? 0) < (routine?.targets[e.key] ?? 0))
-  const [exercise, setExercise] = useState<ExerciseKey>((firstOpen ?? exercises[0])?.key ?? 'pushups')
+  const exercises = routine?.exercises ?? []
+  const firstOpen = exercises.find(e => (routine?.done[e.key] ?? 0) < e.target)
+  const [picked, setExercise] = useState<ExerciseKey>((firstOpen ?? exercises[0])?.key ?? 'pushups')
+  // After an edit removes the picked exercise, fall back to the first one.
+  const current = exercises.find(e => e.key === picked) ?? exercises[0]
+  const exercise = current?.key ?? picked
+  const [editing, setEditing] = useState(false)
+  const [fixing, setFixing] = useState(false)
+  const [fixValue, setFixValue] = useState('')
   const [camera, setCamera] = useState<CameraState>('off')
   const [error, setError] = useState('')
   const [facing, setFacing] = useState<'user' | 'environment'>('user')
@@ -29,13 +36,20 @@ export function Workout({ summary, sets, onClose }: { summary: Summary; sets: Ex
   const savedRef = useRef(0)
   const doneRef = useRef(0)
   const speakRef = useRef(speak)
-  const info = EXERCISES.find(e => e.key === exercise)!
+  // The camera can follow the System's built-in exercises; player-added ones are counted by hand.
+  const known = exerciseInfo(exercise)
+  const info = {
+    name: current?.name ?? known?.name ?? exercise,
+    unit: current?.unit ?? known?.unit ?? 'reps',
+    tracking: known?.tracking ?? 'manual',
+    tip: known?.tip ?? 'Count them yourself and enter the number.',
+  }
   const target = routine?.targets[exercise] ?? 0
   const done = routine?.done[exercise] ?? 0
   doneRef.current = done
   speakRef.current = speak
 
-  const amountOf = (c: CounterState) => (info.unit === 'seconds' ? Math.floor(c.heldMs / 1000) : c.count)
+  const amountOf = (c: CounterState) => (info.tracking === 'hold' ? Math.floor(c.heldMs / 1000) : c.count)
 
   /** Logs whatever the camera counted that isn't saved yet. */
   const flush = () => {
@@ -149,15 +163,15 @@ export function Workout({ summary, sets, onClose }: { summary: Summary; sets: Ex
     setManual('')
   }
 
-  if (!routine || exercises.length === 0) {
-    return (
-      <main className="hud">
-        <SystemWindow title="Strength routine">
-          <p>Your strength routine has no targets yet. They come from the fitness test in the Awakening.</p>
-          <button onClick={onClose}>Back</button>
-        </SystemWindow>
-      </main>
-    )
+  if (editing || !routine || exercises.length === 0) {
+    return <RoutineEditor exercises={exercises} onDone={() => (routine && exercises.length > 0 ? setEditing(false) : onClose())} />
+  }
+
+  const saveFix = async () => {
+    stopCamera()
+    await correctTotal(exercise, Number(fixValue))
+    setFixing(false)
+    setFixValue('')
   }
 
   const level = routineLevel(routine.targets, routine.done)
@@ -171,12 +185,12 @@ export function Workout({ summary, sets, onClose }: { summary: Summary; sets: Ex
         <ul className="routine-list">
           {exercises.map(e => {
             const d = routine.done[e.key] ?? 0
-            const t = routine.targets[e.key]!
+            const t = e.target
             return (
               <li key={e.key}>
                 <button className={`routine-item ${e.key === exercise ? 'picked' : ''} ${d >= t ? 'done' : ''}`} onClick={() => setExercise(e.key)}>
                   <span className="quest-title">{e.name}</span>
-                  <span className="routine-count">{Math.min(d, t)}/{t}{e.unit === 'seconds' ? 's' : ''}</span>
+                  <span className="routine-count">{Math.min(d, t)}/{formatAmount(e, t)}</span>
                   <Bar value={d} max={t} thin />
                 </button>
               </li>
@@ -185,6 +199,10 @@ export function Workout({ summary, sets, onClose }: { summary: Summary; sets: Ex
         </ul>
         {level === 'full' && <p className="system-line clear">Routine complete. Quest cleared.</p>}
         {level === 'min' && <p className="muted">Half of every target done: you can claim the minimum version on the HUD, or keep going.</p>}
+        <p className="muted">
+          Targets start from your fitness test and are yours to change. After {PROGRESSION_DAYS} days in a row of the full routine, the System offers to raise them.
+        </p>
+        <button className="ghost small" onClick={() => { stopCamera(); setEditing(true) }}>Edit routine</button>
       </SystemWindow>
 
       <SystemWindow title={info.name}>
@@ -225,11 +243,26 @@ export function Workout({ summary, sets, onClose }: { summary: Summary; sets: Ex
           <input type="number" min={1} inputMode="numeric" placeholder={`Add ${info.unit} by hand`} value={manual} onChange={e => setManual(e.target.value)} />
           <button className="small ghost" disabled={!(Number(manual) > 0)} onClick={addManual}>Add</button>
         </div>
+        {fixing ? (
+          <div className="fix-count">
+            <p className="muted">Camera got it wrong? Enter today's real total for {info.name.toLowerCase()}. This replaces the count, on your honour.</p>
+            <div className="inline-form">
+              <input type="number" min={0} inputMode="numeric" placeholder={`Today's total ${info.unit}`} value={fixValue} onChange={e => setFixValue(e.target.value)} autoFocus />
+              <button className="small" disabled={fixValue === '' || Number(fixValue) < 0} onClick={saveFix}>Set total</button>
+              <button className="small ghost" onClick={() => setFixing(false)}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button className="ghost small" onClick={() => { setFixValue(String(shownTotal)); setFixing(true) }}>Fix today's count</button>
+        )}
         {todaySets.length > 0 && (
           <ul className="board-list compact">
             {todaySets.map(s => (
               <li key={s.id}>
-                <span className="quest-title">+{s.amount} {info.unit} <small className="muted">{s.source === 'camera' ? 'camera' : 'by hand'} · {new Date(s.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</small></span>
+                <span className="quest-title">
+                  {s.amount > 0 ? '+' : ''}{s.amount} {info.unit}{' '}
+                  <small className="muted">{SOURCE_LABEL[s.source]} · {new Date(s.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</small>
+                </span>
                 <button className="ghost small icon" aria-label="Delete set" title="Delete" onClick={() => deleteSet(s.id)}>×</button>
               </li>
             ))}
@@ -241,6 +274,8 @@ export function Workout({ summary, sets, onClose }: { summary: Summary; sets: Ex
     </main>
   )
 }
+
+const SOURCE_LABEL: Record<ExerciseSet['source'], string> = { camera: 'camera', manual: 'by hand', correction: 'correction' }
 
 function say(text: string) {
   if (!('speechSynthesis' in window)) return

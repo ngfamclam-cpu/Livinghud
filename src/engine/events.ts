@@ -17,7 +17,8 @@ export type GameEvent =
   | { type: 'savings.goalMet'; month: string; target: number }
   /** Live from a camera while you train; nothing is saved until the set is logged. */
   | { type: 'workout.rep'; exercise: ExerciseKey; count: number }
-  | { type: 'workout.set'; exercise: ExerciseKey; amount: number; total: number; target: number }
+  | { type: 'workout.set'; exercise: ExerciseKey; name: string; amount: number; total: number; target: number }
+  | { type: 'routine.raised' }
 
 type Listener = (event: GameEvent) => void
 

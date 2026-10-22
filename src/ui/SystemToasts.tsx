@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { EXERCISES, onGameEvent, type GameEvent } from '../engine'
+import { onGameEvent, type GameEvent } from '../engine'
 
 interface Toast {
   id: number
@@ -33,11 +33,10 @@ function toastFor(event: GameEvent): Toast | null {
       return { id: nextId++, text: 'Recovery Day token granted for tomorrow. Your streaks are safe.', big: true }
     case 'savings.logged':
       return { id: nextId++, text: `${event.kind === 'saved' ? 'Savings' : 'Income'} logged: $${event.amount.toFixed(2)}` }
-    case 'workout.set': {
-      const name = EXERCISES.find(e => e.key === event.exercise)?.name ?? event.exercise
-      const unit = event.exercise === 'plankSeconds' ? 's' : ''
-      return { id: nextId++, text: `${name} +${event.amount}${unit}  (${Math.min(event.total, event.target)}/${event.target}${unit})` }
-    }
+    case 'workout.set':
+      return { id: nextId++, text: `${event.name} +${event.amount}  (${Math.min(event.total, event.target)}/${event.target})` }
+    case 'routine.raised':
+      return { id: nextId++, text: 'Routine levelled up. New targets start today.', big: true }
     case 'savings.goalMet':
       return { id: nextId++, text: `Savings goal met: $${event.target.toFixed(2)}. The Reward Shop is open.`, big: true }
     default:

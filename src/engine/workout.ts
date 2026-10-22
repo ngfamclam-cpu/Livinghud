@@ -2,17 +2,19 @@
 // rep counter that turns body positions (from any camera: phone today,
 // glasses later) into reps. Pure math, no camera or screen code.
 
-import type { ExerciseKey, ExerciseSet, FitnessBaseline } from './types'
+import { addDays } from './time'
+import type { ExerciseKey, ExerciseSet, ExerciseUnit, FitnessBaseline, Player, RoutineExercise } from './types'
 
 export interface ExerciseInfo {
   key: ExerciseKey
   name: string
-  unit: 'reps' | 'seconds'
+  unit: ExerciseUnit
   /** How the camera tracks it; 'manual' means type the number in. */
   tracking: 'reps' | 'hold' | 'manual'
   tip: string
 }
 
+/** Exercises the System knows. The camera can follow all but pull-ups; player-added ones are counted by hand. */
 export const EXERCISES: ExerciseInfo[] = [
   { key: 'pushups', name: 'Pushups', unit: 'reps', tracking: 'reps', tip: 'Put the phone on the floor about 2 m away, side-on, so your whole body is in view.' },
   { key: 'squats', name: 'Squats', unit: 'reps', tracking: 'reps', tip: 'Stand side-on to the phone, about 2–3 m away, with your whole body in view.' },
@@ -21,29 +23,89 @@ export const EXERCISES: ExerciseInfo[] = [
   { key: 'gluteBridges', name: 'Glute bridges', unit: 'reps', tracking: 'reps', tip: 'Lie side-on to the phone with your shoulders, hips and knees in view.' },
 ]
 
-export type RoutineTargets = Partial<Record<ExerciseKey, number>>
+export const exerciseInfo = (key: ExerciseKey): ExerciseInfo | undefined => EXERCISES.find(e => e.key === key)
 
-/** Today's targets come from the fitness test. Exercises at 0 (e.g. no pull-ups yet) are skipped. */
-export function routineTargets(fitness: FitnessBaseline): RoutineTargets {
+export type RoutineTargets = Record<ExerciseKey, number>
+
+/** The routine before the player edits it: the fitness test numbers. Exercises at 0 (e.g. no pull-ups yet) are left out. */
+export function defaultRoutine(fitness: FitnessBaseline): RoutineExercise[] {
+  return EXERCISES.filter(e => fitness[e.key as keyof FitnessBaseline] > 0).map(e => ({
+    key: e.key,
+    name: e.name,
+    unit: e.unit,
+    target: fitness[e.key as keyof FitnessBaseline],
+  }))
+}
+
+/** The player's routine: their edited one, or the fitness test numbers. Null without either. */
+export function playerRoutine(player: Pick<Player, 'routine' | 'fitness'>): RoutineExercise[] | null {
+  if (player.routine) return player.routine
+  return player.fitness ? defaultRoutine(player.fitness) : null
+}
+
+export function routineTargets(exercises: RoutineExercise[]): RoutineTargets {
   const targets: RoutineTargets = {}
-  for (const { key } of EXERCISES) if (fitness[key] > 0) targets[key] = fitness[key]
+  for (const e of exercises) if (e.target > 0) targets[e.key] = e.target
   return targets
 }
 
-/** Reps (or plank seconds) logged per exercise on one game day. Sets can be split across the day. */
+/** Amount logged per exercise on one game day. Sets can be split across the day; corrections can lower it. */
 export function routineDone(sets: ExerciseSet[], day: string): RoutineTargets {
   const done: RoutineTargets = {}
   for (const s of sets) if (s.day === day) done[s.exercise] = (done[s.exercise] ?? 0) + s.amount
+  for (const k of Object.keys(done)) done[k] = Math.max(0, done[k])
   return done
 }
 
 /** 'full' when every target is hit, 'min' when every exercise is at least half way ("half the reps"). */
 export function routineLevel(targets: RoutineTargets, done: RoutineTargets): 'full' | 'min' | null {
-  const keys = Object.keys(targets) as ExerciseKey[]
+  const keys = Object.keys(targets)
   if (keys.length === 0) return null
-  if (keys.every(k => (done[k] ?? 0) >= targets[k]!)) return 'full'
-  if (keys.every(k => (done[k] ?? 0) >= Math.ceil(targets[k]! / 2))) return 'min'
+  if (keys.every(k => (done[k] ?? 0) >= targets[k])) return 'full'
+  if (keys.every(k => (done[k] ?? 0) >= Math.ceil(targets[k] / 2))) return 'min'
   return null
+}
+
+const UNIT_SHORT: Record<ExerciseUnit, string> = { reps: '', seconds: 's', minutes: ' min' }
+
+/** e.g. "Pushups 20" or "Plank 60s". */
+export const formatAmount = (e: Pick<RoutineExercise, 'unit'>, n: number) => `${n}${UNIT_SHORT[e.unit]}`
+
+/** The strength quest's description for a routine. */
+export function routineDescription(exercises: RoutineExercise[]): string {
+  return exercises.map(e => `${e.name} ${formatAmount(e, e.target)}`).join(' · ') + '. Reps can be split across the day.'
+}
+
+// ---- Progression: numbers go up after 3 consistent weeks, never after one good day ----
+
+export const PROGRESSION_DAYS = 21
+
+/** About 25% more, rounded to a sensible step: 20 → 25, 40 → 50, 10 → 12, 60s → 75s. */
+export function nextTarget(target: number, unit: ExerciseUnit): number {
+  if (unit === 'seconds') return Math.max(target + 5, Math.round((target * 1.25) / 5) * 5)
+  return Math.max(target + 1, Math.floor(target * 1.25))
+}
+
+/**
+ * After 21 days in a row of the full routine (Recovery Days don't break the run),
+ * the System offers harder targets. Returns the raised routine, or null if not yet.
+ * Days on or before `reviewedOn` (the last accept or decline) don't count, so
+ * "Not now" waits another 3 weeks.
+ */
+export function progressionOffer(
+  exercises: RoutineExercise[],
+  fullDays: Set<string>,
+  restDays: Set<string>,
+  today: string,
+  reviewedOn?: string,
+): RoutineExercise[] | null {
+  let clean = 0
+  for (let day = addDays(today, -1); clean < PROGRESSION_DAYS; day = addDays(day, -1)) {
+    if (reviewedOn && day <= reviewedOn) return null
+    if (fullDays.has(day)) clean++
+    else if (!restDays.has(day)) return null
+  }
+  return exercises.map(e => ({ ...e, target: nextTarget(e.target, e.unit) }))
 }
 
 // ---- Rep counter ----
