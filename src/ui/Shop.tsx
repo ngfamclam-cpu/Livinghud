@@ -17,6 +17,7 @@ import {
 } from '../engine'
 import { addReward, addSuggestedRewards, buyReward, deleteSavings, logSavings, refundPurchase, removeReward } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
+import { EditReward, OneOffPurchase, RewardIdeas } from './ShopExtras'
 import { money, monthName, SPECIAL_LABEL } from './format'
 
 interface Props {
@@ -29,6 +30,7 @@ interface Props {
 
 export function Shop({ player, rewards, purchases, savings, summary }: Props) {
   const [message, setMessage] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
   const active = rewards.filter(r => r.active).sort((a, b) => a.price - b.price)
   const { wallet } = summary
   const ctx = {
@@ -110,8 +112,10 @@ export function Shop({ player, rewards, purchases, savings, summary }: Props) {
                     <span className="price">{money(r.price)}</span>
                     <div className="reward-actions">
                       {check.ok ? <button className="small" onClick={() => buy(r)}>Buy</button> : <span className="lock-reason">{check.reason}</span>}
+                      <button className="ghost small" onClick={() => setEditing(e => (e === r.id ? null : r.id))}>Edit</button>
                       <button className="ghost small icon" aria-label={`Remove ${r.title}`} title="Remove" onClick={() => remove(r)}>×</button>
                     </div>
+                    {editing === r.id && <EditReward reward={r} onDone={() => setEditing(null)} />}
                   </li>
                 )
               })}
@@ -119,6 +123,10 @@ export function Shop({ player, rewards, purchases, savings, summary }: Props) {
           </SystemWindow>
         )
       })}
+
+      <OneOffPurchase />
+
+      <RewardIdeas stats={player.stats} owned={owned} />
 
       <SystemWindow title="Add a reward">
         {active.length === 0 && <p>Your shop is empty. Start with the suggested list, or add your own rewards below.</p>}
