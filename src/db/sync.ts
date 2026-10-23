@@ -51,6 +51,8 @@ let status: SyncStatus = { state: 'off', code: formatCode(storage.get(KEY_STORE)
 const listeners = new Set<() => void>()
 
 export const getSyncStatus = () => status
+/** This device's sync code (unformatted), or null before sync starts. Photos use it too. */
+export const syncKey = () => storage.get(KEY_STORE)
 export function subscribeSync(listener: () => void): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)

@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, type Completion, type Player, type Quest, type Summary, type SurpriseClear } from '../engine'
+import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, type Completion, type Memory, type Player, type Quest, type Summary, type SurpriseClear } from '../engine'
 import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { SurpriseCard } from './SurpriseCard'
+import { NewAreaBanner, TodayPage } from './lifelog/HudPanels'
 import { activeFocus, focusedMinutes } from '../db/focus'
 import { Bar } from './Bar'
 import { money, monthName } from './format'
@@ -21,9 +22,12 @@ interface HudProps {
   onPlans: (id?: string | null) => void
   /** On the PC dashboard the status and stats live in their own panels. */
   desktop?: boolean
+  memories: Memory[]
+  /** Opens the Life log, optionally straight into the camera. */
+  onLifeLog: (camera?: boolean) => void
 }
 
-export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop }: HudProps) {
+export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop, memories, onLifeLog }: HudProps) {
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
   const sides = active.filter(q => q.kind === 'side')
@@ -81,6 +85,8 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
         ) : null}
       </SystemWindow>}
 
+      {featureOn(player, 'memories') && <NewAreaBanner onSnap={() => onLifeLog(true)} />}
+
       {featureOn(player, 'surprises') && <SurpriseCard player={player} summary={summary} cleared={surprises} now={now} />}
 
       {summary.recoveryToday && (
@@ -125,7 +131,11 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
 
       {featureOn(player, 'focus') && <FocusPanel summary={summary} showBoss={featureOn(player, 'bosses')} onFocus={onFocus} />}
 
-      {featureOn(player, 'journal') && (
+      {featureOn(player, 'memories') && (
+        <TodayPage summary={summary} memories={memories} journaledToday={journaledToday} showJournal={featureOn(player, 'journal')} onLifeLog={onLifeLog} onJournal={onJournal} />
+      )}
+
+      {featureOn(player, 'journal') && !featureOn(player, 'memories') && (
         <SystemWindow title="Journal">
           <div className="row">
             <p className="muted grow">{journaledToday ? 'Today’s entry is saved. You can still add to it.' : 'Three questions, two taps. About two minutes.'}</p>
@@ -160,6 +170,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
               streak={summary.streaks.get(q.id) ?? 0}
               routine={q.templateId === 'str-routine' ? summary.routine : null}
               onStartWorkout={onStartWorkout}
+              onPhoto={q.templateId === 'int-photo' ? () => onLifeLog(true) : undefined}
             />
           ))}
         </ul>
@@ -190,9 +201,11 @@ interface RowProps {
   streak?: number
   routine?: Summary['routine'] | null
   onStartWorkout?: () => void
+  /** "Photo of the day": cleared by adding a memory rather than ticking it off. */
+  onPhoto?: () => void
 }
 
-function QuestRow({ quest, done, streak = 0, routine, onStartWorkout }: RowProps) {
+function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto }: RowProps) {
   const [open, setOpen] = useState(false)
   const routineParts = routine
     ? [
@@ -222,8 +235,11 @@ function QuestRow({ quest, done, streak = 0, routine, onStartWorkout }: RowProps
         {done ? (
           <>
             <span className="cleared">{done.version === 'full' ? 'CLEAR' : 'MIN CLEAR'} +{done.xp} XP · +{money(done.dollars)}</span>
+            {onPhoto && done.version === 'min' && <button className="small" onClick={onPhoto}>📷 Add photo</button>}
             <button className="ghost small" onClick={() => undoQuest(quest)}>Undo</button>
           </>
+        ) : onPhoto ? (
+          <button className="small" onClick={onPhoto}>📷 Add photo</button>
         ) : (
           <>
             <button className="ghost small" onClick={() => completeQuest(quest, 'min')}>Minimum</button>

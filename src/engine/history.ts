@@ -6,7 +6,7 @@ import { BOSS_XP } from './focus'
 import { CONTACT_NAMES } from './party'
 import { statScores } from './summary'
 import { addDays, dayKey, daysBetween, monthOf } from './time'
-import type { Boss, Completion, Contact, ExerciseKey, ExerciseSet, FocusRun, JournalEntry, Person, Player, PlanFund, Purchase, Quest, SavingsEntry, StatKey, SurpriseClear } from './types'
+import type { Memory, Boss, Completion, Contact, ExerciseKey, ExerciseSet, FocusRun, JournalEntry, Person, Player, PlanFund, Purchase, Quest, SavingsEntry, StatKey, SurpriseClear } from './types'
 
 export interface CalendarDay {
   day: string
@@ -143,7 +143,7 @@ export function exerciseHistory(sets: ExerciseSet[], exercise: ExerciseKey, toda
   return out
 }
 
-export type FeedKind = 'quest' | 'reward' | 'set' | 'contact' | 'focus' | 'boss' | 'journal' | 'surprise' | 'savings' | 'plan'
+export type FeedKind = 'memory' | 'quest' | 'reward' | 'set' | 'contact' | 'focus' | 'boss' | 'journal' | 'surprise' | 'savings' | 'plan'
 
 export interface FeedEntry {
   id: string
@@ -172,6 +172,7 @@ export function activityFeed(
     planFunds: PlanFund[]
     planNames: Map<string, string>
     exerciseName: (key: ExerciseKey) => string
+    memories?: Memory[]
   },
   limit: number,
 ): FeedEntry[] {
@@ -206,6 +207,9 @@ export function activityFeed(
   }
   for (const b of logs.bosses) {
     if (b.defeatedAt) out.push({ id: `${b.id}-defeat`, at: b.defeatedAt, kind: 'boss', text: `Boss defeated: ${b.name}`, gain: `+${BOSS_XP} XP`, stat: b.stat })
+  }
+  for (const m of logs.memories ?? []) {
+    out.push({ id: m.id, at: m.at, kind: 'memory', text: m.note ? `Memory: ${m.note.length > 60 ? `${m.note.slice(0, 57)}…` : m.note}` : 'Memory saved', gain: m.photos.length ? `📷 ${m.photos.length}` : '', stat: null })
   }
   for (const j of logs.journal) out.push({ id: j.id, at: j.createdAt, kind: 'journal', text: 'Journal entry written', gain: '', stat: 'INT' })
   for (const s of logs.surprises) out.push({ id: s.id, at: s.createdAt, kind: 'surprise', text: 'Surprise quest cleared', gain: `+${s.xp} XP`, stat: null })

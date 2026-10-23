@@ -33,6 +33,10 @@ export interface BadgeInput {
   focusMinutes: number
   journalEntries: number
   hangouts: number
+  /** Life log: distinct places, cities and countries visited. */
+  places?: number
+  cities?: number
+  countries?: number
 }
 
 interface Milestone extends Badge {
@@ -52,7 +56,24 @@ const MILESTONES: Milestone[] = [
   { id: 'unshakable', title: 'Unshakable', description: '50 hours in focus dungeons', earned: i => i.focusMinutes >= 3000 },
   { id: 'chronicler', title: 'Chronicler', description: '30 journal entries', earned: i => i.journalEntries >= 30 },
   { id: 'socialite', title: 'Socialite', description: '10 hangouts logged', earned: i => i.hangouts >= 10 },
+  ...TRAVEL_TITLES(),
 ]
+
+/** Travel titles pay XP once (never dollars), on top of the title. */
+export const TRAVEL_XP = 50
+
+function TRAVEL_TITLES(): Milestone[] {
+  return [
+    { id: 'explorer', title: 'Explorer', description: '10 places in the Life log', earned: i => (i.places ?? 0) >= 10 },
+    { id: 'wanderer', title: 'Wanderer', description: '25 places in the Life log', earned: i => (i.places ?? 0) >= 25 },
+    { id: 'pathfinder', title: 'Pathfinder', description: '50 places in the Life log', earned: i => (i.places ?? 0) >= 50 },
+    { id: 'cartographer', title: 'Cartographer', description: '100 places in the Life log', earned: i => (i.places ?? 0) >= 100 },
+    { id: 'city-hopper', title: 'City Hopper', description: 'Memories in 5 cities', earned: i => (i.cities ?? 0) >= 5 },
+    { id: 'globetrotter', title: 'Globetrotter', description: 'Memories in a second country', earned: i => (i.countries ?? 0) >= 2 },
+  ]
+}
+
+export const TRAVEL_IDS = new Set(TRAVEL_TITLES().map(t => t.id))
 
 /** Every badge, earned or not, so the Settings screen can show what's still locked. */
 export function allBadges(): Badge[] {

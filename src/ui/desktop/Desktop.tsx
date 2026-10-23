@@ -6,6 +6,8 @@ import type {
   ExerciseSet,
   FocusRun,
   JournalEntry,
+  Memory,
+  Place,
   Person,
   Plan,
   PlanFund,
@@ -32,6 +34,8 @@ import { Focus, type FocusPreset } from '../Focus'
 import { Journal } from '../Journal'
 import { Report } from '../Report'
 import { Plans } from '../Plans'
+import { LifeLog } from '../lifelog/LifeLog'
+import { MemoriesPanel } from './MemoriesPanel'
 import { MoneyPanel, ProfileCard, ReportWall, StatTrends, StreakCalendar, Timeline, TrainingPanel } from './panels'
 import { setPref, usePrefs, type Look } from './prefs'
 import { dailyReminders, enableNotifications, notifySupported } from './notify'
@@ -55,13 +59,16 @@ export interface DashData {
   surprises: SurpriseClear[]
   plans: Plan[]
   planFunds: PlanFund[]
+  memories: Memory[]
+  places: Place[]
 }
 
-type Page = 'dashboard' | 'quests' | 'party' | 'shop' | 'plans' | 'journal' | 'report' | 'settings' | 'workout' | 'scan' | 'focus'
+type Page = 'dashboard' | 'lifelog' | 'quests' | 'party' | 'shop' | 'plans' | 'journal' | 'report' | 'settings' | 'workout' | 'scan' | 'focus'
 
 const NAV: { key: Page; label: string; icon: string; feature?: Parameters<typeof featureOn>[1] }[] = [
   { key: 'dashboard', label: 'Command centre', icon: '◈' },
   { key: 'quests', label: 'Quests', icon: '❖' },
+  { key: 'lifelog', label: 'Life log', icon: '❂', feature: 'memories' },
   { key: 'workout', label: 'Training', icon: '⚔' },
   { key: 'focus', label: 'Focus dungeon', icon: '⧗', feature: 'focus' },
   { key: 'party', label: 'Party', icon: '✦', feature: 'party' },
@@ -78,6 +85,7 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
   const [page, setPage] = useState<Page>('dashboard')
   const [planId, setPlanId] = useState<string | null>(null)
   const [focusPreset, setFocusPreset] = useState<FocusPreset>({})
+  const [logCamera, setLogCamera] = useState(0)
   const prefs = usePrefs()
   const sync = useSyncExternalStore(subscribeSync, getSyncStatus)
 
@@ -96,6 +104,10 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
     setPage('focus')
   }
   const home = () => setPage('dashboard')
+  const openLog = (camera = false) => {
+    setLogCamera(n => (camera ? n + 1 : 0))
+    setPage('lifelog')
+  }
   const nav = NAV.filter(n => !n.feature || featureOn(player, n.feature))
 
   return (
@@ -115,7 +127,7 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
               key={n.key}
               className={page === n.key || (n.key === 'workout' && page === 'scan') ? 'on' : ''}
               aria-current={page === n.key ? 'page' : undefined}
-              onClick={() => (n.key === 'plans' ? openPlans() : n.key === 'focus' ? openFocus() : setPage(n.key))}
+              onClick={() => (n.key === 'plans' ? openPlans() : n.key === 'focus' ? openFocus() : n.key === 'lifelog' ? openLog() : setPage(n.key))}
             >
               <span className="nav-icon" aria-hidden>{n.icon}</span>
               {n.label}
@@ -165,9 +177,12 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
                   surprises={data.surprises}
                   now={now}
                   onPlans={openPlans}
+                  memories={data.memories}
+                  onLifeLog={openLog}
                 />
               </div>
               <div className="dash-col">
+                {featureOn(player, 'memories') && <MemoriesPanel data={data} summary={summary} onOpen={() => openLog()} onCamera={() => openLog(true)} />}
                 <MoneyPanel data={data} summary={summary} onPlans={openPlans} onShop={() => setPage('shop')} />
                 <TrainingPanel data={data} summary={summary} onWorkout={() => setPage('workout')} onScan={() => setPage('scan')} />
                 {featureOn(player, 'report') && <ReportWall input={reportInput} summary={summary} onReport={() => setPage('report')} />}
@@ -177,6 +192,9 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
           </>
         )}
         <div className="desk-page">
+          {page === 'lifelog' && (
+            <LifeLog key={logCamera} data={data} summary={summary} startCamera={logCamera > 0} onJournal={() => setPage('journal')} onClose={() => { setLogCamera(0); home() }} />
+          )}
           {page === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} onFight={bossId => openFocus({ bossId })} />}
           {page === 'party' && <Party summary={summary} contacts={data.contacts} />}
           {page === 'shop' && <Shop player={player} rewards={data.rewards} purchases={data.purchases} savings={data.savings} summary={summary} onPlans={() => openPlans()} />}

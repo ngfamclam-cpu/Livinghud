@@ -2,7 +2,7 @@
 // tests can swap in an in-memory store. Lives outside api/ so Vercel doesn't
 // turn it into an endpoint of its own.
 
-import { BlobPreconditionFailedError, get, put } from '@vercel/blob'
+import { BlobPreconditionFailedError, del, get, list, put } from '@vercel/blob'
 
 export interface Stored {
   body: string
@@ -76,4 +76,41 @@ export function normalizeKey(raw: string): string | null {
 
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } })
+}
+
+// ---- Photos (binary) ----
+
+export interface PhotoStore {
+  read(path: string): Promise<{ body: ArrayBuffer; type: string } | null>
+  write(path: string, body: ArrayBuffer, type: string): Promise<void>
+  remove(path: string): Promise<void>
+  /** Number of files and total bytes under a folder. */
+  usage(prefix: string): Promise<{ count: number; bytes: number }>
+}
+
+export const blobPhotoStore: PhotoStore = {
+  async read(path) {
+    const result = await withAccess(access => get(path, { access, useCache: false }))
+    if (!result || result.statusCode !== 200) return null
+    return { body: await new Response(result.stream).arrayBuffer(), type: result.blob.contentType || 'image/jpeg' }
+  },
+  async write(path, body, type) {
+    // Photos never change once taken, so devices may cache them for a long time.
+    await withAccess(access => put(path, body, { access, contentType: type, addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 31_536_000 }))
+  },
+  async remove(path) {
+    await del(path).catch(() => {})
+  },
+  async usage(prefix) {
+    let count = 0
+    let bytes = 0
+    let cursor: string | undefined
+    do {
+      const page = await list({ prefix, cursor, limit: 1000 })
+      count += page.blobs.length
+      bytes += page.blobs.reduce((s, b) => s + b.size, 0)
+      cursor = page.hasMore ? page.cursor : undefined
+    } while (cursor)
+    return { count, bytes }
+  },
 }

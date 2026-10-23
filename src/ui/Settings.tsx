@@ -4,6 +4,7 @@ import { exportSave, importSave, resetEverything, updateSettings } from '../db/a
 import { forgetSync } from '../db/sync'
 import { SystemWindow } from './SystemWindow'
 import { SyncPanel } from './CloudSync'
+import { PhotoStorage } from './lifelog/PhotoStorage'
 import { Automations } from './Automations'
 import { TitlesLoot } from './TitlesLoot'
 import { FEATURES, featureOn } from '../engine'
@@ -110,6 +111,7 @@ export function Settings({ player, quests, summary, onClose }: { player: Player;
       <Automations player={player} quests={quests} />
 
       <SyncPanel />
+      {featureOn(player, 'memories') && <PhotoStorage />}
 
       <SystemWindow title="Save file">
         <p className="muted">Optional: cloud sync already keeps your progress safe. A save file is an extra copy you keep yourself.</p>

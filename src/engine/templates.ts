@@ -97,6 +97,13 @@ export const DAILY_TEMPLATES: DailyTemplate[] = [
     minVersion: 'One line',
   },
   {
+    id: 'int-photo',
+    stat: 'INT',
+    title: 'Photo of the day',
+    description: 'Capture one memory from today in the Life log: a photo of where you are or what you did.',
+    minVersion: 'A one-line note instead',
+  },
+  {
     id: 'int-read',
     stat: 'INT',
     title: 'Read 10 pages',

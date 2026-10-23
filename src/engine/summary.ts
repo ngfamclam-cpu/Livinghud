@@ -10,8 +10,9 @@ import { partyBonds, type Bond } from './party'
 import { BOSS_XP, bossStatus, type BossStatus } from './focus'
 import { planStatus, type PlanStatus } from './plans'
 import { CASUAL_PAUSE_DAYS, penalties, type Penalties } from './penalties'
-import { earnedBadges, longestStreak, streakBonuses, unlockedThemes, type Badge } from './badges'
-import type { Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, Plan, PlanFund, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
+import { TRAVEL_IDS, TRAVEL_XP, earnedBadges, longestStreak, streakBonuses, unlockedThemes, type Badge } from './badges'
+import { travelCounts } from './memories'
+import type { Memory, Place, Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, Plan, PlanFund, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
 export const STAT_WINDOW_DAYS = 30
 
@@ -95,6 +96,8 @@ export interface Summary {
   restDays: Set<string>
   /** Active plans (raves, festivals, trips), soonest first. */
   plans: PlanStatus[]
+  /** Distinct places, cities and countries in the Life log. */
+  travel: { places: number; cities: number; countries: number }
   /** The plan with raised targets the System offers after 3 clean weeks; null when not due. */
   routineOffer: TrainingPlan | null
 }
@@ -111,6 +114,8 @@ export interface Logs {
   surprises?: SurpriseClear[]
   plans?: Plan[]
   planFunds?: PlanFund[]
+  memories?: Memory[]
+  places?: Place[]
 }
 
 const weight = (c: Completion) => (c.version === 'full' ? 1 : 0.5)
@@ -120,7 +125,7 @@ export function summarize(
   quests: Quest[],
   completions: Completion[],
   now: Date,
-  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [], surprises = [], plans = [], planFunds = [] }: Logs = {},
+  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [], surprises = [], plans = [], planFunds = [], memories = [], places = [] }: Logs = {},
 ): Summary {
   const today = dayKey(now, player.settings.resetHour)
   const week = weekOf(today)
@@ -130,11 +135,15 @@ export function summarize(
   // A big night out grants a Recovery Day token for the next day.
   const recoveryDays = new Set(purchases.filter(p => p.special === 'bigNight').map(p => addDays(p.forDay ?? p.day, 1)))
 
+  // Travel titles pay XP once each; they don't depend on level, so they're counted first.
+  const travel = player.features?.memories !== false ? travelCounts(memories, places) : { places: 0, cities: 0, countries: 0 }
+  const travelXp = earnedBadges({ level: 0, bestStreak: {}, currentStreak: {}, bossesDefeated: 0, focusMinutes: 0, journalEntries: 0, hangouts: 0, ...travel }).filter(b => TRAVEL_IDS.has(b.id)).length * TRAVEL_XP
   const rawXp =
     completions.reduce((sum, c) => sum + c.xp, 0) + purchases.reduce((sum, p) => sum + p.xp, 0) + contacts.reduce((sum, c) => sum + c.xp, 0) +
     focusRuns.reduce((sum, r) => sum + r.xp, 0) +
     bosses.filter(b => b.defeatedAt).length * BOSS_XP +
-    surprises.reduce((sum, s) => sum + s.xp, 0)
+    surprises.reduce((sum, s) => sum + s.xp, 0) +
+    travelXp
 
   // Wallet: each month caps at the budget and the overflow goes to the Vault.
   // When a month ends, whatever the wallet didn't spend rolls into the Vault too.
@@ -261,6 +270,7 @@ export function summarize(
     focusMinutes: focusRuns.reduce((sum, r) => sum + r.minutes, 0),
     journalEntries: journal.length,
     hangouts: contacts.filter(c => c.kind === 'hangout').length,
+    ...travel,
   }
 
   const plan = playerPlan(player, startDay)
@@ -300,6 +310,7 @@ export function summarize(
     bosses: bossStatus(bosses, focusRuns),
     focusToday: focusRuns.filter(r => r.day === today).reduce((sum, r) => sum + r.minutes, 0),
     party: partyBonds(people, contacts, today, at => dayKey(new Date(at), player.settings.resetHour)),
+    travel,
     routineOffer: progressionDue(routineFullDays, recoveryDays, today, player.routineReviewedOn) ? raisePlan(plan) : null,
   }
 }
