@@ -349,7 +349,7 @@ const FILTERS: { key: 'all' | FeedKind[]; label: string }[] = [
   { key: ['contact'], label: 'Party' },
   { key: ['focus', 'boss'], label: 'Focus' },
   { key: ['reward', 'savings', 'plan'], label: 'Money' },
-  { key: ['journal'], label: 'Journal' },
+  { key: ['journal', 'memory'], label: 'Journal' },
 ]
 
 export function Timeline({ data }: { data: DashData }) {

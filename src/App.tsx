@@ -15,17 +15,19 @@ import { Focus, type FocusPreset } from './ui/Focus'
 import { Journal } from './ui/Journal'
 import { Report } from './ui/Report'
 import { Plans } from './ui/Plans'
+import { LifeLog } from './ui/lifelog/LifeLog'
 import { Briefing } from './ui/Briefing'
 import { briefingSeen } from './ui/briefingSeen'
 import { dayKey, featureOn } from './engine'
 import { Desktop } from './ui/desktop/Desktop'
 import { setPref, usePrefs, useWide } from './ui/desktop/prefs'
 
-type Tab = 'hud' | 'quests' | 'party' | 'shop' | 'settings'
+type Tab = 'hud' | 'quests' | 'log' | 'party' | 'shop' | 'settings'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'hud', label: 'Status' },
   { key: 'quests', label: 'Quests' },
+  { key: 'log', label: 'Log' },
   { key: 'party', label: 'Party' },
   { key: 'shop', label: 'Shop' },
   { key: 'settings', label: 'Settings' },
@@ -35,6 +37,7 @@ export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
   const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | null>(null)
+  const [logCamera, setLogCamera] = useState(0)
   const [planId, setPlanId] = useState<string | null>(null)
   const [briefingDone, setBriefingDone] = useState(false)
   const [focusPreset, setFocusPreset] = useState<FocusPreset>({})
@@ -44,7 +47,7 @@ export default function App() {
     document.documentElement.dataset.look = prefs.look
   }, [prefs.look])
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
@@ -61,8 +64,10 @@ export default function App() {
       db.surprises.where('userId').equals(LOCAL_USER).toArray(),
       db.plans.where('userId').equals(LOCAL_USER).toArray(),
       db.planFunds.where('userId').equals(LOCAL_USER).toArray(),
+      db.memories.where('userId').equals(LOCAL_USER).toArray(),
+      db.places.where('userId').equals(LOCAL_USER).toArray(),
     ])
-    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds }
+    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places }
   })
 
   if (!data) return null
@@ -76,7 +81,7 @@ export default function App() {
   }
 
   const { player, quests, rewards, purchases, savings, sets, people, contacts, focusRuns, bosses } = data
-  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises, plans: data.plans, planFunds: data.planFunds })
+  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises, plans: data.plans, planFunds: data.planFunds, memories: data.memories, places: data.places })
   const reportInput = {
     stats: player.stats,
     quests,
@@ -117,7 +122,12 @@ export default function App() {
     )
   }
 
-  const tabs = TABS.filter(t => t.key !== 'party' || featureOn(player, 'party'))
+  const openLog = (camera = false) => {
+    setLogCamera(n => (camera ? n + 1 : 0))
+    setScreen(null)
+    setTab('log')
+  }
+  const tabs = TABS.filter(t => (t.key !== 'party' || featureOn(player, 'party')) && (t.key !== 'log' || featureOn(player, 'memories')))
   const current = tabs.some(t => t.key === tab) ? tab : 'hud'
 
   if (screen) {
@@ -145,14 +155,17 @@ export default function App() {
     <>
       <nav className="tabs" aria-label="Screens">
         {tabs.map(t => (
-          <button key={t.key} className={current === t.key ? 'on' : ''} aria-current={current === t.key ? 'page' : undefined} onClick={() => setTab(t.key)}>
+          <button key={t.key} className={current === t.key ? 'on' : ''} aria-current={current === t.key ? 'page' : undefined} onClick={() => { if (t.key === 'log') setLogCamera(0); setTab(t.key) }}>
             {t.label}
           </button>
         ))}
         {wide && <button onClick={() => setPref('layout', 'auto')}>PC dashboard</button>}
       </nav>
       {current === 'party' && <Party summary={summary} contacts={contacts} />}
-      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} />}
+      {current === 'log' && (
+        <LifeLog key={logCamera} data={{ ...data, player }} summary={summary} startCamera={logCamera > 0} onJournal={() => setScreen('journal')} onClose={() => { setLogCamera(0); setTab('hud') }} />
+      )}
+      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} memories={data.memories} onLifeLog={openLog} />}
       {current === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} onFight={bossId => openFocus({ bossId })} />}
       {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} onPlans={() => openPlans()} />}
       {current === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setTab('hud')} />}

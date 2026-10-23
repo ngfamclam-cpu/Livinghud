@@ -110,6 +110,7 @@ export async function awaken(answers: AwakeningAnswers): Promise<void> {
     await db.rewards.bulkPut(rewards)
   })
   emit({ type: 'player.awakened', name: answers.name, stats: answers.stats })
+  await (await import('./memories')).ensureMemoryQuest()
 }
 
 export async function updateSettings(patch: Partial<PlayerSettings>): Promise<void> {
@@ -132,7 +133,7 @@ export async function ensurePenaltyStart(): Promise<void> {
   await db.players.update(LOCAL_USER, { penaltiesSince: dayKey(new Date(), player.settings.resetHour) })
 }
 
-async function snapshot() {
+export async function snapshot() {
   const player = await db.players.get(LOCAL_USER)
   if (!player) throw new Error('No player yet')
   const [quests, completions, purchases, savings, sets] = await Promise.all([
@@ -142,7 +143,7 @@ async function snapshot() {
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
     db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const [people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds] = await Promise.all([
+  const [people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places] = await Promise.all([
     db.people.where('userId').equals(LOCAL_USER).toArray(),
     db.contacts.where('userId').equals(LOCAL_USER).toArray(),
     db.focusRuns.where('userId').equals(LOCAL_USER).toArray(),
@@ -151,9 +152,11 @@ async function snapshot() {
     db.surprises.where('userId').equals(LOCAL_USER).toArray(),
     db.plans.where('userId').equals(LOCAL_USER).toArray(),
     db.planFunds.where('userId').equals(LOCAL_USER).toArray(),
+    db.memories.where('userId').equals(LOCAL_USER).toArray(),
+    db.places.where('userId').equals(LOCAL_USER).toArray(),
   ])
   const summary = summarize(player, quests, completions, new Date(), {
-    purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds,
+    purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places,
   })
   return { player, quests, completions, purchases, savings, sets, people, contacts, focusRuns, bosses, summary }
 }
@@ -963,24 +966,25 @@ export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
   // Switching penalties back on starts a fresh count from today.
   const restart = key === 'penalties' && on ? { penaltiesSince: dayKey(new Date(), player.settings.resetHour) } : {}
   await db.players.update(LOCAL_USER, { features: { ...player.features, [key]: on }, ...restart, updatedAt: Date.now() })
+  if (key === 'memories') await (await import('./memories')).ensureMemoryQuest()
 }
 
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds] = await Promise.all(
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places] = await Promise.all(
     tables().map(t => t.toArray()),
   )
   return {
     format: SAVE_FORMAT,
-    version: 9,
-    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds,
+    version: 10,
+    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places,
   }
 }
 
@@ -1012,11 +1016,13 @@ export async function importSave(json: string): Promise<void> {
     await db.surprises.bulkPut(data.surprises ?? [])
     await db.plans.bulkPut(data.plans ?? [])
     await db.planFunds.bulkPut(data.planFunds ?? [])
+    await db.memories.bulkPut(data.memories ?? [])
+    await db.places.bulkPut(data.places ?? [])
   })
 }
 
 export async function resetEverything(): Promise<void> {
-  await db.transaction('rw', tables(), async () => {
-    await Promise.all(tables().map(t => t.clear()))
+  await db.transaction('rw', [...tables(), db.photoCache], async () => {
+    await Promise.all([...tables(), db.photoCache].map(t => t.clear()))
   })
 }

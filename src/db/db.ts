@@ -2,9 +2,17 @@
 // Phase 5 adds Supabase sync on top; records already carry userId + timestamps.
 
 import Dexie, { type EntityTable } from 'dexie'
-import type { Boss, Completion, Contact, ExerciseSet, FocusRun, JournalEntry, Person, Plan, PlanFund, Player, SurpriseClear, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
+import type { Memory, Place, Boss, Completion, Contact, ExerciseSet, FocusRun, JournalEntry, Person, Plan, PlanFund, Player, SurpriseClear, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
 
 export const LOCAL_USER = 'local'
+
+export interface CachedPhoto {
+  id: string
+  blob: Blob
+  /** 1 once the cloud has it, 0 while waiting to upload. */
+  uploaded: 0 | 1
+  createdAt: number
+}
 
 export const db = new Dexie('livinghud') as Dexie & {
   players: EntityTable<Player, 'id'>
@@ -23,6 +31,10 @@ export const db = new Dexie('livinghud') as Dexie & {
   surprises: EntityTable<SurpriseClear, 'id'>
   plans: EntityTable<Plan, 'id'>
   planFunds: EntityTable<PlanFund, 'id'>
+  memories: EntityTable<Memory, 'id'>
+  places: EntityTable<Place, 'id'>
+  /** This device's copy of Life log photos. Not part of the save; the cloud holds the originals. */
+  photoCache: EntityTable<CachedPhoto, 'id'>
 }
 
 db.version(1).stores({
@@ -76,4 +88,11 @@ db.version(8).stores({
 db.version(9).stores({
   plans: 'id, userId',
   planFunds: 'id, userId, planId',
+})
+
+// The Life log: entries, places, and this device's photo cache.
+db.version(10).stores({
+  memories: 'id, userId, day, placeId',
+  places: 'id, userId',
+  photoCache: 'id, uploaded',
 })

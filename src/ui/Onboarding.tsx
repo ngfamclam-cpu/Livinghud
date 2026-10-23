@@ -170,7 +170,7 @@ export function Onboarding() {
         <SystemWindow title="Daily quests">
           <p>Pick {MIN_DAILIES}–{MAX_STARTER_DAILIES} dailies to start. Fewer is better; more unlock as you level up. Every quest has a minimum version for bad days.</p>
           <div className="choices">
-            {DAILY_TEMPLATES.filter(t => stats.includes(t.stat)).map(t => (
+            {DAILY_TEMPLATES.filter(t => stats.includes(t.stat) && t.id !== 'int-photo').map(t => (
               <button key={t.id} className={`choice ${dailyIds.includes(t.id) ? 'picked' : ''}`} onClick={() => toggleDaily(t.id)} aria-pressed={dailyIds.includes(t.id)}>
                 <span className="stat-key">{t.stat}</span>
                 <span><b>{t.title}</b><br /><small>Minimum: {t.minVersion}</small></span>

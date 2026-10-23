@@ -55,6 +55,8 @@ export interface Player {
   dismissedNotices?: string[]
   /** Optional features switched off in Settings. Missing means on. */
   features?: Partial<Record<FeatureKey, boolean>>
+  /** The Life log switch paused the photo quest (so switching it back on resumes it). */
+  memoryQuestPaused?: boolean
   /** The title shown under the player's name, chosen from earned badges. */
   title?: string | null
   /** The HUD colour theme, chosen from unlocked loot. */
@@ -227,7 +229,7 @@ export interface PostureScan {
 }
 
 /** Optional parts of the game the player can switch off in Settings. */
-export type FeatureKey = 'plans' | 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises'
+export type FeatureKey = 'plans' | 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises' | 'memories'
 
 export type Circle = 'friend' | 'family' | 'dating' | 'work'
 
@@ -364,4 +366,45 @@ export interface PlanFund {
   /** Game day, YYYY-MM-DD. */
   day: string
   createdAt: number
+}
+
+/** A place you've been, named by OpenStreetMap or by you. */
+export interface Place {
+  id: string
+  userId: string
+  /** The name shown: OpenStreetMap's, or yours once you rename it. */
+  name: string
+  /** True once you've named it yourself, so a lookup never overwrites it. */
+  custom: boolean
+  lat: number
+  lon: number
+  city: string
+  country: string
+  /** ISO 3166-1 alpha-2, lower case (e.g. 'jp'); '' if unknown. */
+  countryCode: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface MemoryPhoto {
+  /** Also the photo's file name in the cloud and the local cache key. */
+  id: string
+  width: number
+  height: number
+  bytes: number
+}
+
+/** A Life log entry: a note, photos and where you were, at a moment of a game day. */
+export interface Memory {
+  id: string
+  userId: string
+  /** Game day, YYYY-MM-DD. */
+  day: string
+  /** When it happened (ms). */
+  at: number
+  note: string
+  photos: MemoryPhoto[]
+  placeId: string | null
+  createdAt: number
+  updatedAt: number
 }

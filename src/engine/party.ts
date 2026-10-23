@@ -62,6 +62,7 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'report', name: 'Weekly report card', description: 'A grade, stat changes and one suggestion for each week, shown on Mondays.' },
   { key: 'plans', name: 'Plans: raves, festivals, trips', description: 'Save for big experiences from the Vault and book them piece by piece.' },
   { key: 'surprises', name: 'Surprise challenges', description: 'Once a day a small quest appears at a random moment; do it within an hour for 30 XP.' },
+  { key: 'memories', name: 'Life log and photo a day', description: 'Notes, a daily photo and the places you go, with a map and the "Photo of the day" daily quest.' },
   { key: 'journal', name: 'Reflection journal', description: 'Three prompts a day, mood and energy, and the patterns over time.' },
 ]
 
