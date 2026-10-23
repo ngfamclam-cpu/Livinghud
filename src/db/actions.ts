@@ -8,6 +8,8 @@ import {
   REWARD_TEMPLATES,
   REWARD_IDEAS,
   SIDE_TEMPLATES,
+  SIDE_OFFERS,
+  MAIN_OFFERS,
   addDays,
   dayKey,
   weekOf,
@@ -273,8 +275,8 @@ export async function addSideQuest(input: { stat: StatKey; title: string; descri
 }
 
 export async function addSideFromTemplate(templateId: string): Promise<void> {
-  const t = SIDE_TEMPLATES.find(t => t.id === templateId)
-  if (t) await addSideQuest({ ...t, templateId: t.id })
+  const t = SIDE_TEMPLATES.find(t => t.id === templateId) ?? SIDE_OFFERS.find(t => t.id === templateId)
+  if (t) await addSideQuest({ stat: t.stat, title: t.title, description: t.description, minVersion: t.minVersion, templateId: t.id })
 }
 
 export async function addMainFromTemplate(templateId: string): Promise<void> {
@@ -306,7 +308,7 @@ export async function archiveQuest(quest: Quest): Promise<void> {
 }
 
 function mainFromTemplate(templateId: string, at: number): Quest {
-  const t = MAIN_TEMPLATES.find(t => t.id === templateId)!
+  const t = MAIN_TEMPLATES.find(t => t.id === templateId) ?? MAIN_OFFERS.find(t => t.id === templateId)!
   return {
     id: newId(),
     userId: LOCAL_USER,
