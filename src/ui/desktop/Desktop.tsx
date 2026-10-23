@@ -195,7 +195,7 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
           {page === 'lifelog' && (
             <LifeLog key={logCamera} data={data} summary={summary} startCamera={logCamera > 0} onJournal={() => setPage('journal')} onClose={() => { setLogCamera(0); home() }} />
           )}
-          {page === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} onFight={bossId => openFocus({ bossId })} />}
+          {page === 'quests' && <QuestBoard player={player} quests={quests} completions={data.completions} summary={summary} onFight={bossId => openFocus({ bossId })} />}
           {page === 'party' && <Party summary={summary} contacts={data.contacts} />}
           {page === 'shop' && <Shop player={player} rewards={data.rewards} purchases={data.purchases} savings={data.savings} summary={summary} onPlans={() => openPlans()} />}
           {page === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={home} />}

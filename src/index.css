@@ -728,3 +728,17 @@ button.photo { cursor: zoom-in; }
 .today-row p { margin: 0 0 4px; }
 .new-area { border-color: var(--good); box-shadow: 0 0 18px rgba(77, 255, 166, 0.35); }
 :root[data-look='clean'] .new-area, :root[data-look='clean'] .hero-photo .photo { box-shadow: none; }
+
+/* ---- Quest offers ---- */
+.offer-list-board { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.offer-card { border: 1px solid rgba(47, 143, 255, 0.35); border-radius: var(--radius); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.offer-card p { margin: 0; font-size: 0.88rem; }
+.offer-card .row { margin-top: auto; padding-top: 6px; }
+.offer-card.added { border-color: rgba(77, 255, 166, 0.5); background: rgba(77, 255, 166, 0.05); }
+.offer-card.kind-dark { border-color: rgba(164, 107, 255, 0.55); background: rgba(164, 107, 255, 0.06); }
+.offer-card.main { border-color: rgba(255, 207, 92, 0.45); }
+.offer-top { display: flex; align-items: center; gap: 8px; }
+.offer-kind { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.offer-kind.you { color: var(--accent); }
+.offer-kind.dark { color: #c3a6ff; }
+.offer-card .stage-list { margin: 4px 0 0; padding-left: 18px; font-size: 0.85rem; color: var(--muted); }

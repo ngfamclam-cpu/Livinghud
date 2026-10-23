@@ -1,4 +1,4 @@
-import { DAY_NAMES, NORMAL_XP_PER_MISS, daysBetween, dayKey, featureOn, type Player, type Quest, type Summary } from '../engine'
+import { DAY_NAMES, NORMAL_XP_PER_MISS, SIDE_OFFER_DAYS, daysBetween, dayKey, featureOn, type Player, type Quest, type Summary } from '../engine'
 import { SystemWindow } from './SystemWindow'
 import { markSeen } from './briefingSeen'
 
@@ -40,6 +40,9 @@ export function Briefing({ player, quests, summary, onClose, onReport }: {
   const missed = summary.penalty?.missedYesterday ?? 0
   if (missed > 0 && player.settings.difficulty === 'normal') lines.push(`Yesterday's ${missed} missed dail${missed === 1 ? 'y' : 'ies'} cost ${missed * NORMAL_XP_PER_MISS} XP.`)
   if (toCap > 0) lines.push(`$${toCap.toFixed(2)} left to fill this month's wallet.`)
+  const newSides = (day - 1) % SIDE_OFFER_DAYS === 0
+  const newMains = summary.today === summary.week
+  if (newSides || newMains) lines.push(`New ${[newSides && 'side', newMains && 'main'].filter(Boolean).join(' and ')} quest offers on the Quests board.`)
   if (featureOn(player, 'surprises')) lines.push('A surprise quest will appear at some point today. Be ready.')
 
   return (

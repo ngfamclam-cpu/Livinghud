@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { featureOn, MAIN_TEMPLATES, SIDE_TEMPLATES, SIDE_XP, SIDE_PAY_SHARE, type Player, type Quest, type StatKey, type Summary } from '../engine'
+import { featureOn, MAIN_TEMPLATES, SIDE_TEMPLATES, SIDE_XP, SIDE_PAY_SHARE, type Completion, type Player, type Quest, type StatKey, type Summary } from '../engine'
 import { addCustomMain, addMainFromTemplate, addSideFromTemplate, addSideQuest, archiveQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { Bosses } from './Bosses'
+import { QuestOffers } from './QuestOffers'
 import { money } from './format'
 
-export function QuestBoard({ player, quests, summary, onFight }: { player: Player; quests: Quest[]; summary: Summary; onFight: (bossId: string) => void }) {
+export function QuestBoard({ player, quests, completions, summary, onFight }: { player: Player; quests: Quest[]; completions: Completion[]; summary: Summary; onFight: (bossId: string) => void }) {
   const active = quests.filter(q => q.active)
   const activeTemplates = new Set(active.map(q => q.templateId))
   const sides = active.filter(q => q.kind === 'side')
@@ -25,6 +26,8 @@ export function QuestBoard({ player, quests, summary, onFight }: { player: Playe
           Side and main quest money comes on top of your dailies, so it usually lands in the Vault.
         </p>
       </SystemWindow>
+
+      <QuestOffers player={player} quests={quests} completions={completions} summary={summary} />
 
       {featureOn(player, 'bosses') && <Bosses player={player} summary={summary} onFight={onFight} />}
 
