@@ -219,32 +219,8 @@ export function summarize(
     mainProgress.set(q.id, { cleared, current, done })
   }
 
-  // Rolling 30-day window. Past days count fully; today only counts what is
-  // already done, so stats don't dip every morning before you start.
-  // Recovery Days are skipped, so a planned rest never lowers a stat.
-  const pastDays = Math.min(STAT_WINDOW_DAYS - 1, Math.max(0, daysBetween(startDay, today)))
-  const windowStart = addDays(today, -pastDays)
-  let restDays = 0
-  for (const d of recoveryDays) if (d >= windowStart && d < today) restDays++
-  const countedDays = pastDays - restDays
   const dailies = quests.filter(q => q.kind === 'daily' && q.active)
-  const inWindow = completions.filter(c => c.day >= windowStart && c.day <= today)
-
-  const stats: Partial<Record<StatKey, number>> = {}
-  let allDone = 0
-  let allPossible = 0
-  for (const stat of player.stats) {
-    const statDailies = dailies.filter(q => q.stat === stat)
-    const ids = new Set(statDailies.map(q => q.id))
-    const done = inWindow.filter(c => ids.has(c.questId)).reduce((s, c) => s + weight(c), 0)
-    const doneToday = statDailies.filter(q => todayDone.has(q.id)).length
-    const possible = statDailies.length * countedDays + doneToday
-    const counted = Math.min(done, possible)
-    stats[stat] = possible > 0 ? Math.round((100 * counted) / possible) : 0
-    allDone += counted
-    allPossible += possible
-  }
-  const completionRate = allPossible > 0 ? Math.min(1, allDone / allPossible) : 0
+  const { stats, completionRate } = statScores(player, dailies, completions, recoveryDays, today, startDay)
 
   // Streaks count back from today (or yesterday if today isn't done yet).
   // A Recovery Day neither breaks a streak nor adds to it.
@@ -326,4 +302,42 @@ export function summarize(
     party: partyBonds(people, contacts, today, at => dayKey(new Date(at), player.settings.resetHour)),
     routineOffer: progressionDue(routineFullDays, recoveryDays, today, player.routineReviewedOn) ? raisePlan(plan) : null,
   }
+}
+
+/**
+ * 0-100 per stat over the rolling 30-day window ending on `today`. Past days
+ * count fully; `today` only counts what is already done, so stats don't dip
+ * every morning before you start. Recovery Days are skipped, so a planned rest
+ * never lowers a stat. Also used to draw stat history (each past day as "today").
+ */
+export function statScores(
+  player: Pick<Player, 'stats'>,
+  dailies: Quest[],
+  completions: Completion[],
+  recoveryDays: Set<string>,
+  today: string,
+  startDay: string,
+): { stats: Partial<Record<StatKey, number>>; completionRate: number } {
+  const pastDays = Math.min(STAT_WINDOW_DAYS - 1, Math.max(0, daysBetween(startDay, today)))
+  const windowStart = addDays(today, -pastDays)
+  let restDays = 0
+  for (const d of recoveryDays) if (d >= windowStart && d < today) restDays++
+  const countedDays = pastDays - restDays
+  const inWindow = completions.filter(c => c.day >= windowStart && c.day <= today)
+  const doneToday = new Set(inWindow.filter(c => c.day === today).map(c => c.questId))
+
+  const stats: Partial<Record<StatKey, number>> = {}
+  let allDone = 0
+  let allPossible = 0
+  for (const stat of player.stats) {
+    const statDailies = dailies.filter(q => q.stat === stat)
+    const ids = new Set(statDailies.map(q => q.id))
+    const done = inWindow.filter(c => ids.has(c.questId)).reduce((s, c) => s + weight(c), 0)
+    const possible = statDailies.length * countedDays + statDailies.filter(q => doneToday.has(q.id)).length
+    const counted = Math.min(done, possible)
+    stats[stat] = possible > 0 ? Math.round((100 * counted) / possible) : 0
+    allDone += counted
+    allPossible += possible
+  }
+  return { stats, completionRate: allPossible > 0 ? Math.min(1, allDone / allPossible) : 0 }
 }

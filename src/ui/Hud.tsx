@@ -19,9 +19,11 @@ interface HudProps {
   surprises: SurpriseClear[]
   now: Date
   onPlans: (id?: string | null) => void
+  /** On the PC dashboard the status and stats live in their own panels. */
+  desktop?: boolean
 }
 
-export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans }: HudProps) {
+export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop }: HudProps) {
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
   const sides = active.filter(q => q.kind === 'side')
@@ -33,7 +35,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
 
   return (
     <main className="hud">
-      <SystemWindow title="Status" className="status">
+      {!desktop && <SystemWindow title="Status" className="status">
         <div className="player-line">
           <div>
             <div className="player-name">{player.name}</div>
@@ -77,7 +79,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
               : `Shop locked until you save ${money(savings.target)} this month (${money(savings.saved)} so far).`}
           </p>
         ) : null}
-      </SystemWindow>
+      </SystemWindow>}
 
       {featureOn(player, 'surprises') && <SurpriseCard player={player} summary={summary} cleared={surprises} now={now} />}
 
@@ -132,7 +134,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
         </SystemWindow>
       )}
 
-      <SystemWindow title="Stats">
+      {!desktop && <SystemWindow title="Stats">
         <ul className="stats">
           {player.stats.map(key => (
             <li key={key} className={key === weakest && dailies.length > 0 ? 'weakest' : ''}>
@@ -143,7 +145,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
             </li>
           ))}
         </ul>
-      </SystemWindow>
+      </SystemWindow>}
 
       <SystemWindow title={`Daily Quest · ${doneCount}/${dailies.length}`}>
         {doneCount === dailies.length && dailies.length > 0 && (
