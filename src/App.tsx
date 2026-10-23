@@ -18,6 +18,8 @@ import { Plans } from './ui/Plans'
 import { Briefing } from './ui/Briefing'
 import { briefingSeen } from './ui/briefingSeen'
 import { dayKey, featureOn } from './engine'
+import { Desktop } from './ui/desktop/Desktop'
+import { setPref, usePrefs, useWide } from './ui/desktop/prefs'
 
 type Tab = 'hud' | 'quests' | 'party' | 'shop' | 'settings'
 
@@ -36,6 +38,11 @@ export default function App() {
   const [planId, setPlanId] = useState<string | null>(null)
   const [briefingDone, setBriefingDone] = useState(false)
   const [focusPreset, setFocusPreset] = useState<FocusPreset>({})
+  const wide = useWide()
+  const prefs = usePrefs()
+  useEffect(() => {
+    document.documentElement.dataset.look = prefs.look
+  }, [prefs.look])
   const data = useLiveQuery(async () => {
     const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds] = await Promise.all([
       db.players.get(LOCAL_USER),
@@ -94,6 +101,22 @@ export default function App() {
     setFocusPreset(preset)
     setScreen('focus')
   }
+  const theme = <ThemeApplier theme={featureOn(player, 'loot') && player.theme && summary.themes.includes(player.theme) ? player.theme : 'system'} />
+  const briefing = showBriefing && (
+    <Briefing player={player} quests={quests} summary={summary} onClose={() => setBriefingDone(true)} onReport={() => { setBriefingDone(true); setScreen('report') }} />
+  )
+
+  if (wide && prefs.layout !== 'phone') {
+    return (
+      <>
+        <Desktop data={{ ...data, player }} summary={summary} reportInput={reportInput} now={now} />
+        {showBriefing && <Briefing player={player} quests={quests} summary={summary} onClose={() => setBriefingDone(true)} onReport={() => setBriefingDone(true)} />}
+        <SystemToasts />
+        {theme}
+      </>
+    )
+  }
+
   const tabs = TABS.filter(t => t.key !== 'party' || featureOn(player, 'party'))
   const current = tabs.some(t => t.key === tab) ? tab : 'hud'
 
@@ -113,6 +136,7 @@ export default function App() {
           <Focus player={player} quests={quests} summary={summary} runs={focusRuns} preset={focusPreset} onClose={() => setScreen(null)} />
         )}
         <SystemToasts />
+        {theme}
       </>
     )
   }
@@ -125,17 +149,16 @@ export default function App() {
             {t.label}
           </button>
         ))}
+        {wide && <button onClick={() => setPref('layout', 'auto')}>PC dashboard</button>}
       </nav>
       {current === 'party' && <Party summary={summary} contacts={contacts} />}
       {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} />}
       {current === 'quests' && <QuestBoard player={player} quests={quests} summary={summary} onFight={bossId => openFocus({ bossId })} />}
       {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} onPlans={() => openPlans()} />}
       {current === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setTab('hud')} />}
-      {showBriefing && (
-        <Briefing player={player} quests={quests} summary={summary} onClose={() => setBriefingDone(true)} onReport={() => { setBriefingDone(true); setScreen('report') }} />
-      )}
+      {briefing}
       <SystemToasts />
-      <ThemeApplier theme={featureOn(player, 'loot') && player.theme && summary.themes.includes(player.theme) ? player.theme : 'system'} />
+      {theme}
     </>
   )
 }
