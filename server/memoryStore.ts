@@ -1,4 +1,4 @@
-import type { Store } from './blob'
+import type { Store } from './blob.js'
 
 /** An in-memory Store with version tags, for tests. */
 export function memoryStore(): Store & { files: Map<string, { body: string; etag: string }> } {

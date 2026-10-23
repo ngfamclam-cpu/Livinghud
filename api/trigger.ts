@@ -10,7 +10,7 @@
 // The inbox is one small file per player, updated with version checks so two
 // writes at the same moment can't lose each other. Only a hash of the token is stored.
 
-import { blobStore, jsonResponse, normalizeKey, sha256, storageError, type Store } from '../server/blob'
+import { blobStore, jsonResponse, normalizeKey, sha256, storageError, type Store } from '../server/blob.js'
 
 export interface InboxItem {
   id: string

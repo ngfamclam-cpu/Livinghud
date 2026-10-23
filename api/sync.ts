@@ -5,7 +5,7 @@
 // GET  /api/sync   header x-sync-key -> the save file, or 404 if none yet
 // PUT  /api/sync   header x-sync-key, body = save file -> stores it
 
-import { blobStore, jsonResponse, normalizeKey, sha256, storageError, type Store } from '../server/blob'
+import { blobStore, jsonResponse, normalizeKey, sha256, storageError, type Store } from '../server/blob.js'
 
 const MAX_BYTES = 2_000_000
 
