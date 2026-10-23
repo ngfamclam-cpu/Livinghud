@@ -1,50 +1,101 @@
 import { useState } from 'react'
-import { RANK_MIN_LEVEL, REWARD_IDEAS, rewardRank, vaultOnly, type Reward, type RewardSpecial, type StatKey } from '../engine'
-import { addSuggestedRewards, buyOneOff, updateReward } from '../db/actions'
+import { RANK_MIN_LEVEL, REWARD_IDEAS, addDays, dayKey, daysBetween, goalProgress, rewardOffers, rewardRank, vaultOnly, type GoalProgress, type Player, type Reward, type RewardSpecial, type RewardTemplate, type Summary } from '../engine'
+import { Bar } from './Bar'
+import { addSuggestedRewards, buyOneOff, surpriseSeed, toggleFavoriteReward, updateReward } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { money, SPECIAL_LABEL } from './format'
 
-/** One-tap reward ideas that fit the rest of the game; ideas for your stats come first. */
-export function RewardIdeas({ stats, owned }: { stats: StatKey[]; owned: Set<string | null> }) {
-  const ideas = REWARD_IDEAS.filter(i => !owned.has(i.id)).sort(
-    (a, b) => Number(!a.stat || !stats.includes(a.stat)) - Number(!b.stat || !stats.includes(b.stat)),
+/**
+ * "Ideas for you": a fresh set every 3 days (same window as side quest offers),
+ * plus the ideas you starred, pinned on top with how close you are to each.
+ */
+export function RewardIdeas({ player, summary, rewards }: { player: Player; summary: Summary; rewards: Reward[] }) {
+  const [browse, setBrowse] = useState(false)
+  const resetHour = player.settings.resetHour
+  const owned = new Map<string, string>()
+  for (const r of rewards) if (r.active && r.templateId) owned.set(r.templateId, dayKey(new Date(r.createdAt), resetHour))
+  const favorites = (player.favoriteRewards ?? []).map(id => REWARD_IDEAS.find(i => i.id === id)).filter((i): i is RewardTemplate => !!i)
+  const startDay = dayKey(new Date(player.createdAt), resetHour)
+  const set = rewardOffers(
+    { seed: surpriseSeed(player), daysSinceStart: daysBetween(startDay, summary.today), stats: player.stats, owned, favorites: favorites.map(f => f.id) },
+    addDays,
+    summary.today,
   )
-  const categories = [...new Set(ideas.map(i => i.category))]
-  const [category, setCategory] = useState<string | null>(null)
-  if (ideas.length === 0) return null
-  const shown = ideas.filter(i => !category || i.category === category)
+  const ctx = {
+    level: summary.level.level,
+    stats: summary.stats,
+    wallet: summary.wallet.available,
+    vault: summary.wallet.vault,
+    savingsMet: summary.savings.met,
+    mainQuestsCleared: summary.mainQuestsCleared,
+  }
+  const left = daysBetween(summary.today, set.nextOn)
+  const all = REWARD_IDEAS.filter(i => !favorites.includes(i))
 
   return (
-    <SystemWindow title="Ideas for you">
-      <p className="muted">Picked to go with your training, posture work, automations, side income and social life. Prices are typical; edit them after adding.</p>
-      <div className="tabs-inline">
-        <button className={`chip ${category === null ? 'picked' : ''}`} onClick={() => setCategory(null)}>All</button>
-        {categories.map(c => (
-          <button key={c} className={`chip ${category === c ? 'picked' : ''}`} onClick={() => setCategory(c)}>{c}</button>
-        ))}
-      </div>
+    <SystemWindow title="Ideas for you" className="reward-ideas">
+      {favorites.length > 0 && (
+        <>
+          <h3>★ Working toward</h3>
+          <ul className="rewards ideas favorites">
+            {favorites.map(i => <IdeaRow key={i.id} idea={i} inShop={owned.has(i.id)} favorite progress={goalProgress(i, ctx)} />)}
+          </ul>
+        </>
+      )}
+      <h3>New picks</h3>
+      <p className="muted">
+        A fresh set every 3 days, picked for your training, posture, raves, the Asia trip and side income. Next set {left <= 1 ? 'tomorrow' : `in ${left} days`}. Star one to keep it here and track it. Prices are typical; edit them after adding.
+      </p>
       <ul className="rewards ideas">
-        {shown.map(i => {
-          const rank = rewardRank(i.price)
-          return (
-            <li key={i.id}>
-              <div className="reward-info">
-                <b>{i.title}</b>
-                <small className="muted">
-                  {rank}-rank{RANK_MIN_LEVEL[rank] > 1 ? ` · level ${RANK_MIN_LEVEL[rank]}+` : ''}{vaultOnly(rank) ? ' · Vault' : ''}
-                  {i.statGate && ` · needs ${i.statGate.stat} ${i.statGate.min}`}
-                </small>
-                {i.why && <small>{i.why}</small>}
-              </div>
-              <span className="price">{money(i.price)}</span>
-              <div className="reward-actions">
-                <button className="small" onClick={() => addSuggestedRewards([i.id])}>+ Add</button>
-              </div>
-            </li>
-          )
-        })}
+        {set.offers.map(i => <IdeaRow key={i.id} idea={i} inShop={owned.has(i.id)} favorite={false} />)}
       </ul>
+      <div className="row end">
+        <button className="ghost small" onClick={() => setBrowse(b => !b)}>{browse ? 'Hide the full list' : `Browse all ${REWARD_IDEAS.length} ideas`}</button>
+      </div>
+      {browse && (
+        <ul className="rewards ideas">
+          {all.map(i => <IdeaRow key={i.id} idea={i} inShop={owned.has(i.id)} favorite={false} />)}
+        </ul>
+      )}
     </SystemWindow>
+  )
+}
+
+function IdeaRow({ idea: i, inShop, favorite, progress }: { idea: RewardTemplate; inShop: boolean; favorite: boolean; progress?: GoalProgress }) {
+  const rank = rewardRank(i.price)
+  return (
+    <li className={favorite ? 'favorite' : ''}>
+      <div className="reward-info">
+        <b>{i.title}</b>
+        <small className="muted">
+          {rank}-rank{RANK_MIN_LEVEL[rank] > 1 ? ` · level ${RANK_MIN_LEVEL[rank]}+` : ''}{vaultOnly(rank) ? ' · Vault' : ''}
+          {i.statGate && ` · needs ${i.statGate.stat} ${i.statGate.min}`}
+          {` · ${i.category}`}
+        </small>
+        {i.why && <small>{i.why}</small>}
+        {progress && (
+          <div className="goal">
+            <Bar value={progress.have} max={i.price} variant="gold" thin label={`${money(Math.min(progress.have, i.price))} of ${money(i.price)}`} />
+            <small className={progress.blockers.length ? 'muted' : 'system-line'}>
+              {progress.blockers.length ? `To go: ${progress.blockers.join(' · ')}` : inShop ? 'Ready: buy it in the shop above.' : 'Ready: add it to the shop and buy it.'}
+            </small>
+          </div>
+        )}
+      </div>
+      <span className="price">{money(i.price)}</span>
+      <div className="reward-actions">
+        <button
+          className={`ghost small icon star ${favorite ? 'on' : ''}`}
+          aria-pressed={favorite}
+          aria-label={favorite ? `Unstar ${i.title}` : `Star ${i.title} to work toward it`}
+          title={favorite ? 'Stop tracking' : 'Work toward this'}
+          onClick={() => toggleFavoriteReward(i.id)}
+        >
+          {favorite ? '★' : '☆'}
+        </button>
+        {inShop ? <span className="cleared">IN SHOP</span> : <button className="small" onClick={() => addSuggestedRewards([i.id])}>+ Add</button>}
+      </div>
+    </li>
   )
 }
 

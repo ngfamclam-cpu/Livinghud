@@ -214,4 +214,35 @@ export const REWARD_IDEAS: RewardTemplate[] = [
   // Gaming
   { id: 'idea-game-pass', title: 'A month of a game subscription', price: 17, category: 'Gaming', special: 'none', why: 'A month of games for a month of streaks.' },
   { id: 'idea-controller', title: 'New game controller', price: 60, category: 'Gaming', special: 'none' },
+  { id: 'idea-gaming-chair', title: 'Ergonomic gaming chair', price: 280, category: 'Gaming', special: 'none', stat: 'STR', why: 'Long sessions without the slump; pick one with real lumbar support.' },
+  // Raves and festivals
+  { id: 'idea-hifi-earplugs', title: 'High-fidelity earplugs', price: 30, category: 'Raves', special: 'none', stat: 'VIT', why: 'Music still sounds good, your ears survive the season.' },
+  { id: 'idea-hydration-pack', title: 'Festival hydration pack', price: 45, category: 'Raves', special: 'none', stat: 'VIT', why: 'Water on your back all night. Pairs with the Rave-ready week quest.' },
+  { id: 'idea-rave-outfit', title: 'Rave outfit', price: 80, category: 'Raves', special: 'none', stat: 'CHA', why: 'For Main character day and the next event.' },
+  { id: 'idea-camp-kit', title: 'Festival camping kit', price: 180, category: 'Raves', special: 'none', why: 'Tent, mat and a decent sleeping bag for festival weekends.' },
+  { id: 'idea-vip-upgrade', title: 'VIP upgrade at a festival', price: 450, category: 'Raves', special: 'bigNight', stat: 'CHA', why: 'Shorter queues, better views. A-rank: it comes out of the Vault.' },
+  // Asia trip
+  { id: 'idea-carry-on', title: 'Carry-on travel backpack', price: 150, category: 'Travel', special: 'none', why: 'One bag for the whole Asia trip; skip the checked-bag fees.' },
+  { id: 'idea-packing-cubes', title: 'Packing cubes', price: 25, category: 'Travel', special: 'none', why: 'Makes living out of a backpack painless.' },
+  { id: 'idea-language-app', title: 'A year of a language app', price: 60, category: 'Travel', special: 'none', stat: 'INT', why: 'For the Speak for the trip main quest.' },
+  { id: 'idea-esim', title: 'Travel eSIM data plan', price: 35, category: 'Travel', special: 'none', why: 'Data the moment you land, no SIM hunting.' },
+  { id: 'idea-noise-cancel', title: 'Noise-cancelling headphones', price: 300, category: 'Travel', special: 'none', why: 'Long-haul flights, train rides and focus sessions at home.' },
+  { id: 'idea-food-tour', title: 'Street-food tour in Asia', price: 60, category: 'Travel', special: 'none', stat: 'CHA', why: 'Book it ahead and it becomes something to look forward to.' },
+  { id: 'idea-business-class', title: 'Business-class upgrade for one flight', price: 900, category: 'Travel', special: 'none', why: 'The ultimate S-rank flex for the Asia trip.' },
+  // Life log and memories
+  { id: 'idea-photo-book', title: 'Printed photo book', price: 50, category: 'Memories', special: 'none', stat: 'INT', why: 'Your Life log photos of the year, on paper.' },
+  { id: 'idea-action-cam', title: 'Action camera', price: 250, category: 'Memories', special: 'none', why: 'Raves, trips and training clips worth keeping.' },
+  { id: 'idea-instant-camera', title: 'Instant camera', price: 90, category: 'Memories', special: 'none', stat: 'CHA', why: 'Photos you can hand to friends on the night.' },
+  // Experiences and self-care
+  { id: 'idea-float', title: 'Float tank or sauna session', price: 50, category: 'Recovery', special: 'none', stat: 'VIT', why: 'A proper reset after a big week.' },
+  { id: 'idea-physio', title: 'Posture assessment with a physio', price: 110, category: 'Recovery', special: 'none', stat: 'STR', why: 'A professional check of your pelvic tilt and neck, to compare with your scans.' },
+  { id: 'idea-pt-session', title: 'Personal-trainer session', price: 80, category: 'Training gear', special: 'none', stat: 'STR', why: 'Form check on pull-ups, squats and glute work.' },
+  { id: 'idea-cooking-class', title: 'Cooking class', price: 90, category: 'Health', special: 'none', stat: 'VIT', why: 'Learn the go-to meals for Recomp season.' },
+  { id: 'idea-skincare', title: 'Skincare starter kit', price: 45, category: 'Self-care', special: 'none', stat: 'CHA', why: 'Small daily habit, noticeable glow-up.' },
+  { id: 'idea-fragrance', title: 'Signature fragrance', price: 130, category: 'Self-care', special: 'none', stat: 'CHA', why: 'Main-character energy in a bottle.' },
+  { id: 'idea-tailored', title: 'A tailored suit or blazer', price: 400, category: 'Self-care', special: 'none', stat: 'WLT', why: 'For interviews, deals and the quiet empire.' },
+  // Money and productivity
+  { id: 'idea-mech-keyboard', title: 'Mechanical keyboard', price: 120, category: 'Desk setup', special: 'none', stat: 'INT', why: 'Makes deep-work sessions a little more fun.' },
+  { id: 'idea-standing-desk', title: 'Standing desk', price: 400, category: 'Desk setup', special: 'none', stat: 'STR', why: 'Switch positions all day; pairs with the Posture rebuild quest.' },
+  { id: 'idea-invest', title: 'First $100 into an index fund', price: 100, category: 'Money', special: 'none', stat: 'WLT', why: 'A reward that pays you back. Counts toward Net worth +$5,000.' },
 ]

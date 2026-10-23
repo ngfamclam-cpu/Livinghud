@@ -134,7 +134,7 @@ export function Shop({ player, rewards, purchases, savings, summary, onPlans }: 
 
       <OneOffPurchase />
 
-      <RewardIdeas stats={player.stats} owned={owned} />
+      <RewardIdeas player={player} summary={summary} rewards={rewards} />
 
       <SystemWindow title="Add a reward">
         {active.length === 0 && <p>Your shop is empty. Start with the suggested list, or add your own rewards below.</p>}
