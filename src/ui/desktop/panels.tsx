@@ -14,6 +14,8 @@ import {
   statHistory,
   weeklyReport,
   featureOn,
+  goalProgress,
+  REWARD_IDEAS,
   type FeedKind,
   type ReportInput,
   type StatKey,
@@ -224,6 +226,7 @@ export function MoneyPanel({ data, summary, onPlans, onShop }: { data: DashData;
         reference={{ value: wallet.budget, label: 'budget' }}
         label="Quest earnings for the last six months"
       />
+      <Goals data={data} summary={summary} onShop={onShop} />
       {featureOn(data.player, 'plans') && (
         <div className="plan-list">
           {summary.plans.map(s => (
@@ -402,4 +405,34 @@ function ago(at: number): string {
   const d = Math.round(h / 24)
   if (d < 7) return `${d}d`
   return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+/** Starred shop ideas and how close each one is. */
+function Goals({ data, summary, onShop }: { data: DashData; summary: Summary; onShop: () => void }) {
+  const goals = (data.player.favoriteRewards ?? []).map(id => REWARD_IDEAS.find(i => i.id === id)).filter(i => !!i)
+  if (goals.length === 0) return null
+  const ctx = {
+    level: summary.level.level,
+    stats: summary.stats,
+    wallet: summary.wallet.available,
+    vault: summary.wallet.vault,
+    savingsMet: summary.savings.met,
+    mainQuestsCleared: summary.mainQuestsCleared,
+  }
+  return (
+    <div className="plan-list">
+      <p className="muted chart-title">★ Working toward</p>
+      {goals.map(g => {
+        const p = goalProgress(g, ctx)
+        return (
+          <button key={g.id} className="plan-row" onClick={onShop}>
+            <span className="plan-name">{g.title}</span>
+            <span className="plan-when">{money(g.price)}</span>
+            <Bar value={p.have} max={g.price} variant="gold" thin />
+            <span className="muted plan-meta">{p.blockers.length ? p.blockers[0] : 'Ready to buy'}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
 }

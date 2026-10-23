@@ -1028,3 +1028,12 @@ export async function resetEverything(): Promise<void> {
     await Promise.all([...tables(), db.photoCache].map(t => t.clear()))
   })
 }
+
+/** Stars or un-stars a Shop reward idea to work toward. */
+export async function toggleFavoriteReward(id: string): Promise<void> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player) return
+  const list = player.favoriteRewards ?? []
+  const next = list.includes(id) ? list.filter(x => x !== id) : [...list, id]
+  await db.players.update(LOCAL_USER, { favoriteRewards: next, updatedAt: Date.now() })
+}

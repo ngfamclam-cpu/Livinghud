@@ -3,8 +3,9 @@
 // the player's id (like surprises), so every device sees the same offers and
 // nothing is stored until you add one. Offers lean toward your weakest stats.
 
-import type { MainTemplate, SideTemplate } from './library'
-import type { StatKey } from './types'
+import { RANK_MIN_LEVEL, rewardRank, round2, vaultOnly, type ShopContext } from './economy'
+import { REWARD_IDEAS, type MainTemplate, type RewardTemplate, type SideTemplate } from './library'
+import type { Reward, StatKey } from './types'
 
 export const SIDE_OFFER_DAYS = 3
 
@@ -301,4 +302,65 @@ export function mainOffers(
   const first = pool.find(o => o.stat === weakest) ?? pool[0]
   const second = pool.find(o => o !== first && o.stat !== first?.stat) ?? pool.find(o => o !== first)
   return { week: input.week, nextOn: addDays(input.week, 7), offers: [first, second].filter((o): o is MainOffer => !!o) }
+}
+
+// ---- Reward offers: the Shop's "Ideas for you" rotates on the same 3-day window ----
+
+export const REWARD_OFFER_COUNT = 6
+
+/**
+ * This window's reward ideas: a spread of prices (something cheap, mid-range
+ * picks and one big Vault goal), mostly for your stats. Favourites are pinned
+ * separately, and ideas already in your shop before the window are skipped.
+ */
+export function rewardOffers(
+  input: { seed: string; daysSinceStart: number; stats: StatKey[]; owned: Owned; favorites: string[] },
+  addDays: (day: string, n: number) => string,
+  today: string,
+): { startedOn: string; nextOn: string; offers: RewardTemplate[] } {
+  const { period, startedOn, nextOn } = sideWindow(input.daysSinceStart, today, addDays)
+  const fav = new Set(input.favorites)
+  const pool = shuffled(
+    REWARD_IDEAS.filter(i => !fav.has(i.id) && !((input.owned.get(i.id) ?? '9999') < startedOn)),
+    `${input.seed}:reward:${period}`,
+  )
+  const mine = (i: RewardTemplate) => !i.stat || input.stats.includes(i.stat)
+  const picked: RewardTemplate[] = []
+  const take = (test: (i: RewardTemplate) => boolean, n: number) => {
+    for (const i of pool) {
+      if (n <= 0) break
+      if (picked.includes(i) || !test(i)) continue
+      picked.push(i)
+      n--
+    }
+  }
+  const rank = (i: RewardTemplate) => rewardRank(i.price)
+  take(i => mine(i) && ['E', 'D'].includes(rank(i)), 2)
+  take(i => mine(i) && ['C', 'B'].includes(rank(i)), 2)
+  take(i => mine(i) && ['A', 'S'].includes(rank(i)), 1)
+  take(mine, REWARD_OFFER_COUNT - picked.length)
+  take(() => true, REWARD_OFFER_COUNT - picked.length)
+  return { startedOn, nextOn, offers: picked }
+}
+
+export interface GoalProgress {
+  /** Money you could put toward it now (wallet + Vault for E–B, Vault only for A/S). */
+  have: number
+  /** 0-1 toward the price. */
+  share: number
+  /** What still stands in the way, in order; empty when you could buy it today. */
+  blockers: string[]
+}
+
+/** How close you are to a favourite: money, level, stat and the other shop gates. */
+export function goalProgress(item: { price: number; statGate?: Reward['statGate'] }, ctx: ShopContext): GoalProgress {
+  const r = rewardRank(item.price)
+  const have = round2(vaultOnly(r) ? ctx.vault : Math.max(0, ctx.wallet) + ctx.vault)
+  const blockers: string[] = []
+  if (ctx.level < RANK_MIN_LEVEL[r]) blockers.push(`Reach level ${RANK_MIN_LEVEL[r]} (you're ${ctx.level})`)
+  if (item.statGate && (ctx.stats[item.statGate.stat] ?? 0) < item.statGate.min) blockers.push(`${item.statGate.stat} ${ctx.stats[item.statGate.stat] ?? 0}/${item.statGate.min}`)
+  if (r === 'S' && ctx.mainQuestsCleared < 1) blockers.push('Clear a main quest')
+  if (!ctx.savingsMet) blockers.push("Meet this month's savings goal")
+  if (have < item.price) blockers.push(`$${(item.price - have).toFixed(2)} more${vaultOnly(r) ? ' in the Vault' : ''}`)
+  return { have, share: item.price > 0 ? Math.min(1, have / item.price) : 1, blockers }
 }

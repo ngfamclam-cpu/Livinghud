@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAIN_OFFERS, SIDE_OFFERS, addDays, mainOffers, sideOffers, sideWindow, type StatKey } from './index'
+import { MAIN_OFFERS, REWARD_OFFER_COUNT, SIDE_OFFERS, addDays, goalProgress, mainOffers, rewardOffers, rewardRank, sideOffers, sideWindow, type StatKey } from './index'
 
 const stats: StatKey[] = ['STR', 'VIT', 'INT', 'CHA', 'AGI', 'WLT']
 const base = { seed: 'player-1', stats, scores: { STR: 90, VIT: 80, INT: 20, CHA: 70, AGI: 60, WLT: 10 }, owned: new Map<string, string>() }
@@ -52,5 +52,42 @@ describe('main quest offers', () => {
     expect(set.offers[1].stat).not.toBe('WLT')
     expect(mainOffers({ ...base, week: '2026-10-05' }, addDays).offers.map(o => o.id)).toEqual(set.offers.map(o => o.id))
     expect(MAIN_OFFERS.every(o => o.stages.length >= 4)).toBe(true)
+  })
+})
+
+describe('reward offers', () => {
+  const input = { seed: 'player-1', stats, owned: new Map<string, string>(), favorites: [] as string[] }
+
+  it('rotate every 3 days with a spread of prices', () => {
+    const a = rewardOffers({ ...input, daysSinceStart: 0 }, addDays, '2026-10-01')
+    const b = rewardOffers({ ...input, daysSinceStart: 2 }, addDays, '2026-10-03')
+    const c = rewardOffers({ ...input, daysSinceStart: 3 }, addDays, '2026-10-04')
+    expect(a.offers).toHaveLength(REWARD_OFFER_COUNT)
+    expect(b.offers.map(i => i.id)).toEqual(a.offers.map(i => i.id))
+    expect(c.offers.map(i => i.id)).not.toEqual(a.offers.map(i => i.id))
+    const ranks = a.offers.map(i => rewardRank(i.price))
+    expect(ranks.some(r => r === 'E' || r === 'D')).toBe(true)
+    expect(ranks.some(r => r === 'A' || r === 'S')).toBe(true)
+  })
+
+  it('leave out favourites (pinned separately) and ideas already in the shop', () => {
+    const first = rewardOffers({ ...input, daysSinceStart: 0 }, addDays, '2026-10-01').offers[0]
+    expect(rewardOffers({ ...input, favorites: [first.id], daysSinceStart: 0 }, addDays, '2026-10-01').offers.map(i => i.id)).not.toContain(first.id)
+    expect(rewardOffers({ ...input, owned: new Map([[first.id, '2026-09-01']]), daysSinceStart: 0 }, addDays, '2026-10-01').offers.map(i => i.id)).not.toContain(first.id)
+  })
+})
+
+describe('goal progress', () => {
+  const ctx = { level: 12, stats: { STR: 50 }, wallet: 20, vault: 30, savingsMet: true, mainQuestsCleared: 0 }
+
+  it('counts wallet and Vault for E–B, only the Vault for A/S', () => {
+    expect(goalProgress({ price: 100 }, ctx)).toMatchObject({ have: 50, share: 0.5 })
+    expect(goalProgress({ price: 400 }, ctx).have).toBe(30)
+    expect(goalProgress({ price: 40 }, ctx).blockers).toEqual([])
+  })
+
+  it('lists what still stands in the way', () => {
+    const p = goalProgress({ price: 600, statGate: { stat: 'STR', min: 60 } }, { ...ctx, savingsMet: false })
+    expect(p.blockers).toEqual(["Reach level 50 (you're 12)", 'STR 50/60', 'Clear a main quest', "Meet this month's savings goal", '$570.00 more in the Vault'])
   })
 })

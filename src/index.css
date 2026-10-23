@@ -742,3 +742,10 @@ button.photo { cursor: zoom-in; }
 .offer-kind.you { color: var(--accent); }
 .offer-kind.dark { color: #c3a6ff; }
 .offer-card .stage-list { margin: 4px 0 0; padding-left: 18px; font-size: 0.85rem; color: var(--muted); }
+
+/* ---- Reward ideas: favourites ---- */
+.reward-ideas h3 { margin: 4px 0 8px; font-size: 0.85rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.rewards.ideas li.favorite { border-color: rgba(255, 207, 92, 0.55); background: rgba(255, 207, 92, 0.05); }
+.star { font-size: 1.15rem; line-height: 1; color: var(--muted); }
+.star.on { color: var(--gold); border-color: var(--gold); }
+.goal { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }

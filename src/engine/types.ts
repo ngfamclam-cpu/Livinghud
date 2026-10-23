@@ -57,6 +57,8 @@ export interface Player {
   features?: Partial<Record<FeatureKey, boolean>>
   /** The Life log switch paused the photo quest (so switching it back on resumes it). */
   memoryQuestPaused?: boolean
+  /** Reward ideas starred in the Shop to work toward. */
+  favoriteRewards?: string[]
   /** The title shown under the player's name, chosen from earned badges. */
   title?: string | null
   /** The HUD colour theme, chosen from unlocked loot. */
