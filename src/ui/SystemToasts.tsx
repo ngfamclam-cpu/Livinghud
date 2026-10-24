@@ -57,6 +57,8 @@ function toastFor(event: GameEvent): Toast | null {
       return { id: nextId++, text: `$${event.amount.toFixed(2)} saved into ${event.name}` }
     case 'plan.booked':
       return { id: nextId++, text: `BOOKED: ${event.label} for ${event.name} ($${event.cost.toFixed(2)})`, big: true }
+    case 'tracking.added':
+      return { id: nextId++, text: `Now tracking: ${event.title} (${event.kind === 'daily' ? 'daily quest' : event.kind === 'side' ? 'weekly side quest' : "tomorrow's top 3"})`, big: true }
     case 'goal.done':
       return event.allDone
         ? { id: nextId++, text: `ALL THREE GOALS DONE. Today belongs to you.`, big: true }

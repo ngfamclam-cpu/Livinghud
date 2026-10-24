@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, journalPatterns, journalVersion, type Completion, type JournalEntry } from './index'
+import { REFLECTION_PROMPTS, addDays, dailyPrompt, journalPatterns, journalVersion, type Completion, type JournalEntry } from './index'
 
 const entry = (day: string, mood: number, drained = ''): JournalEntry => ({
   id: day, userId: 'local', day, wentWell: 'x', drained, adjust: 'y', mood, energy: 3, createdAt: 0, updatedAt: 0,
@@ -38,5 +38,20 @@ describe('journal', () => {
     const p = journalPatterns(moods, completions, 4, '2026-11-01')
     expect(p.moodWhenProductive).toBe(4)
     expect(p.moodOtherwise).toBe(2)
+  })
+})
+
+describe('random reflection question', () => {
+  it('is the same all day on every device and changes between days', () => {
+    expect(dailyPrompt('2026-10-24', 'p:1')).toBe(dailyPrompt('2026-10-24', 'p:1'))
+    expect(REFLECTION_PROMPTS).toContain(dailyPrompt('2026-10-24', 'p:1'))
+    const week = new Set(Array.from({ length: 14 }, (_, i) => dailyPrompt(`2026-11-${String(i + 1).padStart(2, '0')}`, 'p:1')))
+    expect(week.size).toBeGreaterThan(5)
+  })
+
+  it('counts as a line toward the journal minimum', () => {
+    expect(journalVersion({ wentWell: '', drained: '', adjust: '', promptAnswer: 'Stretching after work' })).toBe('min')
+    expect(journalVersion({ wentWell: 'a', drained: 'b', adjust: 'c', promptAnswer: '' })).toBe('full')
+    expect(journalVersion({ wentWell: '', drained: '', adjust: '' })).toBeNull()
   })
 })

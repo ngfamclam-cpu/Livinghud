@@ -260,6 +260,24 @@ export async function undoQuest(quest: Quest): Promise<void> {
   emit({ type: 'quest.undone', questId: quest.id, questTitle: quest.title })
 }
 
+/** A new daily quest. Daily pay re-splits automatically (see dailyWeight). */
+export async function addDailyQuest(input: { stat: StatKey; title: string; description?: string; minVersion: string; templateId?: string }): Promise<void> {
+  const now = Date.now()
+  await db.quests.add({
+    id: newId(),
+    userId: LOCAL_USER,
+    kind: 'daily',
+    stat: input.stat,
+    title: input.title.trim(),
+    description: (input.description ?? '').trim(),
+    minVersion: input.minVersion.trim() || 'Half of it',
+    active: true,
+    templateId: input.templateId ?? null,
+    createdAt: now,
+    updatedAt: now,
+  })
+}
+
 export async function addSideQuest(input: { stat: StatKey; title: string; description: string; minVersion: string; templateId?: string }): Promise<void> {
   const now = Date.now()
   await db.quests.add({
@@ -788,11 +806,23 @@ export async function removeBoss(id: string): Promise<void> {
  * Saves today's journal entry (one per day; saving again updates it) and clears
  * the journal daily: all three prompts is the full quest, one line the minimum.
  */
-export async function saveJournal(input: Pick<JournalEntry, 'wentWell' | 'drained' | 'adjust' | 'mood' | 'energy'>): Promise<void> {
+export async function saveJournal(
+  input: Pick<JournalEntry, 'wentWell' | 'drained' | 'adjust' | 'mood' | 'energy'> & Partial<Pick<JournalEntry, 'prompt' | 'promptAnswer' | 'tracked'>>,
+): Promise<void> {
   const { summary, quests } = await snapshot()
   const now = Date.now()
   const existing = await db.journal.where('userId').equals(LOCAL_USER).filter(e => e.day === summary.today).first()
-  const entry = { ...input, wentWell: input.wentWell.trim(), drained: input.drained.trim(), adjust: input.adjust.trim(), updatedAt: now }
+  // Keep everything tracked from today's reflection, from earlier saves too.
+  const tracked = [...(existing?.tracked ?? []), ...(input.tracked ?? []).filter(t => !existing?.tracked?.some(x => x.kind === t.kind && x.title === t.title))]
+  const entry = {
+    ...input,
+    wentWell: input.wentWell.trim(),
+    drained: input.drained.trim(),
+    adjust: input.adjust.trim(),
+    promptAnswer: input.promptAnswer?.trim() ?? existing?.promptAnswer ?? '',
+    tracked,
+    updatedAt: now,
+  }
   if (existing) await db.journal.update(existing.id, entry)
   else await db.journal.add({ id: newId(), userId: LOCAL_USER, day: summary.today, createdAt: now, ...entry })
 
@@ -1077,4 +1107,38 @@ export async function toggleGoal(id: string, index: number): Promise<void> {
   await db.goals.update(id, { items, updatedAt: Date.now() })
   const ticked = items[index]
   if (ticked.done) emit({ type: 'goal.done', text: ticked.text, allDone: items.every(i => i.done) })
+}
+
+/** Adds one goal to a day's top 3 (if there's room), without touching the planning quest. */
+export async function addGoal(day: string, text: string): Promise<boolean> {
+  const clean = text.trim().slice(0, 140)
+  if (!clean) return false
+  const now = Date.now()
+  const existing = await db.goals.where('day').equals(day).filter(g => g.userId === LOCAL_USER).first()
+  if (existing) {
+    if (existing.items.length >= GOALS_PER_DAY) return false
+    await db.goals.update(existing.id, { items: [...existing.items, { text: clean, done: false, doneAt: null }], updatedAt: now })
+    return true
+  }
+  const { summary } = await snapshot()
+  await db.goals.add({ id: newId(), userId: LOCAL_USER, day, plannedOn: summary.today, items: [{ text: clean, done: false, doneAt: null }], createdAt: now, updatedAt: now })
+  return true
+}
+
+/**
+ * "Track something new" from a reflection: a daily, a weekly side quest or one
+ * of tomorrow's top 3. Returns a reason if it couldn't be added.
+ */
+export async function trackFromReflection(item: { kind: 'daily' | 'side' | 'goal'; title: string; stat: StatKey; minVersion: string }): Promise<string | null> {
+  const title = item.title.trim()
+  if (!title) return 'Write what you want to track.'
+  const { summary } = await snapshot()
+  if (item.kind === 'daily') await addDailyQuest({ stat: item.stat, title, minVersion: item.minVersion, description: 'Added from a reflection.' })
+  if (item.kind === 'side') await addSideQuest({ stat: item.stat, title, minVersion: item.minVersion, description: 'Added from a reflection.' })
+  if (item.kind === 'goal' && !(await addGoal(addDays(summary.today, 1), title))) return "Tomorrow's top 3 is already full."
+  const entry = await db.journal.where('userId').equals(LOCAL_USER).filter(e => e.day === summary.today).first()
+  const record = { kind: item.kind, title, stat: item.kind === 'goal' ? null : item.stat }
+  if (entry) await db.journal.update(entry.id, { tracked: [...(entry.tracked ?? []), record], updatedAt: Date.now() })
+  emit({ type: 'tracking.added', kind: item.kind, title })
+  return null
 }

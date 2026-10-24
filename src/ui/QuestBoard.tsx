@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { featureOn, MAIN_TEMPLATES, SIDE_TEMPLATES, SIDE_XP, SIDE_PAY_SHARE, type Completion, type Player, type Quest, type StatKey, type Summary } from '../engine'
-import { addCustomMain, addMainFromTemplate, addSideFromTemplate, addSideQuest, archiveQuest } from '../db/actions'
+import { DAILY_TEMPLATES, featureOn, MAIN_TEMPLATES, SIDE_TEMPLATES, SIDE_XP, SIDE_PAY_SHARE, type Completion, type Player, type Quest, type StatKey, type Summary } from '../engine'
+import { addCustomMain, addDailyQuest, addMainFromTemplate, addSideFromTemplate, addSideQuest, archiveQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { Bosses } from './Bosses'
 import { QuestOffers } from './QuestOffers'
@@ -9,6 +9,7 @@ import { money } from './format'
 export function QuestBoard({ player, quests, completions, summary, onFight }: { player: Player; quests: Quest[]; completions: Completion[]; summary: Summary; onFight: (bossId: string) => void }) {
   const active = quests.filter(q => q.active)
   const activeTemplates = new Set(active.map(q => q.templateId))
+  const dailies = active.filter(q => q.kind === 'daily').sort((a, b) => a.createdAt - b.createdAt)
   const sides = active.filter(q => q.kind === 'side')
   const mains = active.filter(q => q.kind === 'main')
   const sidePay = money(summary.wallet.budget * SIDE_PAY_SHARE)
@@ -30,6 +31,30 @@ export function QuestBoard({ player, quests, completions, summary, onFight }: { 
       <QuestOffers player={player} quests={quests} completions={completions} summary={summary} />
 
       {featureOn(player, 'bosses') && <Bosses player={player} summary={summary} onFight={onFight} />}
+
+      <SystemWindow title={`Your daily quests · ${dailies.length}`}>
+        <p className="muted">Dailies share the monthly budget, so adding one lowers each daily's pay a little and removing one raises it. Past earnings stay.</p>
+        <ul className="board-list">
+          {dailies.map(q => (
+            <li key={q.id}>
+              <span className="stat-key">{q.stat}</span>
+              <span className="quest-title">{q.title}</span>
+              <button className="ghost small" onClick={() => remove(q)}>Remove</button>
+            </li>
+          ))}
+        </ul>
+        <h3>Add from the library</h3>
+        <div className="choices">
+          {DAILY_TEMPLATES.filter(t => player.stats.includes(t.stat) && !activeTemplates.has(t.id) && t.id !== 'int-photo' && t.id !== 'str-routine').map(t => (
+            <button key={t.id} className="choice" onClick={() => addDailyQuest({ stat: t.stat, title: t.title, description: t.description, minVersion: t.minVersion, templateId: t.id })}>
+              <span className="stat-key">{t.stat}</span>
+              <span><b>{t.title}</b><br /><small>Minimum: {t.minVersion}</small></span>
+              <span className="add">+</span>
+            </button>
+          ))}
+        </div>
+        <CustomDaily stats={player.stats} />
+      </SystemWindow>
 
       <SystemWindow title={`Your side quests · ${sides.length}`}>
         {sides.length === 0 && <p className="muted">None yet. Pick a few below.</p>}
@@ -93,6 +118,32 @@ function StatSelect({ stats, value, onChange }: { stats: StatKey[]; value: StatK
         {stats.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
     </label>
+  )
+}
+
+function CustomDaily({ stats }: { stats: StatKey[] }) {
+  const [open, setOpen] = useState(false)
+  const [stat, setStat] = useState<StatKey>(stats[0])
+  const [title, setTitle] = useState('')
+  const [minVersion, setMinVersion] = useState('')
+
+  if (!open) return <button className="ghost small" onClick={() => setOpen(true)}>Write your own daily quest</button>
+  const save = async () => {
+    await addDailyQuest({ stat, title, minVersion })
+    setTitle('')
+    setMinVersion('')
+    setOpen(false)
+  }
+  return (
+    <div className="form">
+      <StatSelect stats={stats} value={stat} onChange={setStat} />
+      <label>Quest<input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. 10 minutes of stretching" maxLength={60} /></label>
+      <label>Minimum version for a bad day<input value={minVersion} onChange={e => setMinVersion(e.target.value)} placeholder="e.g. 3 minutes" maxLength={60} /></label>
+      <div className="row end">
+        <button className="ghost" onClick={() => setOpen(false)}>Cancel</button>
+        <button disabled={!title.trim()} onClick={save}>Add daily quest</button>
+      </div>
+    </div>
   )
 }
 
