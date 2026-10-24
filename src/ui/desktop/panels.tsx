@@ -354,6 +354,7 @@ const FILTERS: { key: 'all' | FeedKind[]; label: string }[] = [
   { key: ['reward', 'savings', 'plan'], label: 'Money' },
   { key: ['journal', 'memory'], label: 'Journal' },
   { key: ['goal'], label: 'Goals' },
+  { key: ['loot'], label: 'Loot' },
 ]
 
 export function Timeline({ data }: { data: DashData }) {

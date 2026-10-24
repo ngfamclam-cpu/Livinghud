@@ -1,4 +1,4 @@
-import { onGameEvent, type GameEvent, type Summary } from '../../engine'
+import { RARITY_NAMES, cardById, onGameEvent, type GameEvent, type Summary } from '../../engine'
 import { getPrefs, setPref } from './prefs'
 
 // Desktop notifications: browser pop-ups while LivingHUD is open in a tab
@@ -38,6 +38,10 @@ function textFor(event: GameEvent): [string, string] | null {
       return ['Boss defeated', `${event.name}  +${event.xp} XP`]
     case 'badge.earned':
       return ['Title earned', event.title]
+    case 'loot.card': {
+      const c = cardById(event.cardId)
+      return c ? [`${RARITY_NAMES[c.rarity]} loot drop`, c.name] : null
+    }
     case 'quest.completed':
       return event.via === 'automation' ? ['Auto-cleared', event.questTitle] : null
     default:

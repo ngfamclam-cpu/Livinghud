@@ -6,7 +6,8 @@ import { BOSS_XP } from './focus'
 import { CONTACT_NAMES } from './party'
 import { statScores } from './summary'
 import { addDays, dayKey, daysBetween, monthOf } from './time'
-import type { DayGoals, Memory, Boss, Completion, Contact, ExerciseKey, ExerciseSet, FocusRun, JournalEntry, Person, Player, PlanFund, Purchase, Quest, SavingsEntry, StatKey, SurpriseClear } from './types'
+import { RARITY_NAMES, cardById } from './loot'
+import type { LootDrop, DayGoals, Memory, Boss, Completion, Contact, ExerciseKey, ExerciseSet, FocusRun, JournalEntry, Person, Player, PlanFund, Purchase, Quest, SavingsEntry, StatKey, SurpriseClear } from './types'
 
 export interface CalendarDay {
   day: string
@@ -143,7 +144,7 @@ export function exerciseHistory(sets: ExerciseSet[], exercise: ExerciseKey, toda
   return out
 }
 
-export type FeedKind = 'goal' | 'memory' | 'quest' | 'reward' | 'set' | 'contact' | 'focus' | 'boss' | 'journal' | 'surprise' | 'savings' | 'plan'
+export type FeedKind = 'loot' | 'goal' | 'memory' | 'quest' | 'reward' | 'set' | 'contact' | 'focus' | 'boss' | 'journal' | 'surprise' | 'savings' | 'plan'
 
 export interface FeedEntry {
   id: string
@@ -174,6 +175,7 @@ export function activityFeed(
     exerciseName: (key: ExerciseKey) => string
     memories?: Memory[]
     goals?: DayGoals[]
+    loot?: LootDrop[]
   },
   limit: number,
 ): FeedEntry[] {
@@ -211,6 +213,10 @@ export function activityFeed(
   }
   for (const m of logs.memories ?? []) {
     out.push({ id: m.id, at: m.at, kind: 'memory', text: m.note ? `Memory: ${m.note.length > 60 ? `${m.note.slice(0, 57)}…` : m.note}` : 'Memory saved', gain: m.photos.length ? `📷 ${m.photos.length}` : '', stat: null })
+  }
+  for (const d of logs.loot ?? []) {
+    const c = cardById(d.cardId)
+    if (c) out.push({ id: d.id, at: d.createdAt, kind: 'loot', text: `Loot drop: ${c.name} (${RARITY_NAMES[c.rarity]})`, gain: '🂠', stat: null })
   }
   for (const g of logs.goals ?? []) {
     if (g.items.length) out.push({ id: `${g.id}-plan`, at: g.createdAt, kind: 'goal', text: `Top ${g.items.length} set for ${g.day}: ${g.items.map(i => i.text).join(' · ')}`, gain: '', stat: 'AGI' })

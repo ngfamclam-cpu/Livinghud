@@ -12,7 +12,8 @@ import { planStatus, type PlanStatus } from './plans'
 import { CASUAL_PAUSE_DAYS, penalties, type Penalties } from './penalties'
 import { TRAVEL_IDS, TRAVEL_XP, earnedBadges, longestStreak, streakBonuses, unlockedThemes, type Badge } from './badges'
 import { travelCounts } from './memories'
-import type { Memory, Place, Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, Plan, PlanFund, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
+import { starUpXp } from './loot'
+import type { LootDrop, Memory, Place, Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, Plan, PlanFund, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
 export const STAT_WINDOW_DAYS = 30
 
@@ -116,6 +117,7 @@ export interface Logs {
   planFunds?: PlanFund[]
   memories?: Memory[]
   places?: Place[]
+  loot?: LootDrop[]
 }
 
 const weight = (c: Completion) => (c.version === 'full' ? 1 : 0.5)
@@ -125,7 +127,7 @@ export function summarize(
   quests: Quest[],
   completions: Completion[],
   now: Date,
-  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [], surprises = [], plans = [], planFunds = [], memories = [], places = [] }: Logs = {},
+  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [], surprises = [], plans = [], planFunds = [], memories = [], places = [], loot = [] }: Logs = {},
 ): Summary {
   const today = dayKey(now, player.settings.resetHour)
   const week = weekOf(today)
@@ -143,7 +145,8 @@ export function summarize(
     focusRuns.reduce((sum, r) => sum + r.xp, 0) +
     bosses.filter(b => b.defeatedAt).length * BOSS_XP +
     surprises.reduce((sum, s) => sum + s.xp, 0) +
-    travelXp
+    travelXp +
+    (player.features?.cards !== false ? starUpXp(loot) : 0)
 
   // Wallet: each month caps at the budget and the overflow goes to the Vault.
   // When a month ends, whatever the wallet didn't spend rolls into the Vault too.

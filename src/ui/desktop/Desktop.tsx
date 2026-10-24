@@ -9,6 +9,7 @@ import type {
   Memory,
   Place,
   DayGoals,
+  LootDrop,
   Person,
   Plan,
   PlanFund,
@@ -37,6 +38,7 @@ import { Report } from '../Report'
 import { Plans } from '../Plans'
 import { LifeLog } from '../lifelog/LifeLog'
 import { GoalsView } from '../goals/GoalsView'
+import { Collection } from '../loot/Loot'
 import { MemoriesPanel } from './MemoriesPanel'
 import { MoneyPanel, ProfileCard, ReportWall, StatTrends, StreakCalendar, Timeline, TrainingPanel } from './panels'
 import { setPref, usePrefs, type Look } from './prefs'
@@ -64,15 +66,17 @@ export interface DashData {
   memories: Memory[]
   places: Place[]
   goals: DayGoals[]
+  loot: LootDrop[]
 }
 
-type Page = 'dashboard' | 'lifelog' | 'goals' | 'quests' | 'party' | 'shop' | 'plans' | 'journal' | 'report' | 'settings' | 'workout' | 'scan' | 'focus'
+type Page = 'dashboard' | 'lifelog' | 'goals' | 'collection' | 'quests' | 'party' | 'shop' | 'plans' | 'journal' | 'report' | 'settings' | 'workout' | 'scan' | 'focus'
 
 const NAV: { key: Page; label: string; icon: string; feature?: Parameters<typeof featureOn>[1] }[] = [
   { key: 'dashboard', label: 'Command centre', icon: '◈' },
   { key: 'quests', label: 'Quests', icon: '❖' },
   { key: 'lifelog', label: 'Life log', icon: '❂', feature: 'memories' },
   { key: 'goals', label: 'Top 3 goals', icon: '◎' },
+  { key: 'collection', label: 'Collection', icon: '🂠', feature: 'cards' },
   { key: 'workout', label: 'Training', icon: '⚔' },
   { key: 'focus', label: 'Focus dungeon', icon: '⧗', feature: 'focus' },
   { key: 'party', label: 'Party', icon: '✦', feature: 'party' },
@@ -185,6 +189,8 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
                   onLifeLog={openLog}
                   goals={data.goals}
                   onGoals={() => setPage('goals')}
+                  loot={data.loot}
+                  onCollection={() => setPage('collection')}
                 />
               </div>
               <div className="dash-col">
@@ -201,6 +207,7 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
           {page === 'lifelog' && (
             <LifeLog key={logCamera} data={data} summary={summary} startCamera={logCamera > 0} onJournal={() => setPage('journal')} onClose={() => { setLogCamera(0); home() }} />
           )}
+          {page === 'collection' && <Collection player={player} summary={summary} loot={data.loot} />}
           {page === 'goals' && (
             <main className="hud">
               <GoalsView goals={data.goals} summary={summary} />

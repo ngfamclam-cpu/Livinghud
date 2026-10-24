@@ -63,6 +63,7 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'plans', name: 'Plans: raves, festivals, trips', description: 'Save for big experiences from the Vault and book them piece by piece.' },
   { key: 'surprises', name: 'Surprise challenges', description: 'Once a day a small quest appears at a random moment; do it within an hour for 30 XP.' },
   { key: 'memories', name: 'Life log and photo a day', description: 'Notes, a daily photo and the places you go, with a map and the "Photo of the day" daily quest.' },
+  { key: 'cards', name: 'Loot drops and card collection', description: 'Collectible cards (fictional idols, odd relics, a playing-card deck) that drop from quests; duplicates power cards up for XP.' },
   { key: 'journal', name: 'Reflection journal', description: 'Three prompts a day, mood and energy, and the patterns over time.' },
 ]
 
