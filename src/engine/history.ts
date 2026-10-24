@@ -6,7 +6,7 @@ import { BOSS_XP } from './focus'
 import { CONTACT_NAMES } from './party'
 import { statScores } from './summary'
 import { addDays, dayKey, daysBetween, monthOf } from './time'
-import type { Memory, Boss, Completion, Contact, ExerciseKey, ExerciseSet, FocusRun, JournalEntry, Person, Player, PlanFund, Purchase, Quest, SavingsEntry, StatKey, SurpriseClear } from './types'
+import type { DayGoals, Memory, Boss, Completion, Contact, ExerciseKey, ExerciseSet, FocusRun, JournalEntry, Person, Player, PlanFund, Purchase, Quest, SavingsEntry, StatKey, SurpriseClear } from './types'
 
 export interface CalendarDay {
   day: string
@@ -143,7 +143,7 @@ export function exerciseHistory(sets: ExerciseSet[], exercise: ExerciseKey, toda
   return out
 }
 
-export type FeedKind = 'memory' | 'quest' | 'reward' | 'set' | 'contact' | 'focus' | 'boss' | 'journal' | 'surprise' | 'savings' | 'plan'
+export type FeedKind = 'goal' | 'memory' | 'quest' | 'reward' | 'set' | 'contact' | 'focus' | 'boss' | 'journal' | 'surprise' | 'savings' | 'plan'
 
 export interface FeedEntry {
   id: string
@@ -173,6 +173,7 @@ export function activityFeed(
     planNames: Map<string, string>
     exerciseName: (key: ExerciseKey) => string
     memories?: Memory[]
+    goals?: DayGoals[]
   },
   limit: number,
 ): FeedEntry[] {
@@ -210,6 +211,12 @@ export function activityFeed(
   }
   for (const m of logs.memories ?? []) {
     out.push({ id: m.id, at: m.at, kind: 'memory', text: m.note ? `Memory: ${m.note.length > 60 ? `${m.note.slice(0, 57)}…` : m.note}` : 'Memory saved', gain: m.photos.length ? `📷 ${m.photos.length}` : '', stat: null })
+  }
+  for (const g of logs.goals ?? []) {
+    if (g.items.length) out.push({ id: `${g.id}-plan`, at: g.createdAt, kind: 'goal', text: `Top ${g.items.length} set for ${g.day}: ${g.items.map(i => i.text).join(' · ')}`, gain: '', stat: 'AGI' })
+    g.items.forEach((i, n) => {
+      if (i.done && i.doneAt) out.push({ id: `${g.id}-${n}`, at: i.doneAt, kind: 'goal', text: `Goal done: ${i.text}`, gain: '✓', stat: 'AGI' })
+    })
   }
   for (const j of logs.journal) out.push({ id: j.id, at: j.createdAt, kind: 'journal', text: 'Journal entry written', gain: '', stat: 'INT' })
   for (const s of logs.surprises) out.push({ id: s.id, at: s.createdAt, kind: 'surprise', text: 'Surprise quest cleared', gain: `+${s.xp} XP`, stat: null })

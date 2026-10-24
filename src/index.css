@@ -750,3 +750,18 @@ button.photo { cursor: zoom-in; }
 .star.on { color: var(--gold); border-color: var(--gold); }
 .goal { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .quest-pay { color: var(--gold); font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---- Top 3 goals ---- */
+.goal-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.goal-check { flex-direction: row; align-items: center; gap: 10px; margin: 0; color: var(--text); font-size: 1rem; cursor: pointer; }
+.goal-check input { width: 20px; height: 20px; flex: none; accent-color: var(--good); padding: 0; }
+.goal-list li.done .goal-check span { text-decoration: line-through; color: var(--muted); }
+.goal-form { margin-top: 8px; }
+.carry { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.goal-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
+.goal-tiles div { display: flex; flex-direction: column; border: 1px solid rgba(47, 143, 255, 0.25); border-radius: var(--radius); padding: 8px 10px; }
+.goal-tiles b { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.goal-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.goal-history > li { border-left: 2px solid var(--accent); padding-left: 10px; }
+.goal-mark { width: 18px; text-align: center; color: var(--muted); }
+.goal-mark.done { color: var(--good); }

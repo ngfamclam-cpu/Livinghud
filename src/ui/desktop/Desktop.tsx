@@ -8,6 +8,7 @@ import type {
   JournalEntry,
   Memory,
   Place,
+  DayGoals,
   Person,
   Plan,
   PlanFund,
@@ -35,6 +36,7 @@ import { Journal } from '../Journal'
 import { Report } from '../Report'
 import { Plans } from '../Plans'
 import { LifeLog } from '../lifelog/LifeLog'
+import { GoalsView } from '../goals/GoalsView'
 import { MemoriesPanel } from './MemoriesPanel'
 import { MoneyPanel, ProfileCard, ReportWall, StatTrends, StreakCalendar, Timeline, TrainingPanel } from './panels'
 import { setPref, usePrefs, type Look } from './prefs'
@@ -61,14 +63,16 @@ export interface DashData {
   planFunds: PlanFund[]
   memories: Memory[]
   places: Place[]
+  goals: DayGoals[]
 }
 
-type Page = 'dashboard' | 'lifelog' | 'quests' | 'party' | 'shop' | 'plans' | 'journal' | 'report' | 'settings' | 'workout' | 'scan' | 'focus'
+type Page = 'dashboard' | 'lifelog' | 'goals' | 'quests' | 'party' | 'shop' | 'plans' | 'journal' | 'report' | 'settings' | 'workout' | 'scan' | 'focus'
 
 const NAV: { key: Page; label: string; icon: string; feature?: Parameters<typeof featureOn>[1] }[] = [
   { key: 'dashboard', label: 'Command centre', icon: '◈' },
   { key: 'quests', label: 'Quests', icon: '❖' },
   { key: 'lifelog', label: 'Life log', icon: '❂', feature: 'memories' },
+  { key: 'goals', label: 'Top 3 goals', icon: '◎' },
   { key: 'workout', label: 'Training', icon: '⚔' },
   { key: 'focus', label: 'Focus dungeon', icon: '⧗', feature: 'focus' },
   { key: 'party', label: 'Party', icon: '✦', feature: 'party' },
@@ -179,6 +183,8 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
                   onPlans={openPlans}
                   memories={data.memories}
                   onLifeLog={openLog}
+                  goals={data.goals}
+                  onGoals={() => setPage('goals')}
                 />
               </div>
               <div className="dash-col">
@@ -194,6 +200,11 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
         <div className="desk-page">
           {page === 'lifelog' && (
             <LifeLog key={logCamera} data={data} summary={summary} startCamera={logCamera > 0} onJournal={() => setPage('journal')} onClose={() => { setLogCamera(0); home() }} />
+          )}
+          {page === 'goals' && (
+            <main className="hud">
+              <GoalsView goals={data.goals} summary={summary} />
+            </main>
           )}
           {page === 'quests' && <QuestBoard player={player} quests={quests} completions={data.completions} summary={summary} onFight={bossId => openFocus({ bossId })} />}
           {page === 'party' && <Party summary={summary} contacts={data.contacts} />}

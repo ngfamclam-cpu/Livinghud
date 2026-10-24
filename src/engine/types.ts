@@ -410,3 +410,23 @@ export interface Memory {
   createdAt: number
   updatedAt: number
 }
+
+export interface GoalItem {
+  text: string
+  done: boolean
+  /** When it was ticked off (ms). */
+  doneAt: number | null
+}
+
+/** "Tomorrow's top 3": the goals set for one game day. */
+export interface DayGoals {
+  id: string
+  userId: string
+  /** The game day the goals are for, YYYY-MM-DD. */
+  day: string
+  /** The game day they were written. */
+  plannedOn: string
+  items: GoalItem[]
+  createdAt: number
+  updatedAt: number
+}
