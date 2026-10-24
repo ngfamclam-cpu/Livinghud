@@ -16,6 +16,7 @@ import {
   checkPurchase,
   emit,
   questReward,
+  dailyWeight,
   CONTACT_XP,
   BOSS_XP,
   MINUTES_PER_HIT,
@@ -212,8 +213,8 @@ export async function completeQuest(
     version = 'full'
   }
 
-  const activeDailies = before.quests.filter(q => q.kind === 'daily' && q.active).length
-  const base = questReward(quest, version, player.settings.monthlyBudget, activeDailies, stage)
+  const dailyShares = before.quests.filter(q => q.kind === 'daily' && q.active).reduce((sum, q) => sum + dailyWeight(q), 0)
+  const base = questReward(quest, version, player.settings.monthlyBudget, dailyShares, stage)
   // A 30-day streak on this stat's dailies adds 10% XP (never dollars) while it holds.
   const bonus = featureOn(player, 'badges') && summary.streakBonus.has(quest.stat) ? 1 + STREAK_BONUS : 1
   const reward = { ...base, xp: Math.round(base.xp * bonus) }

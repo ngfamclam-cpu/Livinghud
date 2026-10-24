@@ -15,12 +15,21 @@ export const BASE_BUDGET = 150
 export const DATE_XP = 40
 
 /**
- * Dollars one full daily pays. Tuned so hitting ~80% of your dailies for a
- * month earns about your monthly budget.
+ * How many shares of the daily pot a daily gets. The strength + posture
+ * routine takes far longer than the rest, so it pays 3 shares. The pot itself
+ * doesn't grow, so ~80% completion still earns about the monthly budget.
  */
-export function dailyPay(monthlyBudget: number, activeDailies: number): number {
-  if (activeDailies <= 0) return 0
-  const pay = monthlyBudget / (DAYS_PER_MONTH * TARGET_COMPLETION * activeDailies)
+export const DAILY_WEIGHTS: Record<string, number> = { 'str-routine': 3 }
+export const dailyWeight = (quest: Pick<Quest, 'templateId'>) => DAILY_WEIGHTS[quest.templateId ?? ''] ?? 1
+
+/**
+ * Dollars one full daily pays per share. `shares` is the total weight of the
+ * active dailies (their count when every daily weighs 1). Tuned so hitting ~80%
+ * of your dailies for a month earns about your monthly budget.
+ */
+export function dailyPay(monthlyBudget: number, shares: number, weight = 1): number {
+  if (shares <= 0) return 0
+  const pay = (monthlyBudget * weight) / (DAYS_PER_MONTH * TARGET_COMPLETION * shares)
   return round2(pay)
 }
 
@@ -29,16 +38,17 @@ export function dailyPay(monthlyBudget: number, activeDailies: number): number {
  * stages pay on top, so their extra earnings overflow into the Vault.
  */
 export function questReward(
-  quest: Pick<Quest, 'kind'>,
+  quest: Pick<Quest, 'kind'> & Partial<Pick<Quest, 'templateId'>>,
   version: CompletionVersion,
   monthlyBudget: number,
-  activeDailies: number,
+  /** Total shares of the active dailies (see dailyWeight). */
+  dailyShares: number,
   stage?: QuestStage,
 ): { xp: number; dollars: number } {
   const share = version === 'full' ? 1 : MIN_VERSION_SHARE
   switch (quest.kind) {
     case 'daily':
-      return { xp: Math.round(DAILY_XP * share), dollars: round2(dailyPay(monthlyBudget, activeDailies) * share) }
+      return { xp: Math.round(DAILY_XP * share), dollars: round2(dailyPay(monthlyBudget, dailyShares, dailyWeight({ templateId: quest.templateId ?? null })) * share) }
     case 'side':
       return { xp: Math.round(SIDE_XP * share), dollars: round2(monthlyBudget * SIDE_PAY_SHARE * share) }
     case 'main':

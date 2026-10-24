@@ -86,6 +86,14 @@ describe('economy', () => {
     const pay = dailyPay(150, 4)
     expect(pay * 30 * 0.8 * 4).toBeCloseTo(150, 0)
   })
+  it('pays the strength routine 3 shares without growing the monthly pot', () => {
+    // Routine + 3 other dailies = 6 shares.
+    const routine = questReward({ kind: 'daily', templateId: 'str-routine' }, 'full', 150, 6)
+    const other = questReward({ kind: 'daily', templateId: 'vit-trio' }, 'full', 150, 6)
+    expect(routine.dollars).toBeCloseTo(other.dollars * 3, 1)
+    expect(routine.xp).toBe(other.xp)
+    expect((routine.dollars + 3 * other.dollars) * 30 * 0.8).toBeCloseTo(150, 0)
+  })
   it('pays half for the minimum version', () => {
     const full = questReward({ kind: 'daily' }, 'full', 150, 4)
     const min = questReward({ kind: 'daily' }, 'min', 150, 4)
