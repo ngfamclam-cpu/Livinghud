@@ -4,7 +4,7 @@
 import { playerRank } from './economy'
 import { BOSS_XP } from './focus'
 import { addDays, dayKey } from './time'
-import type { Boss, Completion, Contact, FocusRun, JournalEntry, Purchase, Quest, RewardRank, StatKey } from './types'
+import type { DayGoals, Boss, Completion, Contact, FocusRun, JournalEntry, Purchase, Quest, RewardRank, StatKey } from './types'
 
 export interface ReportInput {
   stats: StatKey[]
@@ -19,6 +19,8 @@ export interface ReportInput {
   resetHour: number
   /** Names of people whose bond is weakening now. */
   weakening: string[]
+  /** Tomorrow's top 3 goals, if the player sets them. */
+  goals?: DayGoals[]
 }
 
 export interface WeekReport {
@@ -35,6 +37,9 @@ export interface WeekReport {
   contacts: number
   journalEntries: number
   avgMood: number | null
+  /** Top 3 goals set for days this week, and how many got done. */
+  goalsPlanned: number
+  goalsDone: number
   suggestion: string
 }
 
@@ -99,6 +104,8 @@ export function weeklyReport(input: ReportInput, start: string): WeekReport {
     contacts: week(input.contacts).length,
     journalEntries: entries.length,
     avgMood,
+    goalsPlanned: week(input.goals ?? []).reduce((n, g) => n + g.items.length, 0),
+    goalsDone: week(input.goals ?? []).reduce((n, g) => n + g.items.filter(i => i.done).length, 0),
     suggestion: '',
   }
   report.suggestion = suggest(report, input.weakening)
@@ -113,6 +120,7 @@ function suggest(r: WeekReport, weakening: string[]): string {
   if (r.avgMood !== null && r.avgMood < 2.5) return 'Your mood ran low this week. Plan a lighter week, use minimum versions without guilt, and consider a Recovery Day.'
   if (weakest && weakest.rate < 0.5) return `${weakest.stat} was your weakest area (${Math.round(weakest.rate * 100)}%). Pick its easiest daily and do the minimum version every day this week.`
   if (weakening.length > 0) return `Bond weakening with ${weakening.slice(0, 2).join(' and ')}. Reach out early in the week.`
+  if (r.goalsPlanned >= 6 && r.goalsDone / r.goalsPlanned < 0.5) return `You finished ${r.goalsDone} of ${r.goalsPlanned} top-3 goals. Make goal 1 smaller and do it before anything else.`
   if (r.completion >= 0.9) return 'Excellent week. If it felt easy, it may be time to raise a target or add a side quest.'
   const dropped = rated.find(s => s.previous !== null && s.rate < s.previous - 0.2)
   if (dropped) return `${dropped.stat} slipped compared with the week before. Put its daily first thing in the morning.`

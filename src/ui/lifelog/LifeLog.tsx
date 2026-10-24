@@ -15,16 +15,19 @@ import { deleteMemory, renamePlace } from '../../db/memories'
 import { SystemWindow } from '../SystemWindow'
 import type { DashData } from '../desktop/Desktop'
 import { Composer } from './Composer'
+import { GoalsView } from '../goals/GoalsView'
+import { toggleGoal } from '../../db/actions'
 import { Photo, PhotoViewer } from './Photo'
 
 const MapView = lazy(() => import('./MapView'))
 
-type View = 'day' | 'calendar' | 'photos' | 'places' | 'search'
+type View = 'day' | 'calendar' | 'photos' | 'places' | 'goals' | 'search'
 const VIEWS: { key: View; label: string }[] = [
   { key: 'day', label: 'Day' },
   { key: 'calendar', label: 'Calendar' },
   { key: 'photos', label: 'Photos' },
   { key: 'places', label: 'Places' },
+  { key: 'goals', label: 'Goals' },
   { key: 'search', label: 'Search' },
 ]
 
@@ -109,6 +112,7 @@ export function LifeLog({
       {view === 'calendar' && <MonthCalendar memories={data.memories} summary={summary} onDay={openDay} />}
       {view === 'photos' && <PhotoWall memories={data.memories} onView={(m, id) => setViewing({ id, caption: caption(m) })} />}
       {view === 'places' && <Places memories={data.memories} places={data.places} onDay={openDay} onView={(m, id) => setViewing({ id, caption: caption(m) })} />}
+      {view === 'goals' && <GoalsView goals={data.goals} summary={summary} onDay={openDay} />}
       {view === 'search' && <Search memories={data.memories} places={data.places} placeById={placeById} onDay={openDay} />}
 
       {viewing && <PhotoViewer id={viewing.id} caption={viewing.caption} onClose={() => setViewing(null)} />}
@@ -138,6 +142,7 @@ function DayPage({
   const entries = data.memories.filter(m => m.day === day).sort((a, b) => a.at - b.at)
   const hero = photoOfDay(entries)
   const reflection = data.journal.find(j => j.day === day)
+  const topThree = data.goals.find(g => g.day === day)
   const isToday = day === summary.today
   const resetHour = data.player.settings.resetHour
   const happened = useMemo(
@@ -199,6 +204,21 @@ function DayPage({
           })}
         </ol>
       </SystemWindow>
+
+      {topThree && topThree.items.length > 0 && (
+        <SystemWindow title={`Top 3 · ${topThree.items.filter(i => i.done).length}/${topThree.items.length}`}>
+          <ul className="goal-list">
+            {topThree.items.map((item, i) => (
+              <li key={i} className={item.done ? 'done' : ''}>
+                <label className="goal-check">
+                  <input type="checkbox" checked={item.done} onChange={() => toggleGoal(topThree.id, i)} />
+                  <span>{item.text}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </SystemWindow>
+      )}
 
       <SystemWindow title="Reflection">
         {reflection ? (

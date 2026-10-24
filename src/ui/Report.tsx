@@ -47,6 +47,7 @@ export function Report({ summary, input, onClose }: { summary: Summary; input: R
           <dt>Bosses defeated</dt><dd>{r.bossesDefeated}</dd>
           <dt>People contacted</dt><dd>{r.contacts}</dd>
           <dt>Journal</dt><dd>{r.journalEntries} entries{r.avgMood !== null && `, mood ${r.avgMood.toFixed(1)}/5`}</dd>
+          {r.goalsPlanned > 0 && <><dt>Top 3 goals</dt><dd>{r.goalsDone}/{r.goalsPlanned} done ({Math.round((100 * r.goalsDone) / r.goalsPlanned)}%)</dd></>}
         </dl>
         <p className="system-line">{r.suggestion}</p>
       </SystemWindow>

@@ -17,6 +17,8 @@ import {
   emit,
   questReward,
   dailyWeight,
+  GOALS_PER_DAY,
+  planVersion,
   CONTACT_XP,
   BOSS_XP,
   MINUTES_PER_HIT,
@@ -975,19 +977,19 @@ export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places, db.goals]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places', 'goals'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places] = await Promise.all(
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals] = await Promise.all(
     tables().map(t => t.toArray()),
   )
   return {
     format: SAVE_FORMAT,
-    version: 10,
-    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places,
+    version: 11,
+    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals,
   }
 }
 
@@ -1021,6 +1023,7 @@ export async function importSave(json: string): Promise<void> {
     await db.planFunds.bulkPut(data.planFunds ?? [])
     await db.memories.bulkPut(data.memories ?? [])
     await db.places.bulkPut(data.places ?? [])
+    await db.goals.bulkPut(data.goals ?? [])
   })
 }
 
@@ -1037,4 +1040,41 @@ export async function toggleFavoriteReward(id: string): Promise<void> {
   const list = player.favoriteRewards ?? []
   const next = list.includes(id) ? list.filter(x => x !== id) : [...list, id]
   await db.players.update(LOCAL_USER, { favoriteRewards: next, updatedAt: Date.now() })
+}
+
+// ---- Tomorrow's top 3 ----
+
+/**
+ * Saves the goals for a day (usually tomorrow). Goals that keep their wording
+ * keep their ticks. Writing them clears today's "Plan tomorrow's top 3":
+ * three goals is the full quest, one or two the minimum.
+ */
+export async function saveGoals(day: string, texts: string[]): Promise<void> {
+  const { summary, quests } = await snapshot()
+  const clean = texts.map(t => t.trim().slice(0, 140)).filter(Boolean).slice(0, GOALS_PER_DAY)
+  const now = Date.now()
+  const existing = await db.goals.where('day').equals(day).filter(g => g.userId === LOCAL_USER).first()
+  const items = clean.map(text => {
+    const before = existing?.items.find(i => i.text === text)
+    return { text, done: before?.done ?? false, doneAt: before?.doneAt ?? null }
+  })
+  if (existing) await db.goals.update(existing.id, { items, updatedAt: now })
+  else await db.goals.add({ id: newId(), userId: LOCAL_USER, day, plannedOn: summary.today, items, createdAt: now, updatedAt: now })
+
+  const quest = quests.find(q => q.active && q.kind === 'daily' && q.templateId === 'agi-plan')
+  const version = planVersion(clean)
+  if (!quest || !version) return
+  const done = summary.todayDone.get(quest.id)
+  if (done?.version === 'min' && version === 'full') await db.completions.delete(done.id)
+  if (!done || (done.version === 'min' && version === 'full')) await completeQuest(quest, version)
+}
+
+/** Ticks a goal done (or not done). */
+export async function toggleGoal(id: string, index: number): Promise<void> {
+  const g = await db.goals.get(id)
+  if (!g || !g.items[index]) return
+  const items = g.items.map((item, i) => (i === index ? { ...item, done: !item.done, doneAt: item.done ? null : Date.now() } : item))
+  await db.goals.update(id, { items, updatedAt: Date.now() })
+  const ticked = items[index]
+  if (ticked.done) emit({ type: 'goal.done', text: ticked.text, allDone: items.every(i => i.done) })
 }

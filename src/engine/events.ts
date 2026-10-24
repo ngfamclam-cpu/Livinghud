@@ -27,6 +27,7 @@ export type GameEvent =
   | { type: 'loot.dropped'; name: string }
   | { type: 'surprise.appeared'; text: string }
   | { type: 'memory.added'; photos: number }
+  | { type: 'goal.done'; text: string; allDone: boolean }
   | { type: 'plan.funded'; name: string; amount: number }
   | { type: 'plan.booked'; name: string; label: string; cost: number }
   | { type: 'surprise.cleared'; text: string; xp: number }

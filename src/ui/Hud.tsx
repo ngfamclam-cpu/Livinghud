@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, dailyWeight, type Completion, type Memory, type Player, type Quest, type Summary, type SurpriseClear } from '../engine'
+import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, dailyWeight, type Completion, type DayGoals, type Memory, type Player, type Quest, type Summary, type SurpriseClear } from '../engine'
 import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { SurpriseCard } from './SurpriseCard'
 import { NewAreaBanner, TodayPage } from './lifelog/HudPanels'
+import { TopThree } from './goals/TopThree'
 import { activeFocus, focusedMinutes } from '../db/focus'
 import { Bar } from './Bar'
 import { money, monthName } from './format'
@@ -25,14 +26,19 @@ interface HudProps {
   memories: Memory[]
   /** Opens the Life log, optionally straight into the camera. */
   onLifeLog: (camera?: boolean) => void
+  goals: DayGoals[]
+  /** Opens the top-3 history and stats. */
+  onGoals: () => void
 }
 
-export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop, memories, onLifeLog }: HudProps) {
+export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop, memories, onLifeLog, goals, onGoals }: HudProps) {
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
   const sides = active.filter(q => q.kind === 'side')
   const mains = active.filter(q => q.kind === 'main')
   const doneCount = dailies.filter(q => summary.todayDone.has(q.id)).length
+  const [planning, setPlanning] = useState(false)
+  const showTopThree = dailies.some(q => q.templateId === 'agi-plan') || goals.length > 0
   const shares = dailies.reduce((n, q) => n + dailyWeight(q), 0)
   const payOf = (q: Quest) => questReward(q, 'full', summary.wallet.budget, shares)
   const sideDone = sides.filter(q => summary.weekDone.has(q.id)).length
@@ -159,6 +165,8 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
         </ul>
       </SystemWindow>}
 
+      {showTopThree && <TopThree summary={summary} goals={goals} planning={planning} onPlanning={setPlanning} onHistory={onGoals} />}
+
       <SystemWindow title={`Daily Quest · ${doneCount}/${dailies.length}`}>
         {doneCount === dailies.length && dailies.length > 0 && (
           <p className="system-line clear">All daily quests cleared. Rest well, Player.</p>
@@ -174,6 +182,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
               onStartWorkout={onStartWorkout}
               pay={payOf(q)}
               onPhoto={q.templateId === 'int-photo' ? () => onLifeLog(true) : undefined}
+              onPlan={q.templateId === 'agi-plan' ? () => setPlanning(true) : undefined}
             />
           ))}
         </ul>
@@ -208,9 +217,11 @@ interface RowProps {
   onPhoto?: () => void
   /** What the full version pays (dailies). */
   pay?: { xp: number; dollars: number }
+  /** "Plan tomorrow's top 3": cleared by writing the goals. */
+  onPlan?: () => void
 }
 
-function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto, pay }: RowProps) {
+function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto, pay, onPlan }: RowProps) {
   const [open, setOpen] = useState(false)
   const routineParts = routine
     ? [
@@ -247,10 +258,13 @@ function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto, p
           <>
             <span className="cleared">{done.version === 'full' ? 'CLEAR' : 'MIN CLEAR'} +{done.xp} XP · +{money(done.dollars)}</span>
             {onPhoto && done.version === 'min' && <button className="small" onClick={onPhoto}>📷 Add photo</button>}
+            {onPlan && <button className="ghost small" onClick={onPlan}>Edit top 3</button>}
             <button className="ghost small" onClick={() => undoQuest(quest)}>Undo</button>
           </>
         ) : onPhoto ? (
           <button className="small" onClick={onPhoto}>📷 Add photo</button>
+        ) : onPlan ? (
+          <button className="small" onClick={onPlan}>Write top 3</button>
         ) : (
           <>
             <button className="ghost small" onClick={() => completeQuest(quest, 'min')}>Minimum</button>
