@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { WEEKDAYS, journalPatterns, type Completion, type JournalEntry, type Quest, type Summary } from '../engine'
-import { saveJournal } from '../db/actions'
+import { WEEKDAYS, dailyPrompt, journalPatterns, type Completion, type JournalEntry, type Player, type Quest, type StatKey, type Summary, type TrackedFromReflection } from '../engine'
+import { saveJournal, surpriseSeed, trackFromReflection } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
 
@@ -8,6 +8,7 @@ const MOODS = ['Rough', 'Low', 'Okay', 'Good', 'Great']
 const ENERGY = ['Empty', 'Low', 'Okay', 'Good', 'Charged']
 
 interface Props {
+  player: Player
   summary: Summary
   entries: JournalEntry[]
   completions: Completion[]
@@ -15,13 +16,17 @@ interface Props {
   onClose: () => void
 }
 
-export function Journal({ summary, entries, completions, quests, onClose }: Props) {
+export function Journal({ player, summary, entries, completions, quests, onClose }: Props) {
   const todays = entries.find(e => e.day === summary.today)
   const [wentWell, setWentWell] = useState(todays?.wentWell ?? '')
   const [drained, setDrained] = useState(todays?.drained ?? '')
   const [adjust, setAdjust] = useState(todays?.adjust ?? '')
   const [mood, setMood] = useState(todays?.mood ?? 3)
   const [energy, setEnergy] = useState(todays?.energy ?? 3)
+  // The random question stays the one you answered, even if the pool changes later.
+  const prompt = todays?.prompt || dailyPrompt(summary.today, surpriseSeed(player))
+  const [promptAnswer, setPromptAnswer] = useState(todays?.promptAnswer ?? '')
+  const [tracked, setTracked] = useState<TrackedFromReflection[]>([])
   const [saved, setSaved] = useState(false)
 
   const dailies = quests.filter(q => q.kind === 'daily' && q.active).map(q => q.id)
@@ -30,7 +35,7 @@ export function Journal({ summary, entries, completions, quests, onClose }: Prop
   const past = [...entries].filter(e => e.day !== summary.today).sort((a, b) => b.day.localeCompare(a.day)).slice(0, 14)
 
   const save = async () => {
-    await saveJournal({ wentWell, drained, adjust, mood, energy })
+    await saveJournal({ wentWell, drained, adjust, mood, energy, prompt, promptAnswer, tracked })
     setSaved(true)
   }
 
@@ -40,14 +45,20 @@ export function Journal({ summary, entries, completions, quests, onClose }: Prop
         <label>What went well?<textarea rows={2} value={wentWell} onChange={e => { setWentWell(e.target.value); setSaved(false) }} /></label>
         <label>What drained me?<textarea rows={2} value={drained} onChange={e => { setDrained(e.target.value); setSaved(false) }} /></label>
         <label>One thing to adjust tomorrow<textarea rows={2} value={adjust} onChange={e => { setAdjust(e.target.value); setSaved(false) }} /></label>
+        <label className="random-prompt">
+          <span><span className="prompt-tag">Today's question</span> {prompt}</span>
+          <textarea rows={2} value={promptAnswer} onChange={e => { setPromptAnswer(e.target.value); setSaved(false) }} />
+        </label>
         <Rating label="Mood" names={MOODS} value={mood} onChange={v => { setMood(v); setSaved(false) }} />
         <Rating label="Energy" names={ENERGY} value={energy} onChange={v => { setEnergy(v); setSaved(false) }} />
         <p className="muted">All three prompts clears the journal daily; one line counts as the minimum. You can come back and edit today's entry.</p>
         <div className="row end">
           {saved && <span className="cleared">Saved</span>}
-          <button disabled={!(wentWell.trim() || drained.trim() || adjust.trim())} onClick={save}>{todays ? 'Update entry' : 'Save entry'}</button>
+          <button disabled={!(wentWell.trim() || drained.trim() || adjust.trim() || promptAnswer.trim())} onClick={save}>{todays ? 'Update entry' : 'Save entry'}</button>
         </div>
       </SystemWindow>
+
+      <TrackNew stats={player.stats} already={[...(todays?.tracked ?? []), ...tracked]} onTracked={t => setTracked(list => [...list, t])} />
 
       <SystemWindow title="Patterns">
         {patterns.entries < 5 ? (
@@ -117,8 +128,70 @@ function PastEntry({ entry }: { entry: JournalEntry }) {
           {entry.wentWell && <p><b>Went well:</b> {entry.wentWell}</p>}
           {entry.drained && <p><b>Drained me:</b> {entry.drained}</p>}
           {entry.adjust && <p><b>Adjust:</b> {entry.adjust}</p>}
+          {entry.prompt && entry.promptAnswer && <p><b>{entry.prompt}</b> {entry.promptAnswer}</p>}
+          {entry.tracked?.length ? <p className="muted">Started tracking: {entry.tracked.map(t => t.title).join(', ')}</p> : null}
         </div>
       )}
     </li>
+  )
+}
+
+const KINDS: { key: TrackedFromReflection['kind']; label: string; help: string }[] = [
+  { key: 'daily', label: 'Daily quest', help: 'Every day, with a minimum version for bad days. Daily pay re-splits to include it.' },
+  { key: 'side', label: 'Weekly side quest', help: 'Once a week, resets on Mondays.' },
+  { key: 'goal', label: "Tomorrow's top 3", help: "Adds it to tomorrow's goals (if there's room)." },
+]
+
+/** "Track something new": turn a thought from the reflection into a quest or goal. */
+function TrackNew({ stats, already, onTracked }: { stats: StatKey[]; already: TrackedFromReflection[]; onTracked: (t: TrackedFromReflection) => void }) {
+  const [kind, setKind] = useState<TrackedFromReflection['kind']>('daily')
+  const [title, setTitle] = useState('')
+  const [stat, setStat] = useState<StatKey>(stats[0])
+  const [minVersion, setMinVersion] = useState('')
+  const [error, setError] = useState('')
+
+  const add = async () => {
+    const t = title
+    setTitle('')
+    setMinVersion('')
+    const problem = await trackFromReflection({ kind, title: t, stat, minVersion })
+    if (problem) {
+      setError(problem)
+      setTitle(t)
+      return
+    }
+    setError('')
+    onTracked({ kind, title: t.trim(), stat: kind === 'goal' ? null : stat })
+  }
+
+  return (
+    <SystemWindow title="Track something new">
+      <p className="muted">Did the reflection turn up something you want to start doing or keep an eye on? Add it here and it becomes part of the game.</p>
+      <div className="tabs-inline">
+        {KINDS.map(k => (
+          <button key={k.key} className={`chip ${kind === k.key ? 'picked' : ''}`} aria-pressed={kind === k.key} onClick={() => setKind(k.key)}>{k.label}</button>
+        ))}
+      </div>
+      <p className="muted">{KINDS.find(k => k.key === kind)!.help}</p>
+      <label>What to track<input value={title} maxLength={80} onChange={e => setTitle(e.target.value)} placeholder={kind === 'goal' ? 'e.g. Book the physio appointment' : 'e.g. 10 minutes of stretching after work'} /></label>
+      {kind !== 'goal' && (
+        <div className="grid2">
+          <label>
+            Stat
+            <select value={stat} onChange={e => setStat(e.target.value as StatKey)}>
+              {stats.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+          <label>Minimum version<input value={minVersion} maxLength={60} onChange={e => setMinVersion(e.target.value)} placeholder="e.g. 3 minutes" /></label>
+        </div>
+      )}
+      {error && <p className="muted error">{error}</p>}
+      <div className="row end">
+        <button disabled={!title.trim()} onClick={add}>Start tracking</button>
+      </div>
+      {already.length > 0 && (
+        <p className="muted">From today's reflection: {already.map(t => t.title).join(', ')}</p>
+      )}
+    </SystemWindow>
   )
 }

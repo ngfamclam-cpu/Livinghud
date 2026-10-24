@@ -315,8 +315,19 @@ export interface JournalEntry {
   mood: number
   /** 1 (empty) to 5 (charged). */
   energy: number
+  /** The day's random question and your answer. */
+  prompt?: string
+  promptAnswer?: string
+  /** Things you started tracking from this reflection. */
+  tracked?: TrackedFromReflection[]
   createdAt: number
   updatedAt: number
+}
+
+export interface TrackedFromReflection {
+  kind: 'daily' | 'side' | 'goal'
+  title: string
+  stat: StatKey | null
 }
 
 /** A cleared surprise challenge. */

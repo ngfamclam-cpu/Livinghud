@@ -226,6 +226,8 @@ function DayPage({
             {reflection.wentWell && <><dt>Went well</dt><dd>{reflection.wentWell}</dd></>}
             {reflection.drained && <><dt>Drained me</dt><dd>{reflection.drained}</dd></>}
             {reflection.adjust && <><dt>Adjust tomorrow</dt><dd>{reflection.adjust}</dd></>}
+            {reflection.prompt && reflection.promptAnswer && <><dt>{reflection.prompt}</dt><dd>{reflection.promptAnswer}</dd></>}
+            {reflection.tracked?.length ? <><dt>Started tracking</dt><dd>{reflection.tracked.map(t => t.title).join(', ')}</dd></> : null}
             <dt>Mood · energy</dt>
             <dd>{MOODS[reflection.mood - 1]} · {reflection.energy}/5</dd>
           </dl>
