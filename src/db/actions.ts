@@ -18,6 +18,10 @@ import {
   questReward,
   dailyWeight,
   GOALS_PER_DAY,
+  rollDrop,
+  monthOf,
+  stars,
+  type DropSource,
   planVersion,
   CONTACT_XP,
   BOSS_XP,
@@ -148,7 +152,7 @@ export async function snapshot() {
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
     db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const [people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places] = await Promise.all([
+  const [people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot] = await Promise.all([
     db.people.where('userId').equals(LOCAL_USER).toArray(),
     db.contacts.where('userId').equals(LOCAL_USER).toArray(),
     db.focusRuns.where('userId').equals(LOCAL_USER).toArray(),
@@ -159,9 +163,10 @@ export async function snapshot() {
     db.planFunds.where('userId').equals(LOCAL_USER).toArray(),
     db.memories.where('userId').equals(LOCAL_USER).toArray(),
     db.places.where('userId').equals(LOCAL_USER).toArray(),
+    db.loot.where('userId').equals(LOCAL_USER).toArray(),
   ])
   const summary = summarize(player, quests, completions, new Date(), {
-    purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places,
+    purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot,
   })
   return { player, quests, completions, purchases, savings, sets, people, contacts, focusRuns, bosses, summary }
 }
@@ -234,6 +239,7 @@ export async function completeQuest(
   }
   await db.completions.add(completion)
   emit({ type: 'quest.completed', completion, questTitle: stage ? `${quest.title}: ${stage.title}` : quest.title, via })
+  await dropLoot(quest.kind === 'main' ? 'main' : quest.templateId === 'str-routine' && version === 'full' ? 'strength' : 'quest', completion.id)
   if (stage && quest.stages?.[quest.stages.length - 1].id === stage.id) {
     emit({ type: 'mainQuest.cleared', questId: quest.id, questTitle: quest.title })
   }
@@ -257,6 +263,7 @@ export async function undoQuest(quest: Quest): Promise<void> {
   }
   if (!done) return
   await db.completions.delete(done.id)
+  await removeLootFrom(done.id)
   emit({ type: 'quest.undone', questId: quest.id, questTitle: quest.title })
 }
 
@@ -727,8 +734,9 @@ export async function saveFocusRun(r: FocusResult): Promise<void> {
   if (minutes === 0 && !r.manual) return
   const xp = focusXp(minutes, r.cleared)
   const day = dayKey(new Date(r.startedAt), player.settings.resetHour)
+  const runId = newId()
   await db.focusRuns.add({
-    id: newId(),
+    id: runId,
     userId: LOCAL_USER,
     label: r.label.trim() || 'Focus',
     stat: r.stat,
@@ -744,6 +752,7 @@ export async function saveFocusRun(r: FocusResult): Promise<void> {
     createdAt: Date.now(),
   })
   if (!r.manual) emit({ type: 'focus.ended', label: r.label, minutes, cleared: r.cleared, xp })
+  if (r.cleared && !r.manual) await dropLoot('focus', runId)
   await announceProgress(summary)
 
   // A broken session still counts its minutes, but doesn't clear a quest.
@@ -770,6 +779,7 @@ async function damageBoss(bossId: string): Promise<void> {
   if (status.hpLeft === 0) {
     await db.bosses.update(bossId, { defeatedAt: Date.now(), updatedAt: Date.now() })
     emit({ type: 'boss.defeated', name: status.boss.name, xp: BOSS_XP })
+    await dropLoot('boss', bossId)
     const done = dread && summary.weekDone.get(dread.id)
     if (dread && done?.version === 'min') await db.completions.delete(done.id)
     if (dread && done?.version !== 'full') await completeQuest(dread, 'full')
@@ -848,6 +858,7 @@ export async function clearSurprise(): Promise<void> {
   if (already > 0 || surpriseState(s, false, Date.now()) !== 'open') return
   await db.surprises.add({ id: newId(), userId: LOCAL_USER, day: summary.today, challengeId: s.challenge.id, xp: SURPRISE_XP, createdAt: Date.now() })
   emit({ type: 'surprise.cleared', text: s.challenge.text, xp: SURPRISE_XP })
+  await dropLoot('surprise', `${summary.today}`)
   await announceProgress(summary)
 }
 
@@ -1007,19 +1018,19 @@ export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places, db.goals]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places, db.goals, db.loot]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places', 'goals'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places', 'goals', 'loot'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals] = await Promise.all(
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot] = await Promise.all(
     tables().map(t => t.toArray()),
   )
   return {
     format: SAVE_FORMAT,
-    version: 11,
-    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals,
+    version: 12,
+    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot,
   }
 }
 
@@ -1054,6 +1065,7 @@ export async function importSave(json: string): Promise<void> {
     await db.memories.bulkPut(data.memories ?? [])
     await db.places.bulkPut(data.places ?? [])
     await db.goals.bulkPut(data.goals ?? [])
+    await db.loot.bulkPut(data.loot ?? [])
   })
 }
 
@@ -1107,6 +1119,7 @@ export async function toggleGoal(id: string, index: number): Promise<void> {
   await db.goals.update(id, { items, updatedAt: Date.now() })
   const ticked = items[index]
   if (ticked.done) emit({ type: 'goal.done', text: ticked.text, allDone: items.every(i => i.done) })
+  if (ticked.done && items.length >= GOALS_PER_DAY && items.every(i => i.done)) await dropLoot('goals', g.id)
 }
 
 /** Adds one goal to a day's top 3 (if there's room), without touching the planning quest. */
@@ -1141,4 +1154,27 @@ export async function trackFromReflection(item: { kind: 'daily' | 'side' | 'goal
   if (entry) await db.journal.update(entry.id, { tracked: [...(entry.tracked ?? []), record], updatedAt: Date.now() })
   emit({ type: 'tracking.added', kind: item.kind, title })
   return null
+}
+
+// ---- Loot drops ----
+
+/**
+ * Rolls a loot drop for something just done (see src/engine/loot.ts). The roll
+ * is stable per source record, and each record drops at most once.
+ */
+export async function dropLoot(source: DropSource, sourceId: string): Promise<void> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player || !featureOn(player, 'cards')) return
+  if (await db.loot.where('sourceId').equals(sourceId).count()) return
+  const today = dayKey(new Date(), player.settings.resetHour)
+  const card = rollDrop(source, sourceId, surpriseSeed(player), monthOf(today))
+  if (!card) return
+  const before = await db.loot.where('userId').equals(LOCAL_USER).filter(d => d.cardId === card.id).count()
+  await db.loot.add({ id: newId(), userId: LOCAL_USER, cardId: card.id, source, sourceId, day: today, createdAt: Date.now() })
+  emit({ type: 'loot.card', cardId: card.id, copies: before + 1, starUp: stars(before + 1) > stars(before) && before > 0 })
+}
+
+/** Undoing a quest takes back the card it dropped. */
+async function removeLootFrom(sourceId: string): Promise<void> {
+  await db.loot.where('sourceId').equals(sourceId).delete()
 }

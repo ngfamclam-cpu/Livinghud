@@ -2,7 +2,7 @@
 // Phase 5 adds Supabase sync on top; records already carry userId + timestamps.
 
 import Dexie, { type EntityTable } from 'dexie'
-import type { DayGoals, Memory, Place, Boss, Completion, Contact, ExerciseSet, FocusRun, JournalEntry, Person, Plan, PlanFund, Player, SurpriseClear, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
+import type { LootDrop, DayGoals, Memory, Place, Boss, Completion, Contact, ExerciseSet, FocusRun, JournalEntry, Person, Plan, PlanFund, Player, SurpriseClear, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
 
 export const LOCAL_USER = 'local'
 
@@ -36,6 +36,7 @@ export const db = new Dexie('livinghud') as Dexie & {
   /** This device's copy of Life log photos. Not part of the save; the cloud holds the originals. */
   photoCache: EntityTable<CachedPhoto, 'id'>
   goals: EntityTable<DayGoals, 'id'>
+  loot: EntityTable<LootDrop, 'id'>
 }
 
 db.version(1).stores({
@@ -101,4 +102,9 @@ db.version(10).stores({
 // Tomorrow's top 3: goals per game day.
 db.version(11).stores({
   goals: 'id, userId, day',
+})
+
+// Loot drops: collectible cards.
+db.version(12).stores({
+  loot: 'id, userId, sourceId',
 })

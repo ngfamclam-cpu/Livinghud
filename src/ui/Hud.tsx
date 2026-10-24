@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, dailyWeight, type Completion, type DayGoals, type Memory, type Player, type Quest, type Summary, type SurpriseClear } from '../engine'
+import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, dailyWeight, type Completion, type DayGoals, type LootDrop, type Memory, type Player, type Quest, type Summary, type SurpriseClear } from '../engine'
 import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { SurpriseCard } from './SurpriseCard'
 import { NewAreaBanner, TodayPage } from './lifelog/HudPanels'
 import { TopThree } from './goals/TopThree'
+import { CollectionPanel } from './loot/Loot'
 import { activeFocus, focusedMinutes } from '../db/focus'
 import { Bar } from './Bar'
 import { money, monthName } from './format'
@@ -29,9 +30,11 @@ interface HudProps {
   goals: DayGoals[]
   /** Opens the top-3 history and stats. */
   onGoals: () => void
+  loot: LootDrop[]
+  onCollection: () => void
 }
 
-export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop, memories, onLifeLog, goals, onGoals }: HudProps) {
+export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop, memories, onLifeLog, goals, onGoals, loot, onCollection }: HudProps) {
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
   const sides = active.filter(q => q.kind === 'side')
@@ -195,6 +198,8 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
           </ul>
         </SystemWindow>
       )}
+
+      {featureOn(player, 'cards') && <CollectionPanel loot={loot} onOpen={onCollection} />}
 
       {mains.length > 0 && (
         <SystemWindow title="Main Quests">

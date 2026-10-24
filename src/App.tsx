@@ -17,6 +17,7 @@ import { Report } from './ui/Report'
 import { Plans } from './ui/Plans'
 import { LifeLog } from './ui/lifelog/LifeLog'
 import { GoalsView } from './ui/goals/GoalsView'
+import { Collection, LootReveal } from './ui/loot/Loot'
 import { Briefing } from './ui/Briefing'
 import { briefingSeen } from './ui/briefingSeen'
 import { dayKey, featureOn } from './engine'
@@ -37,7 +38,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
-  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | null>(null)
+  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | 'collection' | null>(null)
   const [logCamera, setLogCamera] = useState(0)
   const [planId, setPlanId] = useState<string | null>(null)
   const [briefingDone, setBriefingDone] = useState(false)
@@ -48,7 +49,7 @@ export default function App() {
     document.documentElement.dataset.look = prefs.look
   }, [prefs.look])
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
@@ -68,8 +69,9 @@ export default function App() {
       db.memories.where('userId').equals(LOCAL_USER).toArray(),
       db.places.where('userId').equals(LOCAL_USER).toArray(),
       db.goals.where('userId').equals(LOCAL_USER).toArray(),
+      db.loot.where('userId').equals(LOCAL_USER).toArray(),
     ])
-    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals }
+    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot }
   })
 
   if (!data) return null
@@ -83,7 +85,7 @@ export default function App() {
   }
 
   const { player, quests, rewards, purchases, savings, sets, people, contacts, focusRuns, bosses } = data
-  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises, plans: data.plans, planFunds: data.planFunds, memories: data.memories, places: data.places })
+  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises, plans: data.plans, planFunds: data.planFunds, memories: data.memories, places: data.places, loot: data.loot })
   const reportInput = {
     stats: player.stats,
     quests,
@@ -120,6 +122,7 @@ export default function App() {
         <Desktop data={{ ...data, player }} summary={summary} reportInput={reportInput} now={now} />
         {showBriefing && <Briefing player={player} quests={quests} summary={summary} onClose={() => setBriefingDone(true)} onReport={() => setBriefingDone(true)} />}
         <SystemToasts />
+        {featureOn(player, 'cards') && <LootReveal />}
         {theme}
       </>
     )
@@ -140,6 +143,7 @@ export default function App() {
           <Workout summary={summary} sets={sets} player={player} onClose={() => setScreen(null)} onScan={() => setScreen('scan')} />
         )}
         {screen === 'scan' && <PostureScan scans={data.scans} onClose={() => setScreen('workout')} />}
+        {screen === 'collection' && <Collection player={player} summary={summary} loot={data.loot} onClose={() => setScreen(null)} />}
         {screen === 'goals' && (
           <main className="hud">
             <div className="row end"><button className="ghost small" onClick={() => setScreen(null)}>Back</button></div>
@@ -155,6 +159,7 @@ export default function App() {
           <Focus player={player} quests={quests} summary={summary} runs={focusRuns} preset={focusPreset} onClose={() => setScreen(null)} />
         )}
         <SystemToasts />
+        {featureOn(player, 'cards') && <LootReveal />}
         {theme}
       </>
     )
@@ -174,12 +179,13 @@ export default function App() {
       {current === 'log' && (
         <LifeLog key={logCamera} data={{ ...data, player }} summary={summary} startCamera={logCamera > 0} onJournal={() => setScreen('journal')} onClose={() => { setLogCamera(0); setTab('hud') }} />
       )}
-      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} memories={data.memories} onLifeLog={openLog} goals={data.goals} onGoals={() => setScreen('goals')} />}
+      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} memories={data.memories} onLifeLog={openLog} goals={data.goals} onGoals={() => setScreen('goals')} loot={data.loot} onCollection={() => setScreen('collection')} />}
       {current === 'quests' && <QuestBoard player={player} quests={quests} completions={data.completions} summary={summary} onFight={bossId => openFocus({ bossId })} />}
       {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} onPlans={() => openPlans()} />}
       {current === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setTab('hud')} />}
       {briefing}
       <SystemToasts />
+        {featureOn(player, 'cards') && <LootReveal />}
       {theme}
     </>
   )

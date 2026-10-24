@@ -765,3 +765,66 @@ button.photo { cursor: zoom-in; }
 .goal-history > li { border-left: 2px solid var(--accent); padding-left: 10px; }
 .goal-mark { width: 18px; text-align: center; color: var(--muted); }
 .goal-mark.done { color: var(--good); }
+
+/* ---- Loot cards ---- */
+.loot-card {
+  --w: 150px;
+  position: relative; width: var(--w); aspect-ratio: 5 / 7; border-radius: 10px; overflow: hidden; flex: none;
+  background: linear-gradient(160deg, #13203a, #070c18); border: 2px solid #6b7a90;
+  display: flex; flex-direction: column; color: var(--text); text-align: left;
+}
+.loot-card.r-rare { border-color: #4da3ff; box-shadow: 0 0 10px rgba(77, 163, 255, 0.45); }
+.loot-card.r-epic { border-color: #b388ff; box-shadow: 0 0 14px rgba(179, 136, 255, 0.55); }
+.loot-card.r-legendary { border-color: #ffcf5c; box-shadow: 0 0 18px rgba(255, 207, 92, 0.65); }
+.loot-card.r-epic::after, .loot-card.r-legendary::after, .loot-card.s3::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; mix-blend-mode: color-dodge; opacity: 0.35;
+  background: linear-gradient(115deg, transparent 20%, #ff6ec7 35%, #6ee7ff 50%, #fff36e 65%, transparent 80%);
+  background-size: 250% 250%; animation: holo 4s linear infinite;
+}
+.loot-card.s2 { outline: 2px solid rgba(255, 207, 92, 0.5); outline-offset: -5px; }
+@keyframes holo { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.card-svg { width: 100%; flex: 1; min-height: 0; display: block; }
+.card-svg .limb { stroke: #0b0d1a; }
+.card-svg .dancer { filter: drop-shadow(0 0 1.2px var(--rim, #fff)) drop-shadow(0 0 3px var(--rim, #fff)); }
+.card-svg .hair { fill: #0b0d1a; }
+.card-svg .head, .card-svg .body, .card-svg .skirt { fill: #0b0d1a; }
+.card-svg .prop { fill: #fff; stroke: none; opacity: 0.9; }
+.card-tag { fill: #fff; font-size: 7px; font-weight: 700; letter-spacing: 0.12em; }
+.card-caption { padding: 5px 7px 6px; background: rgba(0, 0, 0, 0.55); display: flex; flex-direction: column; gap: 1px; }
+.card-caption b { font-size: 0.82rem; line-height: 1.1; }
+.card-caption small { font-size: 0.66rem; color: var(--muted); line-height: 1.1; }
+.card-stars { position: absolute; top: 4px; right: 6px; color: var(--gold); font-size: 0.8rem; text-shadow: 0 0 6px #000; }
+.relic-art { flex: 1; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.16), transparent 65%); }
+.relic-icon { font-size: calc(var(--w) * 0.4); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)); }
+.playing-art { flex: 1; position: relative; display: grid; place-items: center; background: #f4f1ea; color: #111; margin: 6px 6px 0; border-radius: 6px; }
+.playing-art.red { color: #c8102e; }
+.playing-art .pip { font-size: calc(var(--w) * 0.36); }
+.playing-art .corner { position: absolute; font-weight: 700; font-size: 0.75rem; line-height: 1; text-align: center; }
+.playing-art .corner.tl { top: 5px; left: 6px; }
+.playing-art .corner.br { bottom: 5px; right: 6px; transform: rotate(180deg); }
+.loot-card.locked { display: grid; place-items: center; border-style: dashed; border-color: rgba(127, 151, 184, 0.35); background: rgba(5, 10, 20, 0.6); }
+.locked-mark { font-size: 2rem; color: rgba(127, 151, 184, 0.45); font-weight: 700; }
+.binder { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.binder .loot-card { --w: 100%; width: 100%; }
+.card-button { position: relative; padding: 0; background: none; border: 0; box-shadow: none; cursor: pointer; width: 100%; }
+.card-button:disabled { cursor: default; opacity: 1; }
+.copies { position: absolute; bottom: 4px; right: 6px; font-size: 0.75rem; font-weight: 700; background: rgba(0, 0, 0, 0.7); padding: 1px 5px; border-radius: 6px; }
+.card-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.card-row .loot-card, .card-row .card-button { --w: 110px; width: 110px; flex: none; }
+.card-row.small .loot-card { --w: 88px; width: 88px; }
+.card-row.small .card-caption small { display: none; }
+.loot-reveal { flex-direction: column; display: flex; align-items: center; justify-content: center; gap: 12px; text-align: center; }
+.loot-reveal .loot-card { --w: min(62vw, 240px); }
+.loot-reveal .card-caption b { font-size: 1.05rem; }
+.loot-reveal .card-caption small { font-size: 0.8rem; }
+.drop-title { margin: 0; font-weight: 700; letter-spacing: 0.25em; font-size: 1.1rem; }
+.drop-title.r-rare { color: #4da3ff; }
+.drop-title.r-epic { color: #b388ff; }
+.drop-title.r-legendary { color: var(--gold); text-shadow: 0 0 14px rgba(255, 207, 92, 0.7); }
+.drop-text { max-width: 320px; margin: 0; font-style: italic; color: var(--muted); }
+.flip-in { animation: flip-in 0.8s cubic-bezier(0.2, 0.8, 0.2, 1.2) both; perspective: 800px; }
+@keyframes flip-in {
+  0% { transform: rotateY(90deg) scale(0.6); filter: brightness(3); opacity: 0; }
+  60% { transform: rotateY(-12deg) scale(1.05); filter: brightness(1.6); opacity: 1; }
+  100% { transform: none; filter: none; }
+}

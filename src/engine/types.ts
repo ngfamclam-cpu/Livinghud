@@ -231,7 +231,7 @@ export interface PostureScan {
 }
 
 /** Optional parts of the game the player can switch off in Settings. */
-export type FeatureKey = 'plans' | 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises' | 'memories'
+export type FeatureKey = 'plans' | 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises' | 'memories' | 'cards'
 
 export type Circle = 'friend' | 'family' | 'dating' | 'work'
 
@@ -440,4 +440,17 @@ export interface DayGoals {
   items: GoalItem[]
   createdAt: number
   updatedAt: number
+}
+
+/** A collectible card that dropped (see src/engine/loot.ts). */
+export interface LootDrop {
+  id: string
+  userId: string
+  cardId: string
+  /** What dropped it, and the record it came from (a completion, boss, focus run…). */
+  source: string
+  sourceId: string
+  /** Game day, YYYY-MM-DD. */
+  day: string
+  createdAt: number
 }
