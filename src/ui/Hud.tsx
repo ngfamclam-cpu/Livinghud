@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, type Completion, type Memory, type Player, type Quest, type Summary, type SurpriseClear } from '../engine'
+import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, dailyWeight, type Completion, type Memory, type Player, type Quest, type Summary, type SurpriseClear } from '../engine'
 import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { SurpriseCard } from './SurpriseCard'
@@ -33,6 +33,8 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
   const sides = active.filter(q => q.kind === 'side')
   const mains = active.filter(q => q.kind === 'main')
   const doneCount = dailies.filter(q => summary.todayDone.has(q.id)).length
+  const shares = dailies.reduce((n, q) => n + dailyWeight(q), 0)
+  const payOf = (q: Quest) => questReward(q, 'full', summary.wallet.budget, shares)
   const sideDone = sides.filter(q => summary.weekDone.has(q.id)).length
   const { level, wallet, savings } = summary
   const weakest = player.stats.reduce((a, b) => ((summary.stats[b] ?? 0) < (summary.stats[a] ?? 0) ? b : a), player.stats[0])
@@ -170,6 +172,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
               streak={summary.streaks.get(q.id) ?? 0}
               routine={q.templateId === 'str-routine' ? summary.routine : null}
               onStartWorkout={onStartWorkout}
+              pay={payOf(q)}
               onPhoto={q.templateId === 'int-photo' ? () => onLifeLog(true) : undefined}
             />
           ))}
@@ -203,9 +206,11 @@ interface RowProps {
   onStartWorkout?: () => void
   /** "Photo of the day": cleared by adding a memory rather than ticking it off. */
   onPhoto?: () => void
+  /** What the full version pays (dailies). */
+  pay?: { xp: number; dollars: number }
 }
 
-function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto }: RowProps) {
+function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto, pay }: RowProps) {
   const [open, setOpen] = useState(false)
   const routineParts = routine
     ? [
@@ -219,6 +224,7 @@ function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto }:
       <button className="quest-main" onClick={() => setOpen(o => !o)} aria-expanded={open}>
         <span className="stat-key">{quest.stat}</span>
         <span className="quest-title">{quest.title}</span>
+        {pay && !done && <span className="quest-pay" title="Full version pays">{money(pay.dollars)}</span>}
         {streak > 0 && <span className="streak" title={`${streak}-day streak`}>{streak}d</span>}
       </button>
       {routineParts.length > 0 && <p className="routine-line muted">{routineParts.join(' · ')}</p>}
@@ -226,6 +232,11 @@ function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto }:
         <div className="quest-detail">
           {quest.description && <p>{quest.description}</p>}
           <p className="muted">Minimum version: {quest.minVersion}</p>
+          {pay && (
+            <p className="muted">
+              Pays +{pay.xp} XP · {money(pay.dollars)} (minimum: half){dailyWeight(quest) > 1 ? `. Worth ${dailyWeight(quest)}× a normal daily because it takes the longest.` : ''}
+            </p>
+          )}
         </div>
       )}
       <div className="quest-actions">

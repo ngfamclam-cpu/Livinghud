@@ -749,3 +749,4 @@ button.photo { cursor: zoom-in; }
 .star { font-size: 1.15rem; line-height: 1; color: var(--muted); }
 .star.on { color: var(--gold); border-color: var(--gold); }
 .goal { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.quest-pay { color: var(--gold); font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; }

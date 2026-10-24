@@ -11,6 +11,7 @@ import {
   STATS,
   SUGGESTED_STARTERS,
   dailyPay,
+  dailyWeight,
   type Difficulty,
   type FitnessBaseline,
   type PlayerSettings,
@@ -229,7 +230,8 @@ export function Onboarding() {
             <input type="number" min={0} inputMode="decimal" value={settings.monthlyBudget} onChange={e => patch({ monthlyBudget: Math.max(0, Number(e.target.value) || 0) })} />
           </label>
           <p className="muted">
-            About ${dailyPay(settings.monthlyBudget, Math.max(1, dailyIds.length)).toFixed(2)} per daily quest. Doing 80% of your dailies earns the full budget; anything extra goes to the Vault for big rewards.
+            About ${dailyPay(settings.monthlyBudget, Math.max(1, dailyIds.reduce((n, id) => n + dailyWeight({ templateId: id }), 0))).toFixed(2)} per daily quest
+            {dailyIds.includes('str-routine') ? ' (the strength routine pays 3×, since it takes the longest)' : ''}. Doing 80% of your dailies earns the full budget; anything extra goes to the Vault for big rewards.
           </p>
           <p>Pay yourself first: the wallet unlocks only after you hit your monthly savings goal.</p>
           <div className="row">
