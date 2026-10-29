@@ -15,6 +15,16 @@ export type CardKind = 'idol' | 'relic' | 'playing'
 export const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legendary']
 export const RARITY_NAMES: Record<Rarity, string> = { common: 'Common', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' }
 
+/** How an anime-style portrait card is drawn (all original characters). */
+export interface Portrait {
+  hair: string
+  style: 'long' | 'twin' | 'bob' | 'pony' | 'buns' | 'wavy'
+  eyes: string
+  outfit: string
+  accent: 'star' | 'ribbon' | 'headphones' | 'flower' | 'crown' | 'none'
+  expression: 'smile' | 'wink' | 'cool' | 'grin'
+}
+
 /** Dance poses the card art can draw. */
 export type Pose = 'wave' | 'heart' | 'spin' | 'point' | 'kick' | 'hips' | 'arms-up' | 'mic' | 'lean' | 'fan'
 
@@ -28,10 +38,12 @@ export interface Card {
   /** Flavour text on the card. */
   text: string
   /** Idols. */
-  scene?: 'K' | 'J' | 'C'
+  scene?: 'K' | 'J' | 'C' | 'A'
   group?: string
   move?: string
   pose?: Pose
+  /** Anime-style portrait art instead of a dance silhouette. */
+  portrait?: Portrait
   /** Two colours for the card art. */
   colors?: [string, string]
   /** Relics. */
@@ -47,6 +59,7 @@ export const SERIES: Record<string, string> = {
   'neon-seoul': 'Neon Seoul (K-pop)',
   'tokyo-spark': 'Tokyo Spark (J-pop)',
   'shanghai-silk': 'Shanghai Silk (C-pop)',
+  starlight: 'Starlight Stage (anime)',
   'odd-relics': 'Odd Relics',
   'dungeon-pantry': 'Dungeon Pantry',
   deck: 'The Deck',
@@ -149,7 +162,29 @@ const PLAYING: Card[] = [
   { id: 'card-joker-black', kind: 'playing', name: 'Black Joker', suit: '★', rank: 'JOKER', rarity: 'legendary', text: 'Laughs last. Laughs loudest.', series: 'deck' },
 ]
 
-export const CARDS: Card[] = [...IDOLS, ...RELICS, ...PLAYING]
+const anime = (id: string, name: string, group: string, move: string, rarity: Rarity, colors: [string, string], portrait: Portrait, text: string): Card => ({
+  id: `anime-${id}`, kind: 'idol', scene: 'A', name, group, move, rarity, colors, portrait, text, series: 'starlight',
+})
+
+/** Starlight Stage: original anime-style idols, drawn as portraits. */
+const ANIME: Card[] = [
+  anime('hikari', 'Hikari', 'STARLIGHT//7', 'Shooting Star Wink', 'rare', ['#ff9ad5', '#5b2a86'], { hair: '#f4c2d7', style: 'twin', eyes: '#ff5fa2', outfit: '#ff5fa2', accent: 'star', expression: 'wink' }, 'Winks once per show. Fans count it as a holiday.'),
+  anime('ren', 'Ren', 'STARLIGHT//7', 'Thunder Step', 'epic', ['#5ee7ff', '#1b1f5e'], { hair: '#2b2f77', style: 'bob', eyes: '#3fd0ff', outfit: '#3a86ff', accent: 'headphones', expression: 'cool' }, 'Produces the tracks, then out-dances everyone to them.'),
+  anime('mika', 'Mika', 'STARLIGHT//7', 'Ribbon Rush', 'rare', ['#ffd36e', '#e2558a'], { hair: '#f6a440', style: 'pony', eyes: '#ff7b00', outfit: '#ff006e', accent: 'ribbon', expression: 'grin' }, 'Energy drink in human form. Never runs out.'),
+  anime('yuki', 'Yuki', 'STARLIGHT//7', 'Snowfall Spin', 'legendary', ['#e0f4ff', '#6c8cff'], { hair: '#f2f6ff', style: 'long', eyes: '#7aa7ff', outfit: '#8aa9ff', accent: 'crown', expression: 'smile' }, 'Centre position. The snow machine follows her.'),
+  anime('akane', 'Akane', 'CRIMSON CORE', 'Blaze Kick', 'epic', ['#ff5a5f', '#2b0b3f'], { hair: '#c1121f', style: 'pony', eyes: '#ffbe0b', outfit: '#e63946', accent: 'none', expression: 'grin' }, 'Kicks so high the lighting crew ducks.'),
+  anime('sumire', 'Sumire', 'CRIMSON CORE', 'Violet Hour', 'rare', ['#c77dff', '#240046'], { hair: '#7b2cbf', style: 'wavy', eyes: '#e0aaff', outfit: '#9d4edd', accent: 'flower', expression: 'smile' }, 'Sings the ballad. The arena goes quiet.'),
+  anime('nao', 'Nao', 'CRIMSON CORE', 'Pixel Pop', 'rare', ['#80ffdb', '#5390d9'], { hair: '#48bfe3', style: 'buns', eyes: '#56cfe1', outfit: '#5e60ce', accent: 'headphones', expression: 'wink' }, 'Streams rhythm games between rehearsals. Never misses a note.'),
+  anime('kirara', 'Kirara', 'GALAXY GIRLS', 'Supernova', 'legendary', ['#fee440', '#f15bb5'], { hair: '#ffd166', style: 'twin', eyes: '#f15bb5', outfit: '#9b5de5', accent: 'star', expression: 'grin' }, 'Her finale sparkles are visible from space. Allegedly.'),
+  anime('shiori', 'Shiori', 'GALAXY GIRLS', 'Moon Glide', 'epic', ['#a2d2ff', '#3a0ca3'], { hair: '#1d1a39', style: 'long', eyes: '#bde0fe', outfit: '#4361ee', accent: 'ribbon', expression: 'cool' }, 'Glides across the stage like gravity is optional.'),
+  anime('hana', 'Hana', 'GALAXY GIRLS', 'Blossom Clap', 'common', ['#ffc8dd', '#cdb4db'], { hair: '#8d5524', style: 'bob', eyes: '#6d4c41', outfit: '#ffafcc', accent: 'flower', expression: 'smile' }, 'The friendliest member. Remembers every fan’s name.'),
+  anime('rio', 'Rio', 'NEON ARCADE', 'Combo Breaker', 'rare', ['#00f5d4', '#00bbf9'], { hair: '#06d6a0', style: 'buns', eyes: '#00f5d4', outfit: '#118ab2', accent: 'headphones', expression: 'grin' }, 'Holds the high score on every dance machine in the city.'),
+  anime('ayame', 'Ayame', 'NEON ARCADE', 'Final Stage', 'epic', ['#f72585', '#3a0ca3'], { hair: '#3c096c', style: 'wavy', eyes: '#f72585', outfit: '#b5179e', accent: 'crown', expression: 'wink' }, 'The last boss of the idol world. Undefeated.'),
+  anime('momo', 'Momo', 'NEON ARCADE', 'Peach Bounce', 'common', ['#ffb4a2', '#e5989b'], { hair: '#ff8fa3', style: 'twin', eyes: '#ff4d6d', outfit: '#ff758f', accent: 'ribbon', expression: 'smile' }, 'Bounces through choreography like it’s a trampoline.'),
+  anime('tsubaki', 'Tsubaki', 'NEON ARCADE', 'Silk Turn', 'common', ['#e9c46a', '#264653'], { hair: '#2a9d8f', style: 'pony', eyes: '#e9c46a', outfit: '#264653', accent: 'none', expression: 'cool' }, 'Quiet backstage, unstoppable on it.'),
+]
+
+export const CARDS: Card[] = [...IDOLS, ...ANIME, ...RELICS, ...PLAYING]
 export const cardById = (id: string) => CARDS.find(c => c.id === id)
 
 /** What triggered a roll. Big moments drop better loot. */

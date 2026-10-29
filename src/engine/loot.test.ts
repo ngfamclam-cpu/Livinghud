@@ -6,6 +6,8 @@ describe('loot', () => {
     expect(new Set(CARDS.map(c => c.id)).size).toBe(CARDS.length)
     expect(CARDS.filter(c => c.kind === 'playing')).toHaveLength(54)
     expect(CARDS.filter(c => c.kind === 'idol').length).toBeGreaterThanOrEqual(20)
+    expect(CARDS.filter(c => c.portrait).length).toBeGreaterThanOrEqual(12)
+    expect(CARDS.every(c => c.kind !== 'idol' || !!c.pose !== !!c.portrait)).toBe(true)
   })
 
   it('always drops something good from big moments', () => {
