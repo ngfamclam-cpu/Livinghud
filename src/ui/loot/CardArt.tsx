@@ -1,6 +1,7 @@
 import type React from 'react'
 import type { Card, Pose } from '../../engine'
 import { Portrait } from './Portrait'
+import { Photo } from '../lifelog/Photo'
 
 type P = [number, number]
 interface Joints {
@@ -76,7 +77,6 @@ export function CardArt({ card, stars = 0, locked = false }: { card: Card; stars
     )
   }
   const [a, b] = card.colors ?? ['#2f8fff', '#0a1426']
-  const red = card.suit === '♥' || card.suit === '♦' || card.id === 'card-joker-red'
   return (
     <div className={`loot-card r-${card.rarity} kind-${card.kind} s${stars}`} aria-label={`${card.name}, ${card.rarity}${stars > 1 ? `, ${stars} stars` : ''}`}>
       {card.kind === 'idol' && card.portrait && <Portrait p={card.portrait} colors={card.colors ?? ['#ff9ad5', '#5b2a86']} id={card.id} />}
@@ -105,16 +105,15 @@ export function CardArt({ card, stars = 0, locked = false }: { card: Card; stars
           <span className="relic-icon">{card.icon}</span>
         </div>
       )}
-      {card.kind === 'playing' && (
-        <div className={`playing-art ${red ? 'red' : ''}`} aria-hidden>
-          <span className="corner tl">{card.rank === 'JOKER' ? '★' : card.rank}<br />{card.suit}</span>
-          <span className="pip">{card.rank === 'JOKER' ? '🃏' : card.suit}</span>
-          <span className="corner br">{card.rank === 'JOKER' ? '★' : card.rank}<br />{card.suit}</span>
+      {card.photoId && (
+        <div className="custom-art" aria-hidden>
+          <Photo id={card.photoId} alt="" />
+          <span className="card-tag-html">MY CARD</span>
         </div>
       )}
       <div className="card-caption">
         <b>{card.name}</b>
-        {card.kind === 'idol' && <small>{card.group} · {card.move}</small>}
+        {card.kind === 'idol' && (card.group || card.move) && <small>{[card.group, card.move].filter(Boolean).join(' · ')}</small>}
         {stars > 0 && <span className="card-stars">{'★'.repeat(stars)}</span>}
       </div>
     </div>

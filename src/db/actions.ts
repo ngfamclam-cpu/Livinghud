@@ -19,6 +19,8 @@ import {
   dailyWeight,
   GOALS_PER_DAY,
   rollDrop,
+  setCustomCards,
+  customCard,
   monthOf,
   stars,
   type DropSource,
@@ -52,6 +54,7 @@ import {
   type ContactKind,
   type FeatureKey,
   type JournalEntry,
+  type CustomCard,
   type Person,
   type ExerciseKey,
   type ExerciseSet,
@@ -1018,19 +1021,19 @@ export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places, db.goals, db.loot]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places, db.goals, db.loot, db.customCards]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places', 'goals', 'loot'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places', 'goals', 'loot', 'customCards'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot] = await Promise.all(
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards] = await Promise.all(
     tables().map(t => t.toArray()),
   )
   return {
     format: SAVE_FORMAT,
-    version: 12,
-    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot,
+    version: 13,
+    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards,
   }
 }
 
@@ -1066,6 +1069,7 @@ export async function importSave(json: string): Promise<void> {
     await db.places.bulkPut(data.places ?? [])
     await db.goals.bulkPut(data.goals ?? [])
     await db.loot.bulkPut(data.loot ?? [])
+    await db.customCards.bulkPut(data.customCards ?? [])
   })
 }
 
@@ -1166,6 +1170,7 @@ export async function dropLoot(source: DropSource, sourceId: string): Promise<vo
   const player = await db.players.get(LOCAL_USER)
   if (!player || !featureOn(player, 'cards')) return
   if (await db.loot.where('sourceId').equals(sourceId).count()) return
+  setCustomCards((await db.customCards.where('userId').equals(LOCAL_USER).toArray()).map(customCard))
   const today = dayKey(new Date(), player.settings.resetHour)
   const card = rollDrop(source, sourceId, surpriseSeed(player), monthOf(today))
   if (!card) return
@@ -1177,4 +1182,20 @@ export async function dropLoot(source: DropSource, sourceId: string): Promise<vo
 /** Undoing a quest takes back the card it dropped. */
 async function removeLootFrom(sourceId: string): Promise<void> {
   await db.loot.where('sourceId').equals(sourceId).delete()
+}
+
+/** Makes a loot card from your own image. It joins the drop pool straight away. */
+export async function addCustomCard(input: { name: string; rarity: CustomCard['rarity']; text: string; photoId: string }): Promise<void> {
+  const now = Date.now()
+  await db.customCards.add({ id: newId(), userId: LOCAL_USER, name: input.name.trim().slice(0, 40) || 'My card', rarity: input.rarity, text: input.text.trim().slice(0, 140), photoId: input.photoId, createdAt: now, updatedAt: now })
+}
+
+/** Deletes one of your cards, its image and any copies you'd collected. */
+export async function deleteCustomCard(id: string): Promise<void> {
+  const c = await db.customCards.get(id)
+  if (!c) return
+  await db.customCards.delete(id)
+  await db.loot.where('userId').equals(LOCAL_USER).filter(d => d.cardId === `custom-${id}`).delete()
+  const { deletePhotos } = await import('./photos')
+  await deletePhotos([c.photoId])
 }

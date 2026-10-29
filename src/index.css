@@ -769,7 +769,7 @@ button.photo { cursor: zoom-in; }
 /* ---- Loot cards ---- */
 .loot-card {
   --w: 150px;
-  position: relative; width: var(--w); aspect-ratio: 5 / 7; border-radius: 10px; overflow: hidden; flex: none;
+  position: relative; width: var(--w); aspect-ratio: 5 / 7; border-radius: 10px; overflow: hidden; flex: none; container-type: inline-size;
   background: linear-gradient(160deg, #13203a, #070c18); border: 2px solid #6b7a90;
   display: flex; flex-direction: column; color: var(--text); text-align: left;
 }
@@ -795,13 +795,11 @@ button.photo { cursor: zoom-in; }
 .card-caption small { font-size: 0.66rem; color: var(--muted); line-height: 1.1; }
 .card-stars { position: absolute; top: 4px; right: 6px; color: var(--gold); font-size: 0.8rem; text-shadow: 0 0 6px #000; }
 .relic-art { flex: 1; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.16), transparent 65%); }
-.relic-icon { font-size: calc(var(--w) * 0.4); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)); }
-.playing-art { flex: 1; position: relative; display: grid; place-items: center; background: #f4f1ea; color: #111; margin: 6px 6px 0; border-radius: 6px; }
-.playing-art.red { color: #c8102e; }
-.playing-art .pip { font-size: calc(var(--w) * 0.36); }
-.playing-art .corner { position: absolute; font-weight: 700; font-size: 0.75rem; line-height: 1; text-align: center; }
-.playing-art .corner.tl { top: 5px; left: 6px; }
-.playing-art .corner.br { bottom: 5px; right: 6px; transform: rotate(180deg); }
+.relic-icon { font-size: 58cqw; line-height: 1; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.6)); }
+.loot-card.kind-relic .relic-art { background: radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.22), transparent 62%), linear-gradient(160deg, #1d2b52, #0a0f22); }
+.custom-art { flex: 1; min-height: 0; position: relative; }
+.custom-art .photo { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; border: 0; border-radius: 0; }
+.card-tag-html { position: absolute; top: 5px; left: 7px; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; color: #fff; text-shadow: 0 1px 3px #000; }
 .loot-card.locked { display: grid; place-items: center; border-style: dashed; border-color: rgba(127, 151, 184, 0.35); background: rgba(5, 10, 20, 0.6); }
 .locked-mark { font-size: 2rem; color: rgba(127, 151, 184, 0.45); font-weight: 700; }
 .binder { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
@@ -828,3 +826,6 @@ button.photo { cursor: zoom-in; }
   60% { transform: rotateY(-12deg) scale(1.05); filter: brightness(1.6); opacity: 1; }
   100% { transform: none; filter: none; }
 }
+.maker { display: flex; gap: 12px; align-items: flex-start; }
+.maker-photo { width: 110px; aspect-ratio: 5 / 7; flex: none; padding: 0; overflow: hidden; background: rgba(5, 10, 20, 0.6); border: 1px dashed var(--accent); color: var(--accent); box-shadow: none; display: grid; place-items: center; }
+.maker-photo .photo { width: 100%; height: 100%; aspect-ratio: auto; border: 0; border-radius: 0; }
