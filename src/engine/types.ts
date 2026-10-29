@@ -454,3 +454,16 @@ export interface LootDrop {
   day: string
   createdAt: number
 }
+
+/** A loot card you made from your own image. */
+export interface CustomCard {
+  id: string
+  userId: string
+  name: string
+  rarity: 'common' | 'rare' | 'epic' | 'legendary'
+  text: string
+  /** The image, stored like a Life log photo. */
+  photoId: string
+  createdAt: number
+  updatedAt: number
+}

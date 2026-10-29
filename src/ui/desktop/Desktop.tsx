@@ -10,6 +10,7 @@ import type {
   Place,
   DayGoals,
   LootDrop,
+  CustomCard,
   Person,
   Plan,
   PlanFund,
@@ -67,6 +68,7 @@ export interface DashData {
   places: Place[]
   goals: DayGoals[]
   loot: LootDrop[]
+  customCards: CustomCard[]
 }
 
 type Page = 'dashboard' | 'lifelog' | 'goals' | 'collection' | 'quests' | 'party' | 'shop' | 'plans' | 'journal' | 'report' | 'settings' | 'workout' | 'scan' | 'focus'
@@ -207,7 +209,7 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
           {page === 'lifelog' && (
             <LifeLog key={logCamera} data={data} summary={summary} startCamera={logCamera > 0} onJournal={() => setPage('journal')} onClose={() => { setLogCamera(0); home() }} />
           )}
-          {page === 'collection' && <Collection player={player} summary={summary} loot={data.loot} />}
+          {page === 'collection' && <Collection player={player} summary={summary} loot={data.loot} custom={data.customCards} />}
           {page === 'goals' && (
             <main className="hud">
               <GoalsView goals={data.goals} summary={summary} />

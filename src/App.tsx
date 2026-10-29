@@ -20,7 +20,7 @@ import { GoalsView } from './ui/goals/GoalsView'
 import { Collection, LootReveal } from './ui/loot/Loot'
 import { Briefing } from './ui/Briefing'
 import { briefingSeen } from './ui/briefingSeen'
-import { dayKey, featureOn } from './engine'
+import { customCard, dayKey, featureOn, setCustomCards } from './engine'
 import { Desktop } from './ui/desktop/Desktop'
 import { setPref, usePrefs, useWide } from './ui/desktop/prefs'
 
@@ -49,7 +49,7 @@ export default function App() {
     document.documentElement.dataset.look = prefs.look
   }, [prefs.look])
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
@@ -70,8 +70,11 @@ export default function App() {
       db.places.where('userId').equals(LOCAL_USER).toArray(),
       db.goals.where('userId').equals(LOCAL_USER).toArray(),
       db.loot.where('userId').equals(LOCAL_USER).toArray(),
+      db.customCards.where('userId').equals(LOCAL_USER).toArray(),
     ])
-    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot }
+    // Your own cards join the card set before anything reads it.
+    setCustomCards(customCards.map(customCard))
+    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards }
   })
 
   if (!data) return null
@@ -143,7 +146,7 @@ export default function App() {
           <Workout summary={summary} sets={sets} player={player} onClose={() => setScreen(null)} onScan={() => setScreen('scan')} />
         )}
         {screen === 'scan' && <PostureScan scans={data.scans} onClose={() => setScreen('workout')} />}
-        {screen === 'collection' && <Collection player={player} summary={summary} loot={data.loot} onClose={() => setScreen(null)} />}
+        {screen === 'collection' && <Collection player={player} summary={summary} loot={data.loot} custom={data.customCards} onClose={() => setScreen(null)} />}
         {screen === 'goals' && (
           <main className="hud">
             <div className="row end"><button className="ghost small" onClick={() => setScreen(null)}>Back</button></div>

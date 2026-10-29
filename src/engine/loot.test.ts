@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { CARDS, DROP_CHANCE, collection, featuredSeries, rollDrop, starUpXp, stars, summarize, type LootDrop, type Player } from './index'
+import { CARDS, DROP_CHANCE, cardById, setCustomCards, collection, featuredSeries, rollDrop, starUpXp, stars, summarize, type LootDrop, type Player } from './index'
+
+describe('custom cards', () => {
+  it('join the drop pool and the binder once registered', () => {
+    const mine = { id: 'custom-1', kind: 'idol' as const, name: 'Mine', rarity: 'legendary' as const, series: 'custom', text: '', photoId: 'p1' }
+    setCustomCards([mine])
+    expect(cardById('custom-1')?.name).toBe('Mine')
+    const hits = Array.from({ length: 400 }, (_, i) => rollDrop('boss', `b${i}`, 'seed', '2026-10')).filter(c => c?.id === 'custom-1').length
+    expect(hits).toBeGreaterThan(0)
+    setCustomCards([])
+    expect(cardById('custom-1')).toBeUndefined()
+  })
+})
 
 describe('loot', () => {
-  it('has unique card ids and a full deck', () => {
+  it('has unique card ids, the rizz series and no deck', () => {
     expect(new Set(CARDS.map(c => c.id)).size).toBe(CARDS.length)
-    expect(CARDS.filter(c => c.kind === 'playing')).toHaveLength(54)
+    expect(CARDS.filter(c => c.series === 'rizz').length).toBeGreaterThanOrEqual(12)
+    expect(CARDS.some(c => c.id.startsWith('card-'))).toBe(false)
     expect(CARDS.filter(c => c.kind === 'idol').length).toBeGreaterThanOrEqual(20)
     expect(CARDS.filter(c => c.portrait).length).toBeGreaterThanOrEqual(12)
     expect(CARDS.every(c => c.kind !== 'idol' || !!c.pose !== !!c.portrait)).toBe(true)

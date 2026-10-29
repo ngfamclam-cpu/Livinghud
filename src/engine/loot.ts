@@ -2,7 +2,8 @@
 //  - Idols: original, fictional K-pop / J-pop / C-pop style performers, each
 //    with a signature dance move (drawn as a stylised pose on the card).
 //  - Relics: odd little trinkets and surprises.
-//  - Playing cards: a full deck plus two jokers.
+//  - Rizz & Romance: cheeky dating-life loot.
+//  - Your own cards, made from images you pick (setCustomCards).
 // Big moments (bosses, main quest stages, the strength routine) always drop
 // something good; other quests have a 1-in-4 chance. Each month a different
 // series is featured and drops twice as often. Duplicates power a card up.
@@ -10,7 +11,7 @@
 import type { StatKey } from './types'
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary'
-export type CardKind = 'idol' | 'relic' | 'playing'
+export type CardKind = 'idol' | 'relic'
 
 export const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legendary']
 export const RARITY_NAMES: Record<Rarity, string> = { common: 'Common', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' }
@@ -48,9 +49,8 @@ export interface Card {
   colors?: [string, string]
   /** Relics. */
   icon?: string
-  /** Playing cards. */
-  suit?: '♠' | '♥' | '♦' | '♣' | '★'
-  rank?: string
+  /** Your own cards: the image, from the Life log photo store. */
+  photoId?: string
   /** The stat the card is themed on (flavour only). */
   stat?: StatKey
 }
@@ -62,7 +62,8 @@ export const SERIES: Record<string, string> = {
   starlight: 'Starlight Stage (anime)',
   'odd-relics': 'Odd Relics',
   'dungeon-pantry': 'Dungeon Pantry',
-  deck: 'The Deck',
+  rizz: 'Rizz & Romance',
+  custom: 'My cards',
 }
 
 const idol = (id: string, name: string, scene: 'K' | 'J' | 'C', group: string, move: string, pose: Pose, rarity: Rarity, colors: [string, string], text: string): Card => ({
@@ -143,25 +144,6 @@ const RELICS: Card[] = [
   relic('cake', 'Level-Up Cake', '🎂', 'legendary', 'Appears only when someone becomes stronger.', 'dungeon-pantry', 'STR'),
 ]
 
-const SUITS = ['♠', '♥', '♦', '♣'] as const
-const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
-const PLAYING: Card[] = [
-  ...SUITS.flatMap(suit =>
-    RANKS.map<Card>(rank => ({
-      id: `card-${rank}${suit}`,
-      kind: 'playing',
-      name: `${rank === 'A' ? 'Ace' : rank === 'J' ? 'Jack' : rank === 'Q' ? 'Queen' : rank === 'K' ? 'King' : rank} of ${{ '♠': 'Spades', '♥': 'Hearts', '♦': 'Diamonds', '♣': 'Clubs' }[suit]}`,
-      suit,
-      rank,
-      rarity: rank === 'A' ? 'epic' : ['J', 'Q', 'K'].includes(rank) ? 'rare' : 'common',
-      text: rank === 'A' ? 'Collect all four aces for a full set of power.' : 'Part of the deck. Collect them all.',
-      series: 'deck',
-    })),
-  ),
-  { id: 'card-joker-red', kind: 'playing', name: 'Red Joker', suit: '★', rank: 'JOKER', rarity: 'legendary', text: 'Wild. Chaotic. Probably plotting something.', series: 'deck' },
-  { id: 'card-joker-black', kind: 'playing', name: 'Black Joker', suit: '★', rank: 'JOKER', rarity: 'legendary', text: 'Laughs last. Laughs loudest.', series: 'deck' },
-]
-
 const anime = (id: string, name: string, group: string, move: string, rarity: Rarity, colors: [string, string], portrait: Portrait, text: string): Card => ({
   id: `anime-${id}`, kind: 'idol', scene: 'A', name, group, move, rarity, colors, portrait, text, series: 'starlight',
 })
@@ -184,8 +166,51 @@ const ANIME: Card[] = [
   anime('tsubaki', 'Tsubaki', 'NEON ARCADE', 'Silk Turn', 'common', ['#e9c46a', '#264653'], { hair: '#2a9d8f', style: 'pony', eyes: '#e9c46a', outfit: '#264653', accent: 'none', expression: 'cool' }, 'Quiet backstage, unstoppable on it.'),
 ]
 
-export const CARDS: Card[] = [...IDOLS, ...ANIME, ...RELICS, ...PLAYING]
-export const cardById = (id: string) => CARDS.find(c => c.id === id)
+const rizz = (id: string, name: string, icon: string, rarity: Rarity, text: string, stat?: StatKey): Card => ({
+  id: `rizz-${id}`, kind: 'relic', name, icon, rarity, text, series: 'rizz', stat,
+})
+
+/** Rizz & Romance: cheeky dating-life loot. Flirty, never explicit. */
+const RIZZ: Card[] = [
+  rizz('potion', 'Rizz Potion', '🧪', 'rare', 'One sip: +50 charisma, −50 awkward silences.', 'CHA'),
+  rizz('wingman', 'Wingman Token', '🪽', 'rare', 'Redeem for one perfectly timed "you two should talk".', 'CHA'),
+  rizz('superlike', 'Golden Super Like', '💛', 'epic', 'Guaranteed to make someone check your profile twice.', 'CHA'),
+  rizz('cologne', 'Cologne of Irresistibility', '🧴', 'epic', 'People lean in. Nobody knows why.', 'CHA'),
+  rizz('lipstick', 'Lipstick Kiss Mark', '💋', 'rare', 'Left on your collar by a mystery admirer.', 'CHA'),
+  rizz('roses', 'Dozen Red Roses', '🌹', 'common', 'Classic for a reason.', 'CHA'),
+  rizz('dinner', 'Candlelit Dinner Ticket', '🕯️', 'rare', 'Table for two, best seat, nobody else in the room.', 'CHA'),
+  rizz('slowdance', 'Slow Dance Token', '💃', 'common', 'Valid when the DJ plays the one song.', 'CHA'),
+  rizz('number', 'Her Number on a Napkin', '📝', 'epic', 'Smudged a little. Still legible. Call her.', 'CHA'),
+  rizz('abs', 'Golden Abs (Temporary)', '💪', 'legendary', 'Lasts exactly as long as you keep training.', 'STR'),
+  rizz('lineScroll', 'Scroll of Perfect Pickup Lines', '📜', 'rare', 'Works 3 times out of 10. That is a lot of times.', 'CHA'),
+  rizz('mirror', 'Confidence Mirror', '🪞', 'common', 'Always says you look good. It is correct.', 'CHA'),
+  rizz('keycard', 'Penthouse Key Card', '🗝️', 'legendary', 'Top floor, city view. The night is young.', 'WLT'),
+  rizz('champagne', 'Champagne Tower', '🍾', 'epic', 'For when the date goes very, very well.', 'WLT'),
+  rizz('heart', 'Stolen Heart', '❤️‍🔥', 'legendary', 'Someone out there is thinking about you right now.', 'CHA'),
+  rizz('loveletter', 'Sealed Love Letter', '💌', 'rare', 'Smells faintly of perfume. Open it later.', 'CHA'),
+]
+
+/** Cards you make yourself from your own images (see setCustomCards). */
+let customCards: Card[] = []
+
+/**
+ * Registers your own cards (made from images you choose) so they drop and show
+ * in the binder alongside the built-in set. Called when the game data loads.
+ */
+export function setCustomCards(list: Card[]): void {
+  customCards = list
+}
+
+/** A card from one of your own (see CustomCard). */
+export const customCard = (c: { id: string; name: string; rarity: Rarity; text: string; photoId: string }): Card => ({
+  id: `custom-${c.id}`, kind: 'idol', name: c.name, rarity: c.rarity, text: c.text, photoId: c.photoId, series: 'custom',
+})
+
+const BUILT_IN: Card[] = [...IDOLS, ...ANIME, ...RELICS, ...RIZZ]
+/** Every card that can drop right now: the built-in set plus your own. */
+export const allCards = (): Card[] => [...BUILT_IN, ...customCards]
+export const CARDS = BUILT_IN
+export const cardById = (id: string) => allCards().find(c => c.id === id)
 
 /** What triggered a roll. Big moments drop better loot. */
 export type DropSource = 'boss' | 'main' | 'strength' | 'quest' | 'focus' | 'surprise' | 'goals'
@@ -216,7 +241,7 @@ const unit = (text: string) => hash(text) / 4294967296
 
 /** This month's featured series: its cards drop twice as often. Changes every month. */
 export function featuredSeries(month: string, seed: string): string {
-  const keys = Object.keys(SERIES)
+  const keys = Object.keys(SERIES).filter(k => k !== 'custom')
   return keys[hash(`${seed}:series:${month}`) % keys.length]
 }
 
@@ -238,7 +263,7 @@ export function rollDrop(source: DropSource, sourceId: string, seed: string, mon
     r -= odds[i]
   }
   const featured = featuredSeries(month, seed)
-  const pool = CARDS.filter(c => c.rarity === rarity)
+  const pool = allCards().filter(c => c.rarity === rarity)
   const weights = pool.map(c => (c.series === featured ? 2 : 1))
   let pick = unit(`${base}:card`) * weights.reduce((a, b) => a + b, 0)
   for (let i = 0; i < pool.length; i++) {
