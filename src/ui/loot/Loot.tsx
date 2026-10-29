@@ -23,6 +23,7 @@ import { addPhoto, deletePhotos } from '../../db/photos'
 import { Photo } from '../lifelog/Photo'
 import { SystemWindow } from '../SystemWindow'
 import { CardArt } from './CardArt'
+import { BulkImport } from './BulkImport'
 
 interface Reveal {
   card: Card
@@ -173,6 +174,7 @@ function CardMaker({ custom }: { custom: CustomCard[] }) {
   const [rarity, setRarity] = useState<Rarity>('rare')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [bulk, setBulk] = useState(false)
   const input = useRef<HTMLInputElement>(null)
 
   const pick = async (files: FileList | null) => {
@@ -200,8 +202,14 @@ function CardMaker({ custom }: { custom: CustomCard[] }) {
     if (confirm(`Delete "${c.name}" and any copies you've collected?`)) void deleteCustomCard(c.id)
   }
 
+  if (bulk) return <BulkImport onClose={() => setBulk(false)} />
+
   return (
     <SystemWindow title="Make a card">
+      <div className="row">
+        <span className="muted grow">Have a lot of images? Import up to 50 at once: auto-cropped, with rarity and names filled in for you to review.</span>
+        <button className="small" onClick={() => setBulk(true)}>Bulk import</button>
+      </div>
       <p className="muted">
         Turn any image into a card, for example ones you make in an AI image app. It joins the drops straight away. Your cards are private, stored like your Life log photos. Fictional or AI-generated people only, adults only, never real people.
       </p>
