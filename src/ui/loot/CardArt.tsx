@@ -1,5 +1,6 @@
 import type React from 'react'
 import type { Card, Pose } from '../../engine'
+import { Portrait } from './Portrait'
 
 type P = [number, number]
 interface Joints {
@@ -63,7 +64,7 @@ function Dancer({ pose, color }: { pose: Pose; color: string }) {
   )
 }
 
-const SCENE_LABEL = { K: 'K-POP', J: 'J-POP', C: 'C-POP' } as const
+const SCENE_LABEL = { K: 'K-POP', J: 'J-POP', C: 'C-POP', A: 'ANIME' } as const
 
 /** One collectible card. Size comes from CSS; the art scales with it. */
 export function CardArt({ card, stars = 0, locked = false }: { card: Card; stars?: number; locked?: boolean }) {
@@ -78,6 +79,7 @@ export function CardArt({ card, stars = 0, locked = false }: { card: Card; stars
   const red = card.suit === '♥' || card.suit === '♦' || card.id === 'card-joker-red'
   return (
     <div className={`loot-card r-${card.rarity} kind-${card.kind} s${stars}`} aria-label={`${card.name}, ${card.rarity}${stars > 1 ? `, ${stars} stars` : ''}`}>
+      {card.kind === 'idol' && card.portrait && <Portrait p={card.portrait} colors={card.colors ?? ['#ff9ad5', '#5b2a86']} id={card.id} />}
       {card.kind === 'idol' && card.pose && (
         <svg viewBox="0 0 100 140" className="card-svg" aria-hidden>
           <defs>
