@@ -55,3 +55,32 @@ export async function check(): Promise<void> {
     running = false
   }
 }
+
+const STATUS_KEY = 'livinghud-penalty-status'
+
+/**
+ * Tells the phone-automation link whether a Penalty Quest is open, so a
+ * MacroDroid macro can block games until it's cleared. Only sends when the
+ * state changes (one small write each time).
+ */
+export async function pushPenaltyStatus(locked: boolean, task: string): Promise<void> {
+  const token = (await db.players.get(LOCAL_USER))?.settings.triggerToken
+  if (!token) return
+  const value = `${locked ? 1 : 0}:${task}`
+  try {
+    if (localStorage.getItem(STATUS_KEY) === value) return
+  } catch {
+    // ignore
+  }
+  const res = await fetch(`${ENDPOINT}?t=${encodeURIComponent(token)}&setstatus=1`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ locked, task }),
+  }).catch(() => null)
+  if (!res?.ok) return
+  try {
+    localStorage.setItem(STATUS_KEY, value)
+  } catch {
+    // ignore
+  }
+}

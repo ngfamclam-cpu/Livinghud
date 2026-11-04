@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Player, Quest } from '../engine'
+import { statName, type Player, type Quest } from '../engine'
 import { ensureTriggerToken, resetTriggerToken } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 
@@ -51,7 +51,7 @@ export function Automations({ player, quests }: { player: Player; quests: Quest[
           <ul className="board-list automations">
             {active.map(q => (
               <li key={q.id}>
-                <span className="stat-key">{q.stat}</span>
+                <span className="stat-key">{statName(q.stat)}</span>
                 <span className="quest-title">
                   {q.title} <small className="muted">{q.kind === 'main' ? 'clears the next stage' : q.kind === 'side' ? 'weekly' : 'daily'}</small>
                 </span>

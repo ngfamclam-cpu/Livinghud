@@ -70,3 +70,19 @@ describe('trigger api', () => {
     expect(store.files.size).toBe(0)
   })
 })
+
+describe('penalty status for the phone game lock', () => {
+  it('reads unlocked until the app reports a Penalty Quest, then locked until it clears', async () => {
+    const store = memoryStore()
+    const status = async () => (await handle(new Request(`${base}?t=${T}&status=1`), store)).json()
+    const set = (locked: boolean, task: string) =>
+      handle(new Request(`${base}?t=${T}&setstatus=1`, { method: 'POST', body: JSON.stringify({ locked, task }) }), store)
+    expect(await status()).toEqual({ locked: false, task: '' })
+    expect((await set(true, 'Take a 2-minute cold shower')).status).toBe(200)
+    expect(await status()).toEqual({ locked: true, task: 'Take a 2-minute cold shower' })
+    await set(false, '')
+    expect((await status()).locked).toBe(false)
+    // The status check never touches the completion inbox.
+    expect(await inbox(store)).toEqual([])
+  })
+})

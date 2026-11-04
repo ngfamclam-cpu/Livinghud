@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { addDays, weekFinance, weeklyReport, type ReportInput, type Summary } from '../engine'
+import { addDays, weekFinance, weeklyReport, type ReportInput, type Summary, statName } from '../engine'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
 
@@ -33,7 +33,7 @@ export function Report({ summary, input, onClose }: { summary: Summary; input: R
             const change = s.rate !== null && s.previous !== null ? Math.round((s.rate - s.previous) * 100) : null
             return (
               <li key={s.stat}>
-                <span className="stat-key">{s.stat}</span>
+                <span className="stat-key">{statName(s.stat)}</span>
                 <span className="stat-name">{change === null ? '' : change > 0 ? `▲ ${change}` : change < 0 ? `▼ ${-change}` : '='}</span>
                 <Bar value={s.rate ?? 0} max={1} thin />
                 <span className="stat-value">{pct(s.rate)}</span>

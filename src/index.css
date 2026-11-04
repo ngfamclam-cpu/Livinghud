@@ -139,10 +139,11 @@ input, select, textarea {
 
 .stat-key {
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.03em;
   color: var(--accent);
-  min-width: 2.6em;
-  font-size: 0.9rem;
+  min-width: 6.4em;
+  font-size: 0.78rem;
+  text-transform: uppercase;
 }
 
 .status-list { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0 0 12px; }
@@ -167,10 +168,10 @@ input, select, textarea {
 .big small { color: var(--muted); font-weight: 400; }
 
 .stats { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.stats li { display: grid; grid-template-columns: auto 6.5em 1fr 2.2em; gap: 10px; align-items: center; }
+.stats li { display: grid; grid-template-columns: 6.5em 1fr 2.2em; gap: 10px; align-items: center; }
 .stat-name { color: var(--muted); font-size: 0.92rem; }
 .stat-value { text-align: right; font-weight: 700; }
-.stats li.weakest .stat-key, .stats li.weakest .stat-value { color: var(--gold); text-shadow: 0 0 8px rgba(255, 207, 92, 0.5); }
+.stats li.weakest .stat-name, .stats li.weakest .stat-value { color: var(--gold); text-shadow: 0 0 8px rgba(255, 207, 92, 0.5); }
 
 .quests { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .quest { border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 10px 12px; }
@@ -874,3 +875,36 @@ button.photo { cursor: zoom-in; }
 .reflect-text { color: var(--text); font-size: 0.98rem; }
 .prompt-tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 6px; }
 .goal-from { margin-left: 6px; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+
+/* Incentives: Penalty Zone (the whole HUD turns red) and the combo meter. */
+:root[data-penalty='on'] body { background-image: radial-gradient(ellipse at top, rgba(255, 60, 80, 0.22), transparent 65%); }
+:root[data-penalty='on'] .system-window { border-color: rgba(255, 77, 109, 0.45); }
+.penalty-zone { border-color: var(--danger) !important; box-shadow: 0 0 24px rgba(255, 77, 109, 0.35); animation: penalty-pulse 2.4s ease-in-out infinite; }
+@keyframes penalty-pulse { 50% { box-shadow: 0 0 36px rgba(255, 77, 109, 0.55); } }
+@media (prefers-reduced-motion: reduce) { .penalty-zone { animation: none; } }
+.penalty-task { font-size: 1.15rem; font-weight: 700; margin: 8px 0; color: var(--danger); }
+.danger-button { background: var(--danger); border-color: var(--danger); color: #fff; }
+.combo-row { display: flex; align-items: center; gap: 12px; }
+.combo-mult { font-size: 1.8rem; font-weight: 800; color: var(--gold); text-shadow: 0 0 10px rgba(255, 207, 92, 0.45); font-variant-numeric: tabular-nums; }
+.combo-row .grow { display: grid; gap: 4px; }
+.plain-list { margin: 0 0 12px; padding-left: 1.1em; display: grid; gap: 6px; }
+
+/* Decluttered HUD: everything that isn't today folds into "More". */
+.hud-more { display: grid; gap: 16px; }
+.hud-more > summary {
+  cursor: pointer; list-style: none; padding: 10px 14px; border: 1px dashed rgba(47, 143, 255, 0.4);
+  border-radius: var(--radius); color: var(--muted); font-size: 0.92rem;
+}
+.hud-more > summary::-webkit-details-marker { display: none; }
+.hud-more > summary::before { content: '▸ '; color: var(--accent); }
+.hud-more[open] > summary::before { content: '▾ '; }
+.row.center { justify-content: center; }
+.menu-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.menu-grid button { width: 100%; text-align: left; display: grid; gap: 2px; padding: 12px; }
+.menu-grid small { color: var(--muted); font-weight: 400; }
+.layout-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.layout-list li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.layout-list .grow { min-width: 10em; }
+.seg { display: inline-flex; border: 1px solid rgba(47, 143, 255, 0.4); border-radius: var(--radius); overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 4px 10px; background: transparent; color: var(--muted); }
+.seg button.on { background: var(--accent); color: #fff; }

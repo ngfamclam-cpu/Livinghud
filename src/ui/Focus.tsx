@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FOCUS_CLEAR_BONUS, FOCUS_LENGTHS, STATS, featureOn, type FocusRun, type Player, type Quest, type StatKey, type Summary } from '../engine'
+import { FOCUS_CLEAR_BONUS, FOCUS_LENGTHS, STATS, featureOn, type FocusRun, type Player, type Quest, type StatKey, type Summary, statName } from '../engine'
 import { abandonFocus, activeFocus, endFocus, focusedMinutes, startFocus, type ActiveFocus } from '../db/focus'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
@@ -75,7 +75,7 @@ export function Focus({ player, quests, summary, runs, preset, onClose }: Props)
           <ul className="board-list compact">
             {today.map(r => (
               <li key={r.id}>
-                <span className="stat-key">{r.stat}</span>
+                <span className="stat-key">{statName(r.stat)}</span>
                 <span className="quest-title">
                   {r.label} <small className="muted">{r.minutes} min · {r.cleared ? 'cleared' : 'broken off'} · +{r.xp} XP</small>
                 </span>

@@ -16,6 +16,7 @@ import {
   type FitnessBaseline,
   type PlayerSettings,
   type StatKey,
+  statName,
 } from '../engine'
 import { awaken } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
@@ -136,7 +137,6 @@ export function Onboarding() {
           <div className="choices">
             {STATS.map(s => (
               <button key={s.key} className={`choice ${stats.includes(s.key) ? 'picked' : ''}`} onClick={() => toggleStat(s.key)} aria-pressed={stats.includes(s.key)}>
-                <span className="stat-key">{s.key}</span>
                 <span><b>{s.name}</b><br /><small>{s.area}</small></span>
               </button>
             ))}
@@ -173,7 +173,7 @@ export function Onboarding() {
           <div className="choices">
             {DAILY_TEMPLATES.filter(t => stats.includes(t.stat) && t.id !== 'int-photo').map(t => (
               <button key={t.id} className={`choice ${dailyIds.includes(t.id) ? 'picked' : ''}`} onClick={() => toggleDaily(t.id)} aria-pressed={dailyIds.includes(t.id)}>
-                <span className="stat-key">{t.stat}</span>
+                <span className="stat-key">{statName(t.stat)}</span>
                 <span><b>{t.title}</b><br /><small>Minimum: {t.minVersion}</small></span>
               </button>
             ))}
@@ -189,7 +189,7 @@ export function Onboarding() {
           <div className="choices">
             {MAIN_TEMPLATES.filter(t => stats.includes(t.stat)).map(t => (
               <button key={t.id} className={`choice ${mainIds.includes(t.id) ? 'picked' : ''}`} onClick={() => toggle(t.id, setMainIds)} aria-pressed={mainIds.includes(t.id)}>
-                <span className="stat-key">{t.stat}</span>
+                <span className="stat-key">{statName(t.stat)}</span>
                 <span><b>{t.title}</b><br /><small>{t.stages.map(s => s.title).join(' → ')}</small></span>
               </button>
             ))}

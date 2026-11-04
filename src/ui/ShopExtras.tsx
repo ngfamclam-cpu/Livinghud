@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RANK_MIN_LEVEL, REWARD_IDEAS, addDays, dayKey, daysBetween, goalProgress, rewardOffers, rewardRank, vaultOnly, type GoalProgress, type Player, type Reward, type RewardSpecial, type RewardTemplate, type Summary } from '../engine'
+import { RANK_MIN_LEVEL, REWARD_IDEAS, addDays, featureOn, shopLock, dayKey, daysBetween, goalProgress, rewardOffers, rewardRank, vaultOnly, type GoalProgress, type Player, type Reward, type RewardSpecial, type RewardTemplate, type Summary, statName } from '../engine'
 import { Bar } from './Bar'
 import { addSuggestedRewards, buyOneOff, surpriseSeed, toggleFavoriteReward, updateReward } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
@@ -28,6 +28,7 @@ export function RewardIdeas({ player, summary, rewards }: { player: Player; summ
     vault: summary.wallet.vault,
     savingsMet: summary.savings.met,
     mainQuestsCleared: summary.mainQuestsCleared,
+    locked: shopLock(summary.incentives, player.incentives, featureOn(player, 'penaltyQuest')),
   }
   const left = daysBetween(summary.today, set.nextOn)
   const all = REWARD_IDEAS.filter(i => !favorites.includes(i))
@@ -69,7 +70,7 @@ function IdeaRow({ idea: i, inShop, favorite, progress }: { idea: RewardTemplate
         <b>{i.title}</b>
         <small className="muted">
           {rank}-rank{RANK_MIN_LEVEL[rank] > 1 ? ` · level ${RANK_MIN_LEVEL[rank]}+` : ''}{vaultOnly(rank) ? ' · Vault' : ''}
-          {i.statGate && ` · needs ${i.statGate.stat} ${i.statGate.min}`}
+          {i.statGate && ` · needs ${statName(i.statGate.stat)} ${i.statGate.min}`}
           {` · ${i.category}`}
         </small>
         {i.why && <small>{i.why}</small>}

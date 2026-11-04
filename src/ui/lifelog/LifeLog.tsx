@@ -10,6 +10,7 @@ import {
   type Memory,
   type Place,
   type Summary,
+  statName,
 } from '../../engine'
 import { deleteMemory, renamePlace } from '../../db/memories'
 import { SystemWindow } from '../SystemWindow'
@@ -255,7 +256,7 @@ function DayPage({
             {happened.map(e => (
               <li key={e.id} className={`log-${e.kind}`}>
                 <time className="log-time">{time(e.at)}</time>
-                <span className="stat-key">{e.stat ?? 'SYS'}</span>
+                <span className="stat-key">{e.stat ? statName(e.stat) : 'System'}</span>
                 <span className="log-text">{e.text}</span>
                 {e.gain && <span className="log-gain">{e.gain}</span>}
               </li>

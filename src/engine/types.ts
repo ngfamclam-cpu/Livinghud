@@ -37,6 +37,8 @@ export interface PlayerSettings {
   triggerToken?: string
 }
 
+import type { IncentiveSettings } from './incentives'
+
 export interface Player {
   id: string
   /** Every record carries a userId so cloud sync (Phase 5) needs no migration. */
@@ -59,6 +61,8 @@ export interface Player {
   memoryQuestPaused?: boolean
   /** The finance tracker's monthly limit and options. */
   finance?: FinanceSettings
+  /** Combo, chests, shields and the Penalty Quest settings (see src/engine/incentives.ts). */
+  incentives?: IncentiveSettings
   /** Reward ideas starred in the Shop to work toward. */
   favoriteRewards?: string[]
   /** The title shown under the player's name, chosen from earned badges. */
@@ -233,7 +237,7 @@ export interface PostureScan {
 }
 
 /** Optional parts of the game the player can switch off in Settings. */
-export type FeatureKey = 'plans' | 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises' | 'memories' | 'cards' | 'finance'
+export type FeatureKey = 'plans' | 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises' | 'memories' | 'cards' | 'finance' | 'incentives' | 'penaltyQuest'
 
 export type Circle = 'friend' | 'family' | 'dating' | 'work'
 
@@ -523,4 +527,15 @@ export interface ReflectionAnswer {
   theme: string
   question: string
   answer: string
+}
+
+/** A cleared (or shielded) Penalty Quest. */
+export interface PenaltyClearRecord {
+  id: string
+  userId: string
+  /** The Penalty Quest's game day. */
+  day: string
+  kind: 'done' | 'shield'
+  task: string
+  createdAt: number
 }

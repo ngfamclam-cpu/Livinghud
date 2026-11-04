@@ -123,6 +123,8 @@ export interface ShopContext {
   vault: number
   savingsMet: boolean
   mainQuestsCleared: number
+  /** Why the Shop is locked right now (an open Penalty Quest), if it is. */
+  locked?: string | null
 }
 
 export type BuyCheck =
@@ -134,6 +136,7 @@ export type BuyCheck =
  * E-B rewards spend the wallet first and top up from the Vault; A and S spend only the Vault.
  */
 export function checkPurchase(reward: Pick<Reward, 'price' | 'statGate'>, ctx: ShopContext): BuyCheck {
+  if (ctx.locked) return { ok: false, reason: ctx.locked }
   const rank = rewardRank(reward.price)
   const minLevel = RANK_MIN_LEVEL[rank]
   if (ctx.level < minLevel) return { ok: false, reason: `Needs level ${minLevel}` }

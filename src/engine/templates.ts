@@ -18,6 +18,12 @@ export const STATS: StatInfo[] = [
   { key: 'WLT', name: 'Wealth', area: 'Money, career, side income' },
 ]
 
+/** The full name for a stat key (STR → Strength); anything else comes back as is. */
+export function statName(key: string | null | undefined): string {
+  if (!key) return ''
+  return STATS.find(s => s.key === key)?.name ?? key
+}
+
 export interface DailyTemplate {
   id: string
   stat: StatKey
