@@ -1196,6 +1196,16 @@ export async function trackFromReflection(item: { kind: 'daily' | 'side' | 'goal
  * Rolls a loot drop for something just done (see src/engine/loot.ts). The roll
  * is stable per source record, and each record drops at most once.
  */
+/** Puts a card you already own straight into your binder (a Pack Forge card) and reveals it. */
+export async function grantCard(cardId: string, source: string, sourceId: string): Promise<void> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player) return
+  setCustomCards((await db.customCards.where('userId').equals(LOCAL_USER).toArray()).map(customCard))
+  const before = await db.loot.where('userId').equals(LOCAL_USER).filter(d => d.cardId === cardId).count()
+  await db.loot.add({ id: newId(), userId: LOCAL_USER, cardId, source, sourceId, day: dayKey(new Date(), player.settings.resetHour), createdAt: Date.now() })
+  emit({ type: 'loot.card', cardId, copies: before + 1, starUp: stars(before + 1) > stars(before) && before > 0 })
+}
+
 export async function dropLoot(source: DropSource, sourceId: string, opts: { minRarity?: Rarity; secrets?: Set<string> } = {}): Promise<void> {
   const player = await db.players.get(LOCAL_USER)
   if (!player || !featureOn(player, 'cards')) return
@@ -1215,9 +1225,11 @@ async function removeLootFrom(sourceId: string): Promise<void> {
 }
 
 /** Makes a loot card from your own image. It joins the drop pool straight away. */
-export async function addCustomCard(input: { name: string; rarity: CustomCard['rarity']; text: string; photoId: string }): Promise<void> {
+export async function addCustomCard(input: { name: string; rarity: CustomCard['rarity']; text: string; photoId: string; forge?: string }): Promise<string> {
   const now = Date.now()
-  await db.customCards.add({ id: newId(), userId: LOCAL_USER, name: input.name.trim().slice(0, 40) || 'My card', rarity: input.rarity, text: input.text.trim().slice(0, 140), photoId: input.photoId, createdAt: now, updatedAt: now })
+  const id = newId()
+  await db.customCards.add({ id, userId: LOCAL_USER, name: input.name.trim().slice(0, 40) || 'My card', rarity: input.rarity, text: input.text.trim().slice(0, 140), photoId: input.photoId, ...(input.forge ? { forge: input.forge } : {}), createdAt: now, updatedAt: now })
+  return id
 }
 
 /** Deletes one of your cards, its image and any copies you'd collected. */

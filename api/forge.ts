@@ -1,0 +1,54 @@
+// Pack Forge: makes one card image with Cloudflare Workers AI (FLUX.1 schnell,
+// free daily allowance). Only cards from the app's own catalog can be made, and
+// only for a sync code that has a cloud save, so the endpoint can't be used to
+// generate arbitrary images. The app calls it once per card.
+//
+// POST /api/forge   header x-sync-key, body { cardId: "neon-3" }
+//   -> { image: <base64 JPEG> }
+//   -> 503 { error: 'not-configured' } without CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN
+//   -> 429 { error: 'limit' } when today's free allowance is used up
+
+import { blobStore, jsonResponse, normalizeKey, sha256, type Store } from '../server/blob.js'
+import { FORGE_STEPS, forgeCard, forgePrompt } from '../src/engine/forge.js'
+
+const MODEL = '@cf/black-forest-labs/flux-1-schnell'
+const env = () => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}
+
+export async function handle(request: Request, store: Store = blobStore, fetcher: typeof fetch = fetch): Promise<Response> {
+  if (request.method !== 'POST') return jsonResponse({ error: 'method' }, 405)
+  const key = normalizeKey(request.headers.get('x-sync-key') ?? '')
+  if (!key) return jsonResponse({ error: 'bad-key' }, 400)
+  const account = env().CLOUDFLARE_ACCOUNT_ID?.trim()
+  const token = env().CLOUDFLARE_API_TOKEN?.trim()
+  if (!account || !token) return jsonResponse({ error: 'not-configured' }, 503)
+
+  const body = (await request.json().catch(() => ({}))) as { cardId?: unknown }
+  const card = typeof body.cardId === 'string' ? forgeCard(body.cardId) : undefined
+  if (!card) return jsonResponse({ error: 'unknown-card' }, 400)
+
+  try {
+    if (!(await store.read(`saves/${await sha256(key)}.json`))) return jsonResponse({ error: 'unknown-save' }, 403)
+  } catch {
+    return jsonResponse({ error: 'storage-error' }, 503)
+  }
+
+  let res: Response
+  try {
+    res = await fetcher(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/ai/run/${MODEL}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: forgePrompt(card), steps: FORGE_STEPS }),
+    })
+  } catch {
+    return jsonResponse({ error: 'ai-error' }, 502)
+  }
+  const data = (await res.json().catch(() => null)) as { success?: boolean; result?: { image?: string }; errors?: { code?: number; message?: string }[] } | null
+  const message = (data?.errors ?? []).map(e => `${e.code ?? ''} ${e.message ?? ''}`).join('; ')
+  if (res.status === 401 || res.status === 403) return jsonResponse({ error: 'not-configured', message }, 503)
+  if (res.status === 429 || /daily|allocation|quota|limit/i.test(message)) return jsonResponse({ error: 'limit', message }, 429)
+  const image = data?.result?.image
+  if (!res.ok || !image) return jsonResponse({ error: 'ai-error', message: message || `status ${res.status}` }, 502)
+  return jsonResponse({ image })
+}
+
+export const POST = (request: Request) => handle(request)

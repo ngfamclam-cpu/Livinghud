@@ -476,6 +476,8 @@ export interface CustomCard {
   text: string
   /** The image, stored like a Life log photo. */
   photoId: string
+  /** Made by the Pack Forge: the catalog card it came from (e.g. "neon-3"). */
+  forge?: string
   createdAt: number
   updatedAt: number
 }
