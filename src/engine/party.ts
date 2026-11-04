@@ -63,7 +63,7 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'plans', name: 'Plans: raves, festivals, trips', description: 'Save for big experiences from the Vault and book them piece by piece.' },
   { key: 'surprises', name: 'Surprise challenges', description: 'Once a day a small quest appears at a random moment; do it within an hour for 30 XP.' },
   { key: 'memories', name: 'Life log and photo a day', description: 'Notes, a daily photo and the places you go, with a map and the "Photo of the day" daily quest.' },
-  { key: 'cards', name: 'Loot drops and card collection', description: 'Collectible cards (fictional idols, odd relics, a playing-card deck) that drop from quests; duplicates power cards up for XP.' },
+  { key: 'cards', name: 'Loot drops and card collection', description: 'Brand-new AI-forged cards drop from quests, perfect days and combo packs; duplicates power cards up for XP.' },
   { key: 'finance', name: 'Finance tracker', description: 'Log spending, income and bills; a monthly limit, weekly check-ins and monthly reports; WLT XP for staying under.' },
   { key: 'incentives', name: 'Combo, chests and shields', description: 'Perfect days in a row multiply quest XP; perfect-day chests, card packs at combo milestones, secret card series, and Shields from perfect weeks.' },
   { key: 'penaltyQuest', name: 'Penalty Quests', description: 'Miss too many dailies and the next day brings a mandatory quest from your own list; the Shop stays locked until it is done.' },

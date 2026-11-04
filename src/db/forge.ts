@@ -1,8 +1,8 @@
 // Pack Forge, app side: asks api/forge.ts for each card's image, crops it with
 // the bulk-import tools, saves it as one of your cards and reveals it as a drop.
 
-import { forgeCard, pickPack, replacementPick, MAX_VARIANT, type PackPick } from '../engine'
-import { addCustomCard, grantCard } from './actions'
+import { forgeCard, pickOwnedCard, pickPack, replacementPick, setCustomCards, customCard, MAX_VARIANT, type PackPick, type Rarity } from '../engine'
+import { addCustomCard, grantCard, snapshot } from './actions'
 import { db, LOCAL_USER } from './db'
 import { addPhoto } from './photos'
 import { syncKey } from './sync'
@@ -77,7 +77,8 @@ export async function forgePack(onProgress: (done: number, total: number) => voi
   const recent = mine.filter(c => c.forge).sort((a, b) => b.createdAt - a.createdAt).slice(0, 18).map(c => c.forge!)
   const packId = `forge-${Date.now()}`
   const again = opts.again ? lastPack() : null
-  const picks = again ?? pickPack(`${player?.id ?? 'local'}:${packId}`, recent)
+  const unlocked = (await snapshot()).summary.incentives?.secrets ?? new Set<string>()
+  const picks = again ?? pickPack(`${player?.id ?? 'local'}:${packId}`, recent, unlocked)
   const series = { name: again ? 'Same prompts' : 'Mixed pack' }
   const key = syncKey()
   if (!key) return { ok: false, reason: 'no-sync', made: 0, series: series.name, skipped: 0 }
@@ -104,7 +105,7 @@ export async function forgePack(onProgress: (done: number, total: number) => voi
         break
       }
       // Refused even with softer wording: try a different card of the same rarity.
-      pick = replacementPick(pick.card.rarity, inPack, `${packId}:${slot}:${attempt}`, recent)
+      pick = replacementPick(pick.card.rarity, inPack, `${packId}:${slot}:${attempt}`, recent, unlocked)
       if (pick) {
         inPack.add(pick.card.id)
         swapped++
@@ -166,4 +167,64 @@ export async function remakeCard(customId: string): Promise<RemakeOutcome> {
     if (r.error !== 'declined') return { ok: false, reason: r.error, message: r.message }
   }
   return { ok: false, reason: 'declined', message: 'Cloudflare refused this card three times in a row.' }
+}
+
+/** Drops still being forged, and ones undone while they were (so they never land). */
+const inFlight = new Set<string>()
+const cancelled = new Set<string>()
+
+export function cancelDrops(sourceIds: string[]): void {
+  for (const id of sourceIds) if (inFlight.has(id)) cancelled.add(id)
+}
+
+/**
+ * A quest reward: forges a brand-new card of the rolled rarity and drops it.
+ * If the forge can't make one (offline, not set up, daily allowance used, or the
+ * filter refuses it three times), you get a copy of one of your cards instead.
+ */
+export async function forgeDrop(rarity: Rarity, source: string, sourceId: string, unlocked: Set<string>): Promise<void> {
+  if (inFlight.has(sourceId)) return
+  inFlight.add(sourceId)
+  try {
+    const mine = await db.customCards.where('userId').equals(LOCAL_USER).toArray()
+    const recent = mine.filter(c => c.forge).sort((a, b) => b.createdAt - a.createdAt).slice(0, 18).map(c => c.forge!)
+    const key = syncKey()
+    let made: { pick: PackPick; image: Blob } | null = null
+    if (key) {
+      const tried = new Set<string>()
+      for (let attempt = 0; attempt < 3 && !made; attempt++) {
+        const pick = replacementPick(rarity, tried, `${sourceId}:${attempt}`, recent, unlocked)
+        if (!pick) break
+        tried.add(pick.card.id)
+        const r = await makeImage(key, pick)
+        if (r instanceof Blob) made = { pick, image: r }
+        else if (r.error !== 'declined') break
+      }
+    }
+    if (cancelled.has(sourceId) || (await db.loot.where('sourceId').equals(sourceId).count())) return
+    if (made) {
+      const card = made.pick.card
+      const photo = await cardPhoto(made.image, card.id)
+      if (cancelled.has(sourceId)) return
+      const id = await addCustomCard({ name: card.name, rarity: card.rarity, text: card.text, photoId: photo, forge: card.id })
+      await grantCard(`custom-${id}`, source, sourceId)
+      return
+    }
+    // Fallback: a copy of a card you already have (copies power cards up).
+    setCustomCards(mine.map(customCard))
+    const owned = pickOwnedCard(rarity, sourceId)
+    if (owned) await grantCard(owned.id, source, sourceId)
+  } finally {
+    inFlight.delete(sourceId)
+    cancelled.delete(sourceId)
+  }
+}
+
+/** After an undo takes cards back: forged cards you no longer own any copies of are deleted. */
+export async function pruneOrphanForged(): Promise<void> {
+  const mine = await db.customCards.where('userId').equals(LOCAL_USER).filter(c => !!c.forge).toArray()
+  if (!mine.length) return
+  const owned = new Set((await db.loot.where('userId').equals(LOCAL_USER).toArray()).map(d => d.cardId))
+  const { deleteCustomCard } = await import('./actions')
+  for (const c of mine) if (!owned.has(`custom-${c.id}`)) await deleteCustomCard(c.id)
 }

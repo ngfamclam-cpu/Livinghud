@@ -55,142 +55,8 @@ export interface Card {
   stat?: StatKey
 }
 
-export const SERIES: Record<string, string> = {
-  'neon-seoul': 'Neon Seoul (K-pop)',
-  'tokyo-spark': 'Tokyo Spark (J-pop)',
-  'shanghai-silk': 'Shanghai Silk (C-pop)',
-  starlight: 'Starlight Stage (anime)',
-  'odd-relics': 'Odd Relics',
-  'dungeon-pantry': 'Dungeon Pantry',
-  rizz: 'Rizz & Romance',
-  custom: 'My cards',
-  eclipse: 'Eclipse (secret · 7-day combo)',
-  zenith: 'Zenith (secret · 30-day combo)',
-}
-
-const idol = (id: string, name: string, scene: 'K' | 'J' | 'C', group: string, move: string, pose: Pose, rarity: Rarity, colors: [string, string], text: string): Card => ({
-  id: `idol-${id}`,
-  kind: 'idol',
-  name,
-  scene,
-  group,
-  move,
-  pose,
-  rarity,
-  colors,
-  text,
-  series: scene === 'K' ? 'neon-seoul' : scene === 'J' ? 'tokyo-spark' : 'shanghai-silk',
-})
-
-/** Fictional performers. Any resemblance to real people is unintended. */
-const IDOLS: Card[] = [
-  // Neon Seoul: K-pop style groups (fictional)
-  idol('haneul', 'Haneul', 'K', 'NOVA//9', 'Skyline Wave', 'wave', 'rare', ['#ff4fa3', '#3a1c71'], 'Main dancer. Hits every count like it owes her money.'),
-  idol('yuri', 'Yuri', 'K', 'NOVA//9', 'Heart Bomb', 'heart', 'rare', ['#ff7eb3', '#5f2c82'], 'The heart sign that started a fan war.'),
-  idol('seoa', 'Seo-a', 'K', 'NOVA//9', 'Midnight Spin', 'spin', 'epic', ['#7f5af0', '#ff4fa3'], 'Spins so fast the lightstick ocean goes quiet.'),
-  idol('jiwoo', 'Ji-woo', 'K', 'VELVET RUSH', 'Mic Drop Encore', 'mic', 'epic', ['#e94560', '#16213e'], 'Leader. Ends every set with a dropped mic and a smirk.'),
-  idol('minji', 'Min-ji', 'K', 'VELVET RUSH', 'Point Choreo', 'point', 'rare', ['#f9a826', '#c2185b'], 'Points at the camera. The camera never recovers.'),
-  idol('daeun', 'Da-eun', 'K', 'VELVET RUSH', 'Hip Sway', 'hips', 'rare', ['#ff6f91', '#845ec2'], 'Smooth enough to stop a stadium mid-chant.'),
-  idol('sora-k', 'So-ra', 'K', 'LUNAR CODE', 'Moon Kick', 'kick', 'legendary', ['#00d2ff', '#3a1c71'], 'A high kick choreographed in zero gravity. Probably.'),
-  idol('hyejin', 'Hye-jin', 'K', 'LUNAR CODE', 'Victory Arms', 'arms-up', 'epic', ['#43e97b', '#1e3c72'], 'Arms up for the final chorus. The crowd follows.'),
-  // Tokyo Spark: J-pop style (fictional)
-  idol('aoi', 'Aoi', 'J', 'SAKURA//DRIVE', 'Petal Twirl', 'spin', 'rare', ['#ffb7c5', '#6a3093'], 'Leaves cherry blossoms in her wake. The cleaners are tired.'),
-  idol('hina', 'Hina', 'J', 'SAKURA//DRIVE', 'Peace Pop', 'point', 'rare', ['#ffd166', '#ef476f'], 'Double peace sign, triple the energy.'),
-  idol('rin', 'Rin', 'J', 'SAKURA//DRIVE', 'Fan Flourish', 'fan', 'epic', ['#e63946', '#1d3557'], 'Folding-fan choreography, sharp as a blade.'),
-  idol('mio', 'Mio', 'J', 'ELECTRO MAID', 'Glitch Lean', 'lean', 'epic', ['#00f5d4', '#9b5de5'], 'Leans past the point of physics. Glitches on purpose.'),
-  idol('yuna', 'Yuna', 'J', 'ELECTRO MAID', 'Arcade Heart', 'heart', 'rare', ['#f15bb5', '#00bbf9'], 'Insert coin to continue loving this card.'),
-  idol('kaede', 'Kaede', 'J', 'ELECTRO MAID', 'Final Boss Pose', 'arms-up', 'legendary', ['#fee440', '#9b5de5'], 'The stage goes dark. Only she is lit. Game over.'),
-  idol('saki', 'Saki', 'J', 'HARAJUKU HEX', 'Hex Kick', 'kick', 'rare', ['#ff99c8', '#a9def9'], 'Platform boots, perfect extension.'),
-  idol('nanami', 'Nanami', 'J', 'HARAJUKU HEX', 'Wave Machine', 'wave', 'epic', ['#c77dff', '#3c096c'], 'Body wave so smooth it has its own fan club.'),
-  // Shanghai Silk: C-pop style (fictional)
-  idol('meilin', 'Mei Lin', 'C', 'JADE HORIZON', 'Silk Ribbon Spin', 'spin', 'epic', ['#d00000', '#ffba08'], 'Ribbon dance meets stadium pyrotechnics.'),
-  idol('xiaoyu', 'Xiao Yu', 'C', 'JADE HORIZON', 'Lantern Lean', 'lean', 'rare', ['#ff8c42', '#7b2d26'], 'Glows like a lantern festival in human form.'),
-  idol('lanfei', 'Lan Fei', 'C', 'JADE HORIZON', 'Dragon Arms', 'arms-up', 'legendary', ['#06d6a0', '#073b4c'], 'The finale where the stage dragon roars with her.'),
-  idol('ruoxi', 'Ruo Xi', 'C', 'NEON PEONY', 'Peony Pose', 'hips', 'rare', ['#ff70a6', '#70d6ff'], 'Poses like a magazine cover, laughs like a best friend.'),
-  idol('qingyi', 'Qing Yi', 'C', 'NEON PEONY', 'Mic Spin', 'mic', 'epic', ['#ffd60a', '#003566'], 'Twirls the mic stand like a staff. Never drops it.'),
-  idol('yanyan', 'Yan Yan', 'C', 'NEON PEONY', 'Fan Cascade', 'fan', 'rare', ['#ef476f', '#118ab2'], 'Two fans, one cascade, zero missed beats.'),
-  idol('shuang', 'Shuang', 'C', 'CRIMSON SILK', 'Point Break', 'point', 'rare', ['#e5383b', '#161a1d'], 'Points to the back row. The back row screams.'),
-  idol('ziyi', 'Zi Yi', 'C', 'CRIMSON SILK', 'Heart Lantern', 'heart', 'epic', ['#ff006e', '#3a0ca3'], 'Hearts that float up like sky lanterns.'),
-]
-
-const relic = (id: string, name: string, icon: string, rarity: Rarity, text: string, series: 'odd-relics' | 'dungeon-pantry', stat?: StatKey): Card => ({
-  id: `relic-${id}`, kind: 'relic', name, icon, rarity, text, series, stat,
-})
-
-const RELICS: Card[] = [
-  relic('duck', 'Suspicious Rubber Duck', '🦆', 'common', 'It has seen your code. It says nothing.', 'odd-relics', 'INT'),
-  relic('sock', 'Single Lost Sock', '🧦', 'common', 'Its partner is in another dimension.', 'odd-relics', 'AGI'),
-  relic('cone', 'Traffic Cone of Authority', '🚧', 'common', 'Wear it and nobody questions you.', 'odd-relics', 'CHA'),
-  relic('rock', 'Pet Rock (Level 99)', '🪨', 'rare', 'Has never once missed a daily.', 'odd-relics', 'VIT'),
-  relic('cassette', 'Mixtape From 2009', '📼', 'rare', 'Track 3 is a banger. Track 4 is an apology.', 'odd-relics', 'CHA'),
-  relic('crystal', 'Crystal of Mild Clarity', '🔮', 'rare', 'Shows the future, but only the boring parts.', 'odd-relics', 'INT'),
-  relic('crown', 'Paper Crown of the Main Character', '👑', 'epic', 'From a cracker. Worn with total conviction.', 'odd-relics', 'CHA'),
-  relic('dice', 'Loaded Dice of Fate', '🎲', 'epic', 'Always roll a 6. Use responsibly.', 'odd-relics', 'WLT'),
-  relic('key', 'Key to an Unknown Door', '🗝️', 'epic', 'Somewhere, a door is waiting.', 'odd-relics', 'AGI'),
-  relic('portal', 'Pocket Gate', '🌀', 'legendary', 'Leads to a dungeon full of unfinished chores.', 'odd-relics', 'AGI'),
-  relic('phoenix', 'Phoenix Feather', '🪶', 'legendary', 'Brings a broken streak back once. (Emotionally.)', 'odd-relics', 'VIT'),
-  relic('goldfish', 'Goldfish With a Business Plan', '🐠', 'rare', 'Three-second memory, five-year vision.', 'odd-relics', 'WLT'),
-  relic('ufo', 'Tiny UFO', '🛸', 'epic', 'Abducts one bad habit per week.', 'odd-relics', 'INT'),
-  relic('gnome', 'Gym Gnome', '🧙', 'rare', 'Judges your form silently.', 'odd-relics', 'STR'),
-  relic('cactus', 'Emotional Support Cactus', '🌵', 'common', 'Needs less care than you do.', 'odd-relics', 'VIT'),
-  relic('robot', 'Wind-up Hype Robot', '🤖', 'rare', 'Says "LET’S GO" at random times.', 'odd-relics', 'CHA'),
-  relic('ramen', 'Dungeon Instant Ramen', '🍜', 'common', 'Restores 30 HP and some dignity.', 'dungeon-pantry', 'VIT'),
-  relic('boba', 'Legendary Boba', '🧋', 'rare', 'Exactly the right amount of pearls.', 'dungeon-pantry', 'VIT'),
-  relic('onigiri', 'Triangle of Power', '🍙', 'common', 'Portable. Perfect. Undefeated.', 'dungeon-pantry', 'VIT'),
-  relic('dumpling', 'Lucky Dumpling', '🥟', 'rare', 'One of them has a coin inside.', 'dungeon-pantry', 'WLT'),
-  relic('coffee', 'Bottomless Coffee', '☕', 'epic', 'Every sip resets your focus timer.', 'dungeon-pantry', 'INT'),
-  relic('egg', 'Golden Protein Egg', '🥚', 'epic', '+10 STR. Do not boil.', 'dungeon-pantry', 'STR'),
-  relic('mochi', 'Mochi of Infinite Chill', '🍡', 'rare', 'Lowers stress by an amount.', 'dungeon-pantry', 'VIT'),
-  relic('energy', 'Neon Energy Drink', '🥤', 'common', 'Tastes like 3 a.m. and bad decisions.', 'dungeon-pantry', 'AGI'),
-  relic('chili', 'Chili of Courage', '🌶️', 'rare', 'Eat it before asking someone out.', 'dungeon-pantry', 'CHA'),
-  relic('cake', 'Level-Up Cake', '🎂', 'legendary', 'Appears only when someone becomes stronger.', 'dungeon-pantry', 'STR'),
-]
-
-const anime = (id: string, name: string, group: string, move: string, rarity: Rarity, colors: [string, string], portrait: Portrait, text: string): Card => ({
-  id: `anime-${id}`, kind: 'idol', scene: 'A', name, group, move, rarity, colors, portrait, text, series: 'starlight',
-})
-
-/** Starlight Stage: original anime-style idols, drawn as portraits. */
-const ANIME: Card[] = [
-  anime('hikari', 'Hikari', 'STARLIGHT//7', 'Shooting Star Wink', 'rare', ['#ff9ad5', '#5b2a86'], { hair: '#f4c2d7', style: 'twin', eyes: '#ff5fa2', outfit: '#ff5fa2', accent: 'star', expression: 'wink' }, 'Winks once per show. Fans count it as a holiday.'),
-  anime('ren', 'Ren', 'STARLIGHT//7', 'Thunder Step', 'epic', ['#5ee7ff', '#1b1f5e'], { hair: '#2b2f77', style: 'bob', eyes: '#3fd0ff', outfit: '#3a86ff', accent: 'headphones', expression: 'cool' }, 'Produces the tracks, then out-dances everyone to them.'),
-  anime('mika', 'Mika', 'STARLIGHT//7', 'Ribbon Rush', 'rare', ['#ffd36e', '#e2558a'], { hair: '#f6a440', style: 'pony', eyes: '#ff7b00', outfit: '#ff006e', accent: 'ribbon', expression: 'grin' }, 'Energy drink in human form. Never runs out.'),
-  anime('yuki', 'Yuki', 'STARLIGHT//7', 'Snowfall Spin', 'legendary', ['#e0f4ff', '#6c8cff'], { hair: '#f2f6ff', style: 'long', eyes: '#7aa7ff', outfit: '#8aa9ff', accent: 'crown', expression: 'smile' }, 'Centre position. The snow machine follows her.'),
-  anime('akane', 'Akane', 'CRIMSON CORE', 'Blaze Kick', 'epic', ['#ff5a5f', '#2b0b3f'], { hair: '#c1121f', style: 'pony', eyes: '#ffbe0b', outfit: '#e63946', accent: 'none', expression: 'grin' }, 'Kicks so high the lighting crew ducks.'),
-  anime('sumire', 'Sumire', 'CRIMSON CORE', 'Violet Hour', 'rare', ['#c77dff', '#240046'], { hair: '#7b2cbf', style: 'wavy', eyes: '#e0aaff', outfit: '#9d4edd', accent: 'flower', expression: 'smile' }, 'Sings the ballad. The arena goes quiet.'),
-  anime('nao', 'Nao', 'CRIMSON CORE', 'Pixel Pop', 'rare', ['#80ffdb', '#5390d9'], { hair: '#48bfe3', style: 'buns', eyes: '#56cfe1', outfit: '#5e60ce', accent: 'headphones', expression: 'wink' }, 'Streams rhythm games between rehearsals. Never misses a note.'),
-  anime('kirara', 'Kirara', 'GALAXY GIRLS', 'Supernova', 'legendary', ['#fee440', '#f15bb5'], { hair: '#ffd166', style: 'twin', eyes: '#f15bb5', outfit: '#9b5de5', accent: 'star', expression: 'grin' }, 'Her finale sparkles are visible from space. Allegedly.'),
-  anime('shiori', 'Shiori', 'GALAXY GIRLS', 'Moon Glide', 'epic', ['#a2d2ff', '#3a0ca3'], { hair: '#1d1a39', style: 'long', eyes: '#bde0fe', outfit: '#4361ee', accent: 'ribbon', expression: 'cool' }, 'Glides across the stage like gravity is optional.'),
-  anime('hana', 'Hana', 'GALAXY GIRLS', 'Blossom Clap', 'common', ['#ffc8dd', '#cdb4db'], { hair: '#8d5524', style: 'bob', eyes: '#6d4c41', outfit: '#ffafcc', accent: 'flower', expression: 'smile' }, 'The friendliest member. Remembers every fan’s name.'),
-  anime('rio', 'Rio', 'NEON ARCADE', 'Combo Breaker', 'rare', ['#00f5d4', '#00bbf9'], { hair: '#06d6a0', style: 'buns', eyes: '#00f5d4', outfit: '#118ab2', accent: 'headphones', expression: 'grin' }, 'Holds the high score on every dance machine in the city.'),
-  anime('ayame', 'Ayame', 'NEON ARCADE', 'Final Stage', 'epic', ['#f72585', '#3a0ca3'], { hair: '#3c096c', style: 'wavy', eyes: '#f72585', outfit: '#b5179e', accent: 'crown', expression: 'wink' }, 'The last boss of the idol world. Undefeated.'),
-  anime('momo', 'Momo', 'NEON ARCADE', 'Peach Bounce', 'common', ['#ffb4a2', '#e5989b'], { hair: '#ff8fa3', style: 'twin', eyes: '#ff4d6d', outfit: '#ff758f', accent: 'ribbon', expression: 'smile' }, 'Bounces through choreography like it’s a trampoline.'),
-  anime('tsubaki', 'Tsubaki', 'NEON ARCADE', 'Silk Turn', 'common', ['#e9c46a', '#264653'], { hair: '#2a9d8f', style: 'pony', eyes: '#e9c46a', outfit: '#264653', accent: 'none', expression: 'cool' }, 'Quiet backstage, unstoppable on it.'),
-]
-
-const rizz = (id: string, name: string, icon: string, rarity: Rarity, text: string, stat?: StatKey): Card => ({
-  id: `rizz-${id}`, kind: 'relic', name, icon, rarity, text, series: 'rizz', stat,
-})
-
-/** Rizz & Romance: cheeky dating-life loot. Flirty, never explicit. */
-const RIZZ: Card[] = [
-  rizz('potion', 'Rizz Potion', '🧪', 'rare', 'One sip: +50 charisma, −50 awkward silences.', 'CHA'),
-  rizz('wingman', 'Wingman Token', '🪽', 'rare', 'Redeem for one perfectly timed "you two should talk".', 'CHA'),
-  rizz('superlike', 'Golden Super Like', '💛', 'epic', 'Guaranteed to make someone check your profile twice.', 'CHA'),
-  rizz('cologne', 'Cologne of Irresistibility', '🧴', 'epic', 'People lean in. Nobody knows why.', 'CHA'),
-  rizz('lipstick', 'Lipstick Kiss Mark', '💋', 'rare', 'Left on your collar by a mystery admirer.', 'CHA'),
-  rizz('roses', 'Dozen Red Roses', '🌹', 'common', 'Classic for a reason.', 'CHA'),
-  rizz('dinner', 'Candlelit Dinner Ticket', '🕯️', 'rare', 'Table for two, best seat, nobody else in the room.', 'CHA'),
-  rizz('slowdance', 'Slow Dance Token', '💃', 'common', 'Valid when the DJ plays the one song.', 'CHA'),
-  rizz('number', 'Her Number on a Napkin', '📝', 'epic', 'Smudged a little. Still legible. Call her.', 'CHA'),
-  rizz('abs', 'Golden Abs (Temporary)', '💪', 'legendary', 'Lasts exactly as long as you keep training.', 'STR'),
-  rizz('lineScroll', 'Scroll of Perfect Pickup Lines', '📜', 'rare', 'Works 3 times out of 10. That is a lot of times.', 'CHA'),
-  rizz('mirror', 'Confidence Mirror', '🪞', 'common', 'Always says you look good. It is correct.', 'CHA'),
-  rizz('keycard', 'Penthouse Key Card', '🗝️', 'legendary', 'Top floor, city view. The night is young.', 'WLT'),
-  rizz('champagne', 'Champagne Tower', '🍾', 'epic', 'For when the date goes very, very well.', 'WLT'),
-  rizz('heart', 'Stolen Heart', '❤️‍🔥', 'legendary', 'Someone out there is thinking about you right now.', 'CHA'),
-  rizz('loveletter', 'Sealed Love Letter', '💌', 'rare', 'Smells faintly of perfume. Open it later.', 'CHA'),
-]
+/** Series names for the binder. Every card is now one of yours: forged or imported. */
+export const SERIES: Record<string, string> = { custom: 'My cards' }
 
 /** Cards you make yourself from your own images (see setCustomCards). */
 let customCards: Card[] = []
@@ -209,29 +75,9 @@ export const customCard = (c: { id: string; name: string; rarity: Rarity; text: 
 })
 
 
-/** Secret series: they only drop once your best combo unlocks them (see SECRET_UNLOCKS in incentives.ts). */
-export const SECRET_SERIES = new Set(['eclipse', 'zenith'])
+/** The built-in card set (idols, relics, portraits) was retired in Nov 2026: every card is forged or imported. */
+const BUILT_IN: Card[] = []
 
-const secretAnime = (series: 'eclipse' | 'zenith', id: string, name: string, group: string, move: string, rarity: Rarity, colors: [string, string], portrait: Portrait, text: string): Card => ({
-  id: `${series}-${id}`, kind: 'idol', scene: 'A', name, group, move, rarity, colors, portrait, text, series,
-})
-const secretRelic = (series: 'eclipse' | 'zenith', id: string, name: string, icon: string, rarity: Rarity, text: string): Card => ({
-  id: `${series}-${id}`, kind: 'relic', name, icon, rarity, text, series,
-})
-
-const SECRET: Card[] = [
-  secretAnime('eclipse', 'noctis', 'Noctis', 'ECLIPSE', 'Blackout Spin', 'epic', ['#1b1035', '#7b2cbf'], { hair: '#0d0d1a', style: 'long', eyes: '#c77dff', outfit: '#3c096c', accent: 'crown', expression: 'cool' }, 'Only performs when the lights go out. Seven days earned her.'),
-  secretAnime('eclipse', 'umbra', 'Umbra', 'ECLIPSE', 'Shadow Step', 'epic', ['#0b132b', '#3a506b'], { hair: '#5bc0be', style: 'bob', eyes: '#6fffe9', outfit: '#1c2541', accent: 'headphones', expression: 'wink' }, 'Moves like a shadow you can hear.'),
-  secretAnime('eclipse', 'selene', 'Selene', 'ECLIPSE', 'Moonrise', 'legendary', ['#14213d', '#fca311'], { hair: '#e5e5e5', style: 'wavy', eyes: '#fca311', outfit: '#14213d', accent: 'star', expression: 'smile' }, 'Rises when everyone else gives up for the night.'),
-  secretRelic('eclipse', 'mask', 'Eclipse Mask', '🎭', 'epic', 'Worn by hunters who kept going a whole week straight.'),
-  secretRelic('eclipse', 'hourglass', 'Black Hourglass', '⏳', 'rare', 'Seven grains of sand. One for each perfect day.'),
-  secretAnime('zenith', 'astra', 'Astra', 'ZENITH', 'Supernova Encore', 'legendary', ['#fff3b0', '#e09f3e'], { hair: '#fefae0', style: 'twin', eyes: '#e09f3e', outfit: '#9e2a2b', accent: 'crown', expression: 'grin' }, 'A month of perfect days. The whole stadium chants your name.'),
-  secretAnime('zenith', 'solara', 'Solara', 'ZENITH', 'Sunburst', 'legendary', ['#ffbe0b', '#fb5607'], { hair: '#ff006e', style: 'pony', eyes: '#ffbe0b', outfit: '#8338ec', accent: 'star', expression: 'wink' }, 'Shines brightest at the top. You are at the top.'),
-  secretRelic('zenith', 'crown', 'Crown of Thirty Dawns', '👑', 'legendary', 'Forged from thirty sunrises you did not waste.'),
-]
-
-const BUILT_IN: Card[] = [...IDOLS, ...ANIME, ...RELICS, ...RIZZ, ...SECRET]
-/** Every card that can drop right now: the built-in set plus your own. */
 export const allCards = (): Card[] => [...BUILT_IN, ...customCards]
 export const CARDS = BUILT_IN
 export const cardById = (id: string) => allCards().find(c => c.id === id)
@@ -265,23 +111,12 @@ function hash(text: string): number {
 }
 const unit = (text: string) => hash(text) / 4294967296
 
-/** This month's featured series: its cards drop twice as often. Changes every month. */
-export function featuredSeries(month: string, seed: string): string {
-  const keys = Object.keys(SERIES).filter(k => k !== 'custom' && !SECRET_SERIES.has(k))
-  return keys[hash(`${seed}:series:${month}`) % keys.length]
-}
-
 /**
- * Rolls a drop for something you just did. The same source always rolls the
- * same result (so undo and redo can't farm it). Returns null for no drop.
+ * Rolls whether something you just did drops a card, and how rare it is. The
+ * same source always rolls the same result (so undo and redo can't farm it).
+ * Returns null for no drop. The card itself is then forged (src/db/forge.ts).
  */
-export function rollDrop(
-  source: DropSource,
-  sourceId: string,
-  seed: string,
-  month: string,
-  opts: { unlocked?: Set<string>; minRarity?: Rarity } = {},
-): Card | null {
+export function rollRarity(source: DropSource, sourceId: string, seed: string, opts: { minRarity?: Rarity } = {}): Rarity | null {
   const base = `${seed}:${source}:${sourceId}`
   if (unit(`${base}:chance`) >= DROP_CHANCE[source]) return null
   const odds = RARITY_ODDS[source]
@@ -295,16 +130,19 @@ export function rollDrop(
     r -= odds[i]
   }
   if (opts.minRarity && RARITIES.indexOf(rarity) < RARITIES.indexOf(opts.minRarity)) rarity = opts.minRarity
-  const featured = featuredSeries(month, seed)
-  const open = (c: Card) => !SECRET_SERIES.has(c.series) || !!opts.unlocked?.has(c.series)
-  const pool = allCards().filter(c => c.rarity === rarity && open(c))
-  const weights = pool.map(c => (c.series === featured ? 2 : 1))
-  let pick = unit(`${base}:card`) * weights.reduce((a, b) => a + b, 0)
-  for (let i = 0; i < pool.length; i++) {
-    if (pick < weights[i]) return pool[i]
-    pick -= weights[i]
-  }
-  return pool[pool.length - 1]
+  return rarity
+}
+
+/**
+ * Picks one of the cards you already have (for when a new one can't be forged):
+ * the rolled rarity if you have one, else the nearest rarity below, else any.
+ */
+export function pickOwnedCard(rarity: Rarity, key: string): Card | null {
+  const pool = allCards()
+  if (!pool.length) return null
+  const order = [rarity, ...RARITIES.slice(0, RARITIES.indexOf(rarity)).reverse(), ...RARITIES.slice(RARITIES.indexOf(rarity) + 1)]
+  const tier = order.map(r => pool.filter(c => c.rarity === r)).find(t => t.length > 0)!
+  return tier[hash(key) % tier.length]
 }
 
 /** Copies needed for each power level: 1 copy = ★, 3 = ★★, 6 = ★★★. */

@@ -18,7 +18,7 @@ import {
   questReward,
   dailyWeight,
   GOALS_PER_DAY,
-  rollDrop,
+  rollRarity,
   shopLock,
   PACK_MILESTONES,
   PACK_SIZE,
@@ -28,7 +28,6 @@ import {
   type IncentiveSettings,
   setCustomCards,
   customCard,
-  monthOf,
   stars,
   type DropSource,
   planVersion,
@@ -281,7 +280,11 @@ export async function undoQuest(quest: Quest): Promise<void> {
   await db.completions.delete(done.id)
   await removeLootFrom(done.id)
   if (quest.kind === 'daily') {
-    await db.loot.where('sourceId').anyOf([`perfect-${done.day}`, ...PACK_MILESTONES.flatMap(m => Array.from({ length: PACK_SIZE }, (_, i) => `pack-${done.day}-${m}-${i}`))]).delete()
+    const chestIds = [`perfect-${done.day}`, ...PACK_MILESTONES.flatMap(m => Array.from({ length: PACK_SIZE }, (_, i) => `pack-${done.day}-${m}-${i}`))]
+    const forge = await import('./forge')
+    forge.cancelDrops(chestIds)
+    await db.loot.where('sourceId').anyOf(chestIds).delete()
+    await forge.pruneOrphanForged()
   }
   emit({ type: 'quest.undone', questId: quest.id, questTitle: quest.title })
 }
@@ -1210,18 +1213,21 @@ export async function dropLoot(source: DropSource, sourceId: string, opts: { min
   const player = await db.players.get(LOCAL_USER)
   if (!player || !featureOn(player, 'cards')) return
   if (await db.loot.where('sourceId').equals(sourceId).count()) return
-  setCustomCards((await db.customCards.where('userId').equals(LOCAL_USER).toArray()).map(customCard))
-  const today = dayKey(new Date(), player.settings.resetHour)
-  const card = rollDrop(source, sourceId, surpriseSeed(player), monthOf(today), { unlocked: opts.secrets ?? (await snapshot()).summary.incentives?.secrets, minRarity: opts.minRarity })
-  if (!card) return
-  const before = await db.loot.where('userId').equals(LOCAL_USER).filter(d => d.cardId === card.id).count()
-  await db.loot.add({ id: newId(), userId: LOCAL_USER, cardId: card.id, source, sourceId, day: today, createdAt: Date.now() })
-  emit({ type: 'loot.card', cardId: card.id, copies: before + 1, starUp: stars(before + 1) > stars(before) && before > 0 })
+  const rarity = rollRarity(source, sourceId, surpriseSeed(player), { minRarity: opts.minRarity })
+  if (!rarity) return
+  const secrets = opts.secrets ?? (await snapshot()).summary.incentives?.secrets ?? new Set<string>()
+  // A brand-new card is forged in the background and flips in when it's ready
+  // (falls back to a copy of one you own when the forge can't make one).
+  const { forgeDrop } = await import('./forge')
+  void forgeDrop(rarity, source, sourceId, secrets)
 }
 
 /** Undoing a quest takes back the card it dropped. */
 async function removeLootFrom(sourceId: string): Promise<void> {
+  const forge = await import('./forge')
+  forge.cancelDrops([sourceId])
   await db.loot.where('sourceId').equals(sourceId).delete()
+  await forge.pruneOrphanForged()
 }
 
 /** Makes a loot card from your own image. It joins the drop pool straight away. */
