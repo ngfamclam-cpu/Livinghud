@@ -6,14 +6,18 @@ import type { Completion, JournalEntry } from './types'
 
 export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-/**
- * Journal quest credit: all three prompts is the full quest, any one line the
- * minimum. The random question counts as a line too.
- */
-export function journalVersion(e: Pick<JournalEntry, 'wentWell' | 'drained' | 'adjust'> & { promptAnswer?: string }): 'full' | 'min' | null {
-  const filled = [e.wentWell, e.drained, e.adjust].filter(t => t.trim()).length
-  if (filled === 3) return 'full'
-  return filled > 0 || !!e.promptAnswer?.trim() ? 'min' : null
+/** How many questions an entry answered: the classics, the evolving questions and the old single random question. */
+export function answeredCount(e: Pick<JournalEntry, 'wentWell' | 'drained' | 'adjust'> & { promptAnswer?: string; answers?: { answer: string }[] }): number {
+  const classics = [e.wentWell, e.drained, e.adjust].filter(t => t.trim()).length
+  const extra = (e.answers ?? []).filter(a => a.answer.trim()).length
+  return classics + extra + (e.promptAnswer?.trim() ? 1 : 0)
+}
+
+/** Journal quest credit: any three answers is the full quest, one or two the minimum. Every question is optional. */
+export function journalVersion(e: Parameters<typeof answeredCount>[0]): 'full' | 'min' | null {
+  const n = answeredCount(e)
+  if (n >= 3) return 'full'
+  return n > 0 ? 'min' : null
 }
 
 /**
