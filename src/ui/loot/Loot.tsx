@@ -24,7 +24,7 @@ import { Photo } from '../lifelog/Photo'
 import { SystemWindow } from '../SystemWindow'
 import { CardArt } from './CardArt'
 import { BulkImport } from './BulkImport'
-import { forgePack, lastPack, type ForgeOutcome } from '../../db/forge'
+import { forgePack, lastPack, remakeCard, type ForgeOutcome } from '../../db/forge'
 
 interface Reveal {
   card: Card
@@ -87,6 +87,7 @@ export function Collection({ player, summary, loot, custom, onClose }: { player:
   const ownedShown = shown.filter(c => owned.has(c.id)).length
   const recent = [...loot].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5)
   const entry = open ? owned.get(open.id) : undefined
+  const mineOpen = open?.series === 'custom' ? custom.find(c => `custom-${c.id}` === open.id) : undefined
 
   return (
     <main className="hud collection">
@@ -135,12 +136,13 @@ export function Collection({ player, summary, loot, custom, onClose }: { player:
       {open && entry && (
         <div className="overlay loot-reveal" role="dialog" aria-label={open.name} onClick={() => setOpen(null)}>
           <p className={`drop-title r-${open.rarity}`}>{RARITY_NAMES[open.rarity].toUpperCase()} · {SERIES[open.series]}</p>
-          <CardArt card={open} stars={entry.stars} />
+          <CardArt card={cardById(open.id) ?? open} stars={entry.stars} />
           <p className="drop-text">{open.text}</p>
           <p className="muted">
             ×{entry.copies} · {'★'.repeat(entry.stars)} · first found {new Date(entry.firstAt).toLocaleDateString()}
             {open.kind === 'idol' && ` · signature move: ${open.move}`}
           </p>
+          {mineOpen && <CardActions mine={mineOpen} onDone={() => setOpen(null)} />}
           <button className="ghost" onClick={() => setOpen(null)}>Close</button>
         </div>
       )}
@@ -165,6 +167,33 @@ export function CollectionPanel({ loot, onOpen }: { loot: LootDrop[]; onOpen: ()
         <button className="small" onClick={onOpen}>Open binder</button>
       </div>
     </SystemWindow>
+  )
+}
+
+/** Remake (forged cards) or delete one of your cards, from its big view. */
+function CardActions({ mine, onDone }: { mine: CustomCard; onDone: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
+  const remake = async () => {
+    setBusy(true)
+    setNote('Drawing a new image…')
+    const r = await remakeCard(mine.id)
+    setBusy(false)
+    setNote(r.ok ? 'New image in.' : r.reason === 'limit' ? 'Today’s free allowance is used up.' : r.reason === 'declined' ? 'Cloudflare refused it. Try again or delete it.' : `Couldn’t remake it${r.message ? `: ${r.message}` : '.'}`)
+  }
+  const remove = async () => {
+    if (!confirm(`Delete "${mine.name}"? Its image and copies go, and the forge can make it again in a later pack.`)) return
+    await deleteCustomCard(mine.id)
+    onDone()
+  }
+  return (
+    <div className="card-actions" onClick={e => e.stopPropagation()}>
+      {note && <p className="muted">{note}</p>}
+      <div className="row center">
+        {mine.forge && <button className="small" disabled={busy} onClick={remake}>{busy ? 'Remaking…' : 'Remake image'}</button>}
+        <button className="ghost small danger-text" disabled={busy} onClick={remove}>Delete card</button>
+      </div>
+    </div>
   )
 }
 
@@ -199,7 +228,7 @@ function ForgePanel() {
       </p>
       {progress && <p className="system-line">Forging {progress.done}/{progress.total}…</p>}
       {result?.ok && <p className="system-line">{result.series}: {result.made} card{result.made === 1 ? '' : 's'} forged and added to your binder.</p>}
-      {result && result.skipped > 0 && <p className="muted">{result.skipped} card{result.skipped === 1 ? ' was' : 's were'} refused by Cloudflare’s filter even with softer wording, so {result.skipped === 1 ? 'it was' : 'they were'} skipped.</p>}
+      {result && result.skipped > 0 && <p className="muted">Cloudflare’s filter refused {result.skipped} card{result.skipped === 1 ? '' : 's'}, so {result.skipped === 1 ? 'it was' : 'they were'} swapped for other cards of the same rarity.</p>}
       {result && !result.ok && (
         <p className="muted error">
           {result.made > 0 ? `${result.made} card${result.made === 1 ? '' : 's'} made, then: ` : ''}{FORGE_FAIL[result.reason]}

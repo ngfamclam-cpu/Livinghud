@@ -253,3 +253,16 @@ export function pickPack(seed: string, recent: Iterable<string> = []): PackPick[
   })
   return out
 }
+
+/**
+ * A stand-in card of the same rarity, for when the image filter refuses one:
+ * not already in the pack, recent cards avoided when possible, a fresh look.
+ */
+export function replacementPick(rarity: ForgeRarity, exclude: Iterable<string>, seed: string, recent: Iterable<string> = []): PackPick | null {
+  const skip = new Set(exclude)
+  const old = new Set(recent)
+  const pool = ALL.filter(c => c.rarity === rarity && !skip.has(c.id))
+  const ranked = pool.filter(c => !old.has(c.id)).length ? pool.filter(c => !old.has(c.id)) : pool
+  if (!ranked.length) return null
+  return { card: ranked[hash(seed) % ranked.length], variant: hash(`${seed}:look`) % (MAX_VARIANT + 1) }
+}

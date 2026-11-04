@@ -1,7 +1,7 @@
 // Pack Forge, app side: asks api/forge.ts for each card's image, crops it with
 // the bulk-import tools, saves it as one of your cards and reveals it as a drop.
 
-import { forgeCard, pickPack, type PackPick } from '../engine'
+import { forgeCard, pickPack, replacementPick, MAX_VARIANT, type PackPick } from '../engine'
 import { addCustomCard, grantCard } from './actions'
 import { db, LOCAL_USER } from './db'
 import { addPhoto } from './photos'
@@ -61,10 +61,14 @@ async function makeImage(key: string, { card, variant }: PackPick): Promise<Blob
   return new Blob([bytes], { type: 'image/jpeg' })
 }
 
+/** Tries per card slot before giving up on it (each try is a different card of the same rarity). */
+const TRIES_PER_SLOT = 5
+
 /**
  * Forges one mixed pack (2 Common, 2 Rare, 1 Epic, 1 Legendary), or remakes the
- * last pack with the same prompts. Cards that were made are kept even if a later
- * one fails; a card the image filter refuses is skipped.
+ * last pack with the same prompts. If the image filter refuses a card, a different
+ * card of the same rarity takes its place, so a pack still ends up with 6. Cards
+ * that were made are kept even if something stops the pack part-way.
  */
 export async function forgePack(onProgress: (done: number, total: number) => void = () => {}, opts: { again?: boolean } = {}): Promise<ForgeOutcome> {
   const player = await db.players.get(LOCAL_USER)
@@ -74,42 +78,92 @@ export async function forgePack(onProgress: (done: number, total: number) => voi
   const packId = `forge-${Date.now()}`
   const again = opts.again ? lastPack() : null
   const picks = again ?? pickPack(`${player?.id ?? 'local'}:${packId}`, recent)
-  const cards = picks.map(p => p.card)
   const series = { name: again ? 'Same prompts' : 'Mixed pack' }
   const key = syncKey()
   if (!key) return { ok: false, reason: 'no-sync', made: 0, series: series.name, skipped: 0 }
   rememberPack(picks)
 
-  const images: (Blob | null)[] = new Array(cards.length).fill(null)
+  const total = picks.length
+  const results: ({ pick: PackPick; image: Blob } | null)[] = new Array(total).fill(null)
+  const inPack = new Set(picks.map(p => p.card.id))
   let failure: FatalError | null = null
-  let skipped = 0
+  let swapped = 0
   let done = 0
-  onProgress(0, cards.length)
-  for (let i = 0; i < cards.length && !failure; i += PARALLEL) {
-    const batch = cards.slice(i, i + PARALLEL)
-    const results = await Promise.all(picks.slice(i, i + PARALLEL).map(p => makeImage(key, p)))
-    results.forEach((r, j) => {
-      if (r instanceof Blob) images[i + j] = r
-      else if (r.error === 'declined') skipped++
-      else failure = failure ?? (r as FatalError)
-    })
-    done += batch.length
-    onProgress(Math.min(done, cards.length), cards.length)
+  onProgress(0, total)
+
+  const fill = async (slot: number) => {
+    let pick: PackPick | null = picks[slot]
+    for (let attempt = 0; pick && attempt < TRIES_PER_SLOT && !failure; attempt++) {
+      const r = await makeImage(key, pick)
+      if (r instanceof Blob) {
+        results[slot] = { pick, image: r }
+        break
+      }
+      if (r.error !== 'declined') {
+        failure = failure ?? (r as FatalError)
+        break
+      }
+      // Refused even with softer wording: try a different card of the same rarity.
+      pick = replacementPick(pick.card.rarity, inPack, `${packId}:${slot}:${attempt}`, recent)
+      if (pick) {
+        inPack.add(pick.card.id)
+        swapped++
+      }
+    }
+    done++
+    onProgress(done, total)
   }
+  // Two slots at a time: quick, and gentle on the free allowance's rate limit.
+  let next = 0
+  await Promise.all(Array.from({ length: PARALLEL }, async () => {
+    while (next < total) await fill(next++)
+  }))
 
   // Save in pack order (rarest last), then reveal each one.
   let made = 0
-  for (let i = 0; i < cards.length; i++) {
-    const image = images[i]
-    if (!image) continue
-    const card = cards[i]
-    const draft = await analyse(new File([image], `${card.id}.jpg`, { type: 'image/jpeg' }), i)
-    const photo = await addPhoto(await renderCard(draft))
-    URL.revokeObjectURL(draft.url)
-    const id = await addCustomCard({ name: card.name, rarity: card.rarity, text: card.text, photoId: photo.id, forge: card.id })
+  for (let i = 0; i < total; i++) {
+    const r = results[i]
+    if (!r) continue
+    const card = r.pick.card
+    const photo = await cardPhoto(r.image, card.id)
+    const id = await addCustomCard({ name: card.name, rarity: card.rarity, text: card.text, photoId: photo, forge: card.id })
     await grantCard(`custom-${id}`, 'forge', `${packId}-${i}`)
     made++
   }
   const f = failure as FatalError | null
-  return f ? { ok: false, reason: f.error, made, series: series.name, skipped, message: f.message } : { ok: true, made, series: series.name, skipped }
+  if (f) return { ok: false, reason: f.error, made, series: series.name, skipped: swapped, message: f.message }
+  if (made < total) return { ok: false, reason: 'failed', made, series: series.name, skipped: swapped, message: 'Some cards were refused every time. Try again for the rest.' }
+  return { ok: true, made, series: series.name, skipped: swapped }
+}
+
+/** Crops a forged image to card shape and stores it; returns the photo id. */
+async function cardPhoto(image: Blob, name: string): Promise<string> {
+  const draft = await analyse(new File([image], `${name}.jpg`, { type: 'image/jpeg' }), 0)
+  const photo = await addPhoto(await renderCard(draft))
+  URL.revokeObjectURL(draft.url)
+  return photo.id
+}
+
+export type RemakeOutcome = { ok: true } | { ok: false; reason: 'no-sync' | 'not-configured' | 'limit' | 'failed' | 'declined'; message?: string }
+
+/** Draws a new image for one of your forged cards (same card, a fresh look) and swaps it in. */
+export async function remakeCard(customId: string): Promise<RemakeOutcome> {
+  const mine = await db.customCards.get(customId)
+  const card = mine?.forge ? forgeCard(mine.forge) : undefined
+  if (!mine || !card) return { ok: false, reason: 'failed', message: 'This card wasn’t made by the forge.' }
+  const key = syncKey()
+  if (!key) return { ok: false, reason: 'no-sync' }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const variant = Math.floor(Math.random() * (MAX_VARIANT + 1))
+    const r = await makeImage(key, { card, variant })
+    if (r instanceof Blob) {
+      const photoId = await cardPhoto(r, card.id)
+      await db.customCards.update(customId, { photoId, updatedAt: Date.now() })
+      const { deletePhotos } = await import('./photos')
+      await deletePhotos([mine.photoId])
+      return { ok: true }
+    }
+    if (r.error !== 'declined') return { ok: false, reason: r.error, message: r.message }
+  }
+  return { ok: false, reason: 'declined', message: 'Cloudflare refused this card three times in a row.' }
 }
