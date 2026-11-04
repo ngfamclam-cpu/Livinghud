@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DAILY_TEMPLATES,
+  SUGGESTED_STARTERS,
   addDays,
   checkPurchase,
   savingsStatus,
@@ -89,7 +91,7 @@ describe('economy', () => {
   it('pays the strength routine 3 shares without growing the monthly pot', () => {
     // Routine + 3 other dailies = 6 shares.
     const routine = questReward({ kind: 'daily', templateId: 'str-routine' }, 'full', 150, 6)
-    const other = questReward({ kind: 'daily', templateId: 'vit-trio' }, 'full', 150, 6)
+    const other = questReward({ kind: 'daily', templateId: 'vit-water' }, 'full', 150, 6)
     expect(routine.dollars).toBeCloseTo(other.dollars * 3, 1)
     expect(routine.xp).toBe(other.xp)
     expect((routine.dollars + 3 * other.dollars) * 30 * 0.8).toBeCloseTo(150, 0)
@@ -279,5 +281,15 @@ describe('side and main quests', () => {
     const finished = summarize(player, [main], [stage('one'), stage('two')], now)
     expect(finished.mainProgress.get('m')?.done).toBe(true)
     expect(finished.mainQuestsCleared).toBe(1)
+  })
+})
+
+describe('daily templates', () => {
+  it('only suggests starters that exist', () => {
+    for (const id of SUGGESTED_STARTERS) expect(DAILY_TEMPLATES.some(t => t.id === id)).toBe(true)
+  })
+  it('keeps sleep and water + vitamins as separate dailies', () => {
+    expect(DAILY_TEMPLATES.map(t => t.id)).toEqual(expect.arrayContaining(['vit-sleep', 'vit-water']))
+    expect(DAILY_TEMPLATES.some(t => t.id === 'vit-trio')).toBe(false)
   })
 })

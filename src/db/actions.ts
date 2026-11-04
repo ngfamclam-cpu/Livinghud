@@ -1097,6 +1097,8 @@ export async function importSave(json: string): Promise<void> {
     await db.bills.bulkPut(data.bills ?? [])
     await db.penaltyClears.bulkPut(data.penaltyClears ?? [])
   })
+  // An older save (or another device not yet updated) may still have the combined daily.
+  await splitVitTrio()
 }
 
 export async function resetEverything(): Promise<void> {
@@ -1259,6 +1261,43 @@ export async function ensureIncentives(): Promise<void> {
   const player = await db.players.get(LOCAL_USER)
   if (!player || player.incentives) return
   await db.players.update(LOCAL_USER, { incentives: defaultIncentives(dayKey(new Date(), player.settings.resetHour)) })
+}
+
+/** The old "Sleep, water, vitamins" daily, split into two since Nov 2026. */
+export const OLD_VIT_TRIO = 'vit-trio'
+const SLEEP_QUEST_ID = 'quest-vit-sleep'
+
+/**
+ * Splits an older "Sleep, water, vitamins" daily into "Water + vitamins" (the
+ * same quest, so its history and streak stay) plus a new "Sleep 7.5 hours"
+ * daily. Runs once on startup; the fixed id keeps two devices from adding two.
+ */
+export async function splitVitTrio(): Promise<void> {
+  const quests = await db.quests.where('userId').equals(LOCAL_USER).toArray()
+  const old = quests.find(q => q.kind === 'daily' && q.templateId === OLD_VIT_TRIO)
+  if (!old) return
+  const water = DAILY_TEMPLATES.find(t => t.id === 'vit-water')!
+  const sleep = DAILY_TEMPLATES.find(t => t.id === 'vit-sleep')!
+  const now = Date.now()
+  await db.transaction('rw', db.quests, async () => {
+    await db.quests.update(old.id, { templateId: water.id, title: water.title, description: water.description, minVersion: water.minVersion, updatedAt: now })
+    const hasSleep = quests.some(q => q.kind === 'daily' && q.templateId === sleep.id) || (await db.quests.get(SLEEP_QUEST_ID))
+    if (!hasSleep) {
+      await db.quests.put({
+        id: SLEEP_QUEST_ID,
+        userId: LOCAL_USER,
+        kind: 'daily',
+        stat: old.stat,
+        title: sleep.title,
+        description: sleep.description,
+        minVersion: sleep.minVersion,
+        active: old.active,
+        templateId: sleep.id,
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+  })
 }
 
 export async function saveIncentiveSettings(patch: Partial<Omit<IncentiveSettings, 'since'>>): Promise<void> {

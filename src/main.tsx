@@ -6,7 +6,7 @@ import { startSync } from './db/sync'
 import { startTriggers } from './db/triggers'
 import { startUpdates } from './pwa'
 import { startFocusWatch } from './db/focus'
-import { ensureIncentives, ensurePenaltyStart } from './db/actions'
+import { ensureIncentives, ensurePenaltyStart, splitVitTrio } from './db/actions'
 import { startDesktopNotify } from './ui/desktop/notify'
 import { ensureMemoryQuest } from './db/memories'
 import { startPhotoUploads } from './db/photos'
@@ -20,6 +20,7 @@ startUpdates()
 startFocusWatch()
 void ensurePenaltyStart()
 void ensureIncentives()
+void splitVitTrio()
 startDesktopNotify()
 startPhotoUploads()
 void ensureMemoryQuest()
