@@ -68,11 +68,18 @@ export const DAILY_TEMPLATES: DailyTemplate[] = [
     minVersion: '3,500 steps',
   },
   {
-    id: 'vit-trio',
+    id: 'vit-sleep',
     stat: 'VIT',
-    title: 'Sleep, water, vitamins',
-    description: 'Slept 7.5h+ · 8 glasses of water · took your vitamins.',
-    minVersion: 'Any 2 of 3',
+    title: 'Sleep 7.5 hours',
+    description: 'In bed on time and 7.5 hours or more of sleep last night.',
+    minVersion: '6.5 hours',
+  },
+  {
+    id: 'vit-water',
+    stat: 'VIT',
+    title: 'Water + vitamins',
+    description: '8 glasses of water · took your vitamins.',
+    minVersion: 'Either one',
   },
   {
     id: 'vit-nutrition',
@@ -168,6 +175,6 @@ export const DAILY_TEMPLATES: DailyTemplate[] = [
 ]
 
 /** Suggested starter set: one per chosen stat, at most 4, in this order. */
-export const SUGGESTED_STARTERS = ['str-routine', 'vit-trio', 'wlt-side', 'cha-reach', 'int-learn', 'agi-reset']
+export const SUGGESTED_STARTERS = ['str-routine', 'vit-sleep', 'vit-water', 'wlt-side', 'cha-reach', 'int-learn', 'agi-reset']
 
 export const MAX_STARTER_DAILIES = 5
