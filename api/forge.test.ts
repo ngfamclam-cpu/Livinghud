@@ -32,7 +32,7 @@ describe('forge api', () => {
       sent = { url, body: JSON.parse(String(init.body)), auth: new Headers(init.headers).get('authorization') ?? '' }
       return new Response(JSON.stringify({ success: true, result: { image: 'QUJD' } }), { status: 200 })
     }) as unknown as typeof fetch
-    const res = await handle(req({ cardId: 'neon-0' }), await withSave(), fetcher)
+    const res = await handle(req({ cardId: 'after-0' }), await withSave(), fetcher)
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ image: 'QUJD' })
     expect(sent!.url).toContain('/accounts/acct/ai/run/@cf/black-forest-labs/flux-1-schnell')
@@ -43,33 +43,58 @@ describe('forge api', () => {
   it('only makes catalog cards, for known saves', async () => {
     const ok = reply(200, { success: true, result: { image: 'QUJD' } })
     expect((await handle(req({ cardId: 'anything goes' }), await withSave(), ok)).status).toBe(400)
-    expect((await handle(req({ cardId: 'neon-0' }), memoryStore(), ok)).status).toBe(403)
-    expect((await handle(req({ cardId: 'neon-0' }, null), await withSave(), ok)).status).toBe(400)
+    expect((await handle(req({ cardId: 'after-0' }), memoryStore(), ok)).status).toBe(403)
+    expect((await handle(req({ cardId: 'after-0' }, null), await withSave(), ok)).status).toBe(400)
   })
 
   it('reports a missing setup, a used-up allowance and errors', async () => {
-    expect((await handle(req({ cardId: 'neon-0' }), await withSave(), reply(429, { success: false, errors: [{ code: 3036, message: 'daily free allocation exceeded' }] }))).status).toBe(429)
-    expect((await handle(req({ cardId: 'neon-0' }), await withSave(), reply(401, { success: false }))).status).toBe(503)
-    expect((await handle(req({ cardId: 'neon-0' }), await withSave(), reply(500, { success: false, errors: [{ code: 1, message: 'boom' }] }))).status).toBe(502)
+    expect((await handle(req({ cardId: 'after-0' }), await withSave(), reply(429, { success: false, errors: [{ code: 3036, message: 'daily free allocation exceeded' }] }))).status).toBe(429)
+    expect((await handle(req({ cardId: 'after-0' }), await withSave(), reply(401, { success: false }))).status).toBe(503)
+    expect((await handle(req({ cardId: 'after-0' }), await withSave(), reply(500, { success: false, errors: [{ code: 1, message: 'boom' }] }))).status).toBe(502)
     delete env.CLOUDFLARE_API_TOKEN
-    expect((await handle(req({ cardId: 'neon-0' }), await withSave(), reply(200, {}))).status).toBe(503)
+    expect((await handle(req({ cardId: 'after-0' }), await withSave(), reply(200, {}))).status).toBe(503)
   })
 })
 
 describe('pack picking', () => {
-  it('gives six cards of one series, rarest last, avoiding the last series', () => {
-    const { series, cards } = pickPack('seed-1', null)
-    expect(cards).toHaveLength(6)
-    expect(new Set(cards.map(c => c.series))).toEqual(new Set([series.id]))
-    expect(cards.at(-1)!.rarity).toBe('legendary')
-    for (let i = 0; i < 20; i++) expect(pickPack(`s${i}`, series.id).series.id).not.toBe(series.id)
+  it('gives a mixed 2/2/1/1 pack from different series, rarest last', () => {
+    const pack = pickPack('seed-1')
+    expect(pack.map(p => p.card.rarity)).toEqual(['common', 'common', 'rare', 'rare', 'epic', 'legendary'])
+    expect(new Set(pack.map(p => p.card.series)).size).toBe(6)
+    expect(new Set(pack.map(p => p.card.id)).size).toBe(6)
   })
-  it('keeps every prompt fictional, adult and clothed', () => {
-    for (const c of FORGE_SERIES.flatMap(s => s.cards)) {
-      const p = forgePrompt(c)
-      expect(p).toMatch(/fictional adult woman/)
-      expect(p).toMatch(/fully clothed/)
-      expect(p.length).toBeLessThan(2048)
+  it('skips recently made cards and varies the look', () => {
+    const first = pickPack('seed-2')
+    const next = pickPack('seed-3', first.map(p => p.card.id))
+    for (const p of next) expect(first.map(f => f.card.id)).not.toContain(p.card.id)
+    const card = first[0].card
+    expect(forgePrompt(card, 0)).not.toBe(forgePrompt(card, 4321))
+  })
+  it('has both styles at every rarity', () => {
+    for (const r of ['common', 'rare', 'epic', 'legendary']) {
+      const styles = new Set(FORGE_SERIES.flatMap(s => s.cards).filter(c => c.rarity === r).map(c => c.style))
+      expect(styles).toEqual(new Set(['real', 'anime']))
     }
+  })
+  it('keeps every prompt fictional, adult and non-nude, within the model limit', () => {
+    for (const c of FORGE_SERIES.flatMap(s => s.cards)) {
+      for (const v of [0, 77, 9999]) {
+        const p = forgePrompt(c, v)
+        expect(p).toMatch(/woman/)
+        expect(p).toMatch(/mid-20s/)
+        expect(p).toMatch(/fictional adult/)
+        expect(p).toMatch(/No nudity/)
+        expect(p).not.toMatch(/\bgirl\b|pasties|topless|nude\b/i)
+        expect(p.length).toBeLessThan(2048)
+      }
+    }
+  })
+  it('only accepts variants in range', async () => {
+    env.CLOUDFLARE_ACCOUNT_ID = 'acct'
+    env.CLOUDFLARE_API_TOKEN = 'tok'
+    const ok = reply(200, { success: true, result: { image: 'QUJD' } })
+    expect((await handle(req({ cardId: 'rave-0', variant: 123 }), await withSave(), ok)).status).toBe(200)
+    expect((await handle(req({ cardId: 'rave-0', variant: -1 }), await withSave(), ok)).status).toBe(400)
+    expect((await handle(req({ cardId: 'rave-0', variant: 1.5 }), await withSave(), ok)).status).toBe(400)
   })
 })

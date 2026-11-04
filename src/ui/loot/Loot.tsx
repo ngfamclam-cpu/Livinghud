@@ -194,7 +194,7 @@ function ForgePanel() {
   return (
     <SystemWindow title="Pack Forge">
       <p className="muted">
-        Six new cards from one themed series, made by Cloudflare’s free image model: Common and Rare in anime style, Epic and Legendary photo-real. About a minute per pack. Fictional adults only.
+        Six new cards (2 Common, 2 Rare, 1 Epic, 1 Legendary) mixed from eight sultry series, photo-real and anime at every rarity, each with its own look. Made by Cloudflare’s free image model in about a minute. Fictional adults only, private to you.
       </p>
       {progress && <p className="system-line">Forging {progress.done}/{progress.total}…</p>}
       {result?.ok && <p className="system-line">{result.series}: {result.made} cards forged and added to your binder.</p>}

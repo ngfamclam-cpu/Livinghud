@@ -3,13 +3,13 @@
 // only for a sync code that has a cloud save, so the endpoint can't be used to
 // generate arbitrary images. The app calls it once per card.
 //
-// POST /api/forge   header x-sync-key, body { cardId: "neon-3" }
+// POST /api/forge   header x-sync-key, body { cardId: "rave-3", variant: 0-9999 }
 //   -> { image: <base64 JPEG> }
 //   -> 503 { error: 'not-configured' } without CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN
 //   -> 429 { error: 'limit' } when today's free allowance is used up
 
 import { blobStore, jsonResponse, normalizeKey, sha256, type Store } from '../server/blob.js'
-import { FORGE_STEPS, forgeCard, forgePrompt } from '../src/engine/forge.js'
+import { FORGE_STEPS, MAX_VARIANT, forgeCard, forgePrompt } from '../src/engine/forge.js'
 
 const MODEL = '@cf/black-forest-labs/flux-1-schnell'
 const env = () => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}
@@ -22,9 +22,11 @@ export async function handle(request: Request, store: Store = blobStore, fetcher
   const token = env().CLOUDFLARE_API_TOKEN?.trim()
   if (!account || !token) return jsonResponse({ error: 'not-configured' }, 503)
 
-  const body = (await request.json().catch(() => ({}))) as { cardId?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { cardId?: unknown; variant?: unknown }
   const card = typeof body.cardId === 'string' ? forgeCard(body.cardId) : undefined
   if (!card) return jsonResponse({ error: 'unknown-card' }, 400)
+  const variant = body.variant === undefined ? 0 : Number(body.variant)
+  if (!Number.isInteger(variant) || variant < 0 || variant > MAX_VARIANT) return jsonResponse({ error: 'bad-variant' }, 400)
 
   try {
     if (!(await store.read(`saves/${await sha256(key)}.json`))) return jsonResponse({ error: 'unknown-save' }, 403)
@@ -37,7 +39,7 @@ export async function handle(request: Request, store: Store = blobStore, fetcher
     res = await fetcher(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/ai/run/${MODEL}`, {
       method: 'POST',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ prompt: forgePrompt(card), steps: FORGE_STEPS }),
+      body: JSON.stringify({ prompt: forgePrompt(card, variant), steps: FORGE_STEPS }),
     })
   } catch {
     return jsonResponse({ error: 'ai-error' }, 502)
