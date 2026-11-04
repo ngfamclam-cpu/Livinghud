@@ -7,6 +7,7 @@
 //   -> { image: <base64 JPEG> }
 //   -> 503 { error: 'not-configured' } without CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN
 //   -> 429 { error: 'limit' } when today's free allowance is used up
+//   -> 422 { error: 'declined' } when the NSFW filter refuses it even with softer wording
 
 import { blobStore, jsonResponse, normalizeKey, sha256, type Store } from '../server/blob.js'
 import { FORGE_STEPS, MAX_VARIANT, forgeCard, forgePrompt } from '../src/engine/forge.js'
@@ -34,23 +35,31 @@ export async function handle(request: Request, store: Store = blobStore, fetcher
     return jsonResponse({ error: 'storage-error' }, 503)
   }
 
-  let res: Response
-  try {
-    res = await fetcher(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/ai/run/${MODEL}`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ prompt: forgePrompt(card, variant), steps: FORGE_STEPS }),
-    })
-  } catch {
-    return jsonResponse({ error: 'ai-error' }, 502)
+  // Full wording first; if Cloudflare's filter refuses it, once more with softer words.
+  for (const level of [0, 1] as const) {
+    let res: Response
+    try {
+      res = await fetcher(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/ai/run/${MODEL}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: forgePrompt(card, variant, level), steps: FORGE_STEPS }),
+      })
+    } catch {
+      return jsonResponse({ error: 'ai-error' }, 502)
+    }
+    const data = (await res.json().catch(() => null)) as { success?: boolean; result?: { image?: string }; errors?: { code?: number; message?: string }[] } | null
+    const message = (data?.errors ?? []).map(e => `${e.code ?? ''} ${e.message ?? ''}`).join('; ')
+    if (res.status === 401 || res.status === 403) return jsonResponse({ error: 'not-configured', message }, 503)
+    if (/nsfw/i.test(message)) {
+      if (level === 0) continue
+      return jsonResponse({ error: 'declined', message }, 422)
+    }
+    if (res.status === 429 || /daily|allocation|quota|limit/i.test(message)) return jsonResponse({ error: 'limit', message }, 429)
+    const image = data?.result?.image
+    if (!res.ok || !image) return jsonResponse({ error: 'ai-error', message: message || `status ${res.status}` }, 502)
+    return jsonResponse({ image, softer: level === 1 })
   }
-  const data = (await res.json().catch(() => null)) as { success?: boolean; result?: { image?: string }; errors?: { code?: number; message?: string }[] } | null
-  const message = (data?.errors ?? []).map(e => `${e.code ?? ''} ${e.message ?? ''}`).join('; ')
-  if (res.status === 401 || res.status === 403) return jsonResponse({ error: 'not-configured', message }, 503)
-  if (res.status === 429 || /daily|allocation|quota|limit/i.test(message)) return jsonResponse({ error: 'limit', message }, 429)
-  const image = data?.result?.image
-  if (!res.ok || !image) return jsonResponse({ error: 'ai-error', message: message || `status ${res.status}` }, 502)
-  return jsonResponse({ image })
+  return jsonResponse({ error: 'declined' }, 422)
 }
 
 export const POST = (request: Request) => handle(request)

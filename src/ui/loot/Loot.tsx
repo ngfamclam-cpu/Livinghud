@@ -24,7 +24,7 @@ import { Photo } from '../lifelog/Photo'
 import { SystemWindow } from '../SystemWindow'
 import { CardArt } from './CardArt'
 import { BulkImport } from './BulkImport'
-import { forgePack, type ForgeOutcome } from '../../db/forge'
+import { forgePack, lastPack, type ForgeOutcome } from '../../db/forge'
 
 interface Reveal {
   card: Card
@@ -180,13 +180,14 @@ const FORGE_FAIL: Record<Exclude<ForgeOutcome, { ok: true }>['reason'], string> 
 function ForgePanel() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [result, setResult] = useState<ForgeOutcome | null>(null)
-  const run = async () => {
+  const canRepeat = !progress && !!lastPack()
+  const run = async (again = false) => {
     setResult(null)
     setProgress({ done: 0, total: 6 })
     try {
-      setResult(await forgePack((done, total) => setProgress({ done, total })))
+      setResult(await forgePack((done, total) => setProgress({ done, total }), { again }))
     } catch (e) {
-      setResult({ ok: false, reason: 'failed', made: 0, series: '', message: e instanceof Error ? e.message : String(e) })
+      setResult({ ok: false, reason: 'failed', made: 0, series: '', skipped: 0, message: e instanceof Error ? e.message : String(e) })
     } finally {
       setProgress(null)
     }
@@ -194,10 +195,11 @@ function ForgePanel() {
   return (
     <SystemWindow title="Pack Forge">
       <p className="muted">
-        Six new cards (2 Common, 2 Rare, 1 Epic, 1 Legendary) mixed from eight sultry series, photo-real and anime at every rarity, each with its own look. Made by Cloudflare’s free image model in about a minute. Fictional adults only, private to you.
+        Six new cards (2 Common, 2 Rare, 1 Epic, 1 Legendary) mixed from eight sultry series, photo-real and anime at every rarity, each with its own look. Made by Cloudflare’s free image model in about a minute. “Same prompts again” remakes your last pack with identical prompts, for a second take. Fictional adults only, private to you.
       </p>
       {progress && <p className="system-line">Forging {progress.done}/{progress.total}…</p>}
-      {result?.ok && <p className="system-line">{result.series}: {result.made} cards forged and added to your binder.</p>}
+      {result?.ok && <p className="system-line">{result.series}: {result.made} card{result.made === 1 ? '' : 's'} forged and added to your binder.</p>}
+      {result && result.skipped > 0 && <p className="muted">{result.skipped} card{result.skipped === 1 ? ' was' : 's were'} refused by Cloudflare’s filter even with softer wording, so {result.skipped === 1 ? 'it was' : 'they were'} skipped.</p>}
       {result && !result.ok && (
         <p className="muted error">
           {result.made > 0 ? `${result.made} card${result.made === 1 ? '' : 's'} made, then: ` : ''}{FORGE_FAIL[result.reason]}
@@ -205,7 +207,8 @@ function ForgePanel() {
         </p>
       )}
       <div className="row end">
-        <button className="small" disabled={!!progress} onClick={run}>{progress ? 'Forging…' : 'Forge a test pack'}</button>
+        <button className="ghost small" disabled={!canRepeat} onClick={() => run(true)} title="Remake your last pack with the exact same prompts">Same prompts again</button>
+        <button className="small" disabled={!!progress} onClick={() => run()}>{progress ? 'Forging…' : 'Forge a new pack'}</button>
       </div>
     </SystemWindow>
   )

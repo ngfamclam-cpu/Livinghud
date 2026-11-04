@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { handle } from './forge'
 import { sha256, normalizeKey } from '../server/blob'
 import { memoryStore } from '../server/memoryStore'
-import { FORGE_SERIES, forgePrompt, pickPack } from '../src/engine/forge'
+import { FORGE_SERIES, forgeCard, forgePrompt, pickPack } from '../src/engine/forge'
 
 const KEY = 'ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ2'
 const req = (body: unknown, key: string | null = KEY) =>
@@ -34,7 +34,7 @@ describe('forge api', () => {
     }) as unknown as typeof fetch
     const res = await handle(req({ cardId: 'after-0' }), await withSave(), fetcher)
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ image: 'QUJD' })
+    expect(await res.json()).toEqual({ image: 'QUJD', softer: false })
     expect(sent!.url).toContain('/accounts/acct/ai/run/@cf/black-forest-labs/flux-1-schnell')
     expect(sent!.auth).toBe('Bearer tok')
     expect(sent!.body.prompt).toBe(forgePrompt(FORGE_SERIES[0].cards[0]))
@@ -53,6 +53,37 @@ describe('forge api', () => {
     expect((await handle(req({ cardId: 'after-0' }), await withSave(), reply(500, { success: false, errors: [{ code: 1, message: 'boom' }] }))).status).toBe(502)
     delete env.CLOUDFLARE_API_TOKEN
     expect((await handle(req({ cardId: 'after-0' }), await withSave(), reply(200, {}))).status).toBe(503)
+  })
+})
+
+describe('softer retry', () => {
+  it('tones the wording down but keeps the scene', () => {
+    const card = FORGE_SERIES.find(s => s.id === 'after')!.cards[0]
+    const full = forgePrompt(card, 5, 0)
+    const soft = forgePrompt(card, 5, 1)
+    expect(full).toMatch(/bralette/)
+    expect(soft).not.toMatch(/bralette|lingerie|stockings/i)
+    expect(soft).toMatch(/white duvet/)
+  })
+
+  it('retries once with softer words when Cloudflare says NSFW, then gives up', async () => {
+    env.CLOUDFLARE_ACCOUNT_ID = 'acct'
+    env.CLOUDFLARE_API_TOKEN = 'tok'
+    const prompts: string[] = []
+    const nsfwThenOk = (async (_url: string, init: RequestInit) => {
+      prompts.push(JSON.parse(String(init.body)).prompt)
+      return prompts.length === 1
+        ? new Response(JSON.stringify({ success: false, errors: [{ code: 3030, message: 'AiError: Input prompt contains NSFW content.' }] }), { status: 400 })
+        : new Response(JSON.stringify({ success: true, result: { image: 'QUJD' } }), { status: 200 })
+    }) as unknown as typeof fetch
+    const res = await handle(req({ cardId: 'after-0', variant: 5 }), await withSave(), nsfwThenOk)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ image: 'QUJD', softer: true })
+    expect(prompts).toEqual([forgePrompt(forgeCard('after-0')!, 5, 0), forgePrompt(forgeCard('after-0')!, 5, 1)])
+    const alwaysNsfw = reply(400, { success: false, errors: [{ code: 3030, message: 'Input prompt contains NSFW content' }] })
+    expect((await handle(req({ cardId: 'after-0' }), await withSave(), alwaysNsfw)).status).toBe(422)
+    delete env.CLOUDFLARE_ACCOUNT_ID
+    delete env.CLOUDFLARE_API_TOKEN
   })
 })
 
@@ -79,13 +110,15 @@ describe('pack picking', () => {
   it('keeps every prompt fictional, adult and non-nude, within the model limit', () => {
     for (const c of FORGE_SERIES.flatMap(s => s.cards)) {
       for (const v of [0, 77, 9999]) {
-        const p = forgePrompt(c, v)
-        expect(p).toMatch(/woman/)
-        expect(p).toMatch(/mid-20s/)
-        expect(p).toMatch(/fictional adult/)
-        expect(p).toMatch(/No nudity/)
-        expect(p).not.toMatch(/\bgirl\b|pasties|topless|nude\b/i)
-        expect(p.length).toBeLessThan(2048)
+        for (const level of [0, 1] as const) {
+          const p = forgePrompt(c, v, level)
+          expect(p).toMatch(/woman/)
+          expect(p).toMatch(/early 20s/)
+          expect(p).toMatch(/fictional adult/)
+          // Words that trip Cloudflare's filter, or that we never use.
+          expect(p).not.toMatch(/\bgirl\b|teen|pasties|topless|nud(e|ity)|nipple|genital|sexual|sexy|seductive|sultry|pin-up/i)
+          expect(p.length).toBeLessThan(2048)
+        }
       }
     }
   })
