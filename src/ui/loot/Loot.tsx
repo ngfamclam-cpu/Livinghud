@@ -2,13 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   allCards,
   RARITY_NAMES,
-  SERIES,
   STAR_COPIES,
   STAR_UP_XP,
   cardById,
   collection,
-  featuredSeries,
-  monthOf,
   onGameEvent,
   type Card,
   type CustomCard,
@@ -18,7 +15,7 @@ import {
   type Player,
   type Summary,
 } from '../../engine'
-import { addCustomCard, deleteCustomCard, surpriseSeed } from '../../db/actions'
+import { addCustomCard, deleteCustomCard } from '../../db/actions'
 import { addPhoto, deletePhotos } from '../../db/photos'
 import { Photo } from '../lifelog/Photo'
 import { SystemWindow } from '../SystemWindow'
@@ -68,22 +65,18 @@ const nextStar = (copies: number) => {
   return next ? `${next - copies} more for the next star.` : 'Maxed out.'
 }
 
-const FILTERS: { key: string; label: string; test: (c: Card) => boolean }[] = [
+const RARITY_FILTERS: { key: string; label: string; test: (c: Card) => boolean }[] = [
   { key: 'all', label: 'All', test: () => true },
-  { key: 'idol', label: 'Idols', test: c => c.kind === 'idol' && c.series !== 'custom' },
-  { key: 'rizz', label: 'Rizz', test: c => c.series === 'rizz' },
-  { key: 'relic', label: 'Relics', test: c => c.kind === 'relic' && c.series !== 'rizz' },
-  { key: 'custom', label: 'My cards', test: c => c.series === 'custom' },
+  ...RARITIES.map(r => ({ key: r, label: RARITY_NAMES[r], test: (c: Card) => c.rarity === r })),
 ]
 
 /** The binder: every card, collected or not, with copies and power-up stars. */
-export function Collection({ player, summary, loot, custom, onClose }: { player: Player; summary: Summary; loot: LootDrop[]; custom: CustomCard[]; onClose?: () => void }) {
+export function Collection({ loot, custom, onClose }: { player?: Player; summary?: Summary; loot: LootDrop[]; custom: CustomCard[]; onClose?: () => void }) {
   const [filter, setFilter] = useState('all')
   const [open, setOpen] = useState<Card | null>(null)
   const owned = useMemo(() => collection(loot), [loot])
-  const featured = featuredSeries(monthOf(summary.today), surpriseSeed(player))
   const cards = allCards()
-  const shown = cards.filter(FILTERS.find(f => f.key === filter)!.test)
+  const shown = cards.filter(RARITY_FILTERS.find(f => f.key === filter)!.test).sort((a, b) => RARITIES.indexOf(b.rarity) - RARITIES.indexOf(a.rarity))
   const ownedShown = shown.filter(c => owned.has(c.id)).length
   const recent = [...loot].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5)
   const entry = open ? owned.get(open.id) : undefined
@@ -92,12 +85,11 @@ export function Collection({ player, summary, loot, custom, onClose }: { player:
   return (
     <main className="hud collection">
       <SystemWindow title={`Collection · ${owned.size}/${cards.length}`}>
-        <p className="system-line">Featured this month: {SERIES[featured]}. Its cards drop twice as often.</p>
         <p className="muted">
-          Bosses, main quest stages and the strength routine always drop a card; other quests have a 1-in-4 chance. Duplicates power a card up (★★ at {STAR_COPIES[1]} copies, ★★★ at {STAR_COPIES[2]}), +{STAR_UP_XP} XP each time.
+          Every card is forged for you. Bosses, main quest stages, the strength routine and perfect days always drop a brand-new one; other quests have a 1-in-4 chance. If a new card can’t be made right then, you get a copy of one you own instead: copies power a card up (★★ at {STAR_COPIES[1]} copies, ★★★ at {STAR_COPIES[2]}), +{STAR_UP_XP} XP each time.
         </p>
         <div className="tabs-inline">
-          {FILTERS.map(f => (
+          {RARITY_FILTERS.map(f => (
             <button key={f.key} className={`chip ${filter === f.key ? 'picked' : ''}`} aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}>{f.label}</button>
           ))}
           {onClose && <button className="ghost small" onClick={onClose}>Back</button>}
@@ -116,8 +108,7 @@ export function Collection({ player, summary, loot, custom, onClose }: { player:
         </SystemWindow>
       )}
 
-      {filter === 'custom' && <ForgePanel />}
-      {filter === 'custom' && <CardMaker custom={custom} />}
+      <ForgePanel />
 
       <SystemWindow title="Binder">
         <div className="binder">
@@ -133,9 +124,11 @@ export function Collection({ player, summary, loot, custom, onClose }: { player:
         </div>
       </SystemWindow>
 
+      <CardMaker custom={custom} />
+
       {open && entry && (
         <div className="overlay loot-reveal" role="dialog" aria-label={open.name} onClick={() => setOpen(null)}>
-          <p className={`drop-title r-${open.rarity}`}>{RARITY_NAMES[open.rarity].toUpperCase()} · {SERIES[open.series]}</p>
+          <p className={`drop-title r-${open.rarity}`}>{RARITY_NAMES[open.rarity].toUpperCase()}</p>
           <CardArt card={cardById(open.id) ?? open} stars={entry.stars} />
           <p className="drop-text">{open.text}</p>
           <p className="muted">
@@ -161,7 +154,7 @@ export function CollectionPanel({ loot, onOpen }: { loot: LootDrop[]; onOpen: ()
           {latest.map((c, i) => <CardArt key={`${c.id}-${i}`} card={c} stars={owned.get(c.id)?.stars ?? 1} />)}
         </div>
       ) : (
-        <p className="muted">Clear quests to find cards: idols, Rizz & Romance loot, odd relics, and cards you make yourself. Bosses and the strength routine always drop one.</p>
+        <p className="muted">Clear quests to earn brand-new forged cards. Bosses, main stages, the strength routine and perfect days always drop one; combo milestones open packs.</p>
       )}
       <div className="row end">
         <button className="small" onClick={onOpen}>Open binder</button>

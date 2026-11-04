@@ -98,7 +98,27 @@ const RAW: { id: string; name: string; rows: Row[] }[] = [
     ['epic', 'anime', 'Seraphine · Gate Knight', 'The gate closes when she says so.', 'She kneels in a throne room in sleek silver corset-shaped armour with a flowing cape, a glowing sword in her hand.'],
     ['legendary', 'real', 'Empress Ryu · Violet Gate', 'Rank: beyond measuring.', 'She stands before an enormous violet portal in a dark queen’s gown with a plunging neckline and a crown of violet light, glowing silhouettes of an army behind her.'],
   ]},
+  // Secret series: only forged once your best combo unlocks them (SECRET_UNLOCKS in incentives.ts).
+  { id: 'eclipse', name: 'Eclipse (secret)', rows: [
+    ['common', 'real', 'Noa · Blackout', 'The lights went out. She didn’t.', 'She leans against a moonlit window in a black velvet slip dress, silver hoop earrings, a slow knowing smile.'],
+    ['common', 'anime', 'Kuro · Night Bloom', 'Only blooms after midnight.', 'She sits among dark roses in a black lace corset top and a long tulle skirt, moonlight on her shoulders.'],
+    ['rare', 'anime', 'Selin · Shadow Waltz', 'One dance, then she vanishes.', 'She spins in an empty moonlit ballroom in a black satin gown with an open back, her shadow stretching across the floor.'],
+    ['rare', 'real', 'Yeon · Midnight Silk', 'Silk sheets, silver moon.', 'She lounges on black silk sheets in a silver satin camisole set, moonlight striping across her through blinds.'],
+    ['epic', 'real', 'Lune · Eclipse Gown', 'The moon hid to give her the spotlight.', 'She stands on a rooftop during a lunar eclipse in a sheer black gown embroidered with silver stars, the red moon behind her.'],
+    ['legendary', 'anime', 'Nyx · Queen of Night', 'Darkness was her idea.', 'She floats above a sleeping city in a gown made of night sky, a crescent moon crown in her hair, stars trailing from her fingertips.'],
+  ]},
+  { id: 'zenith', name: 'Zenith (secret)', rows: [
+    ['common', 'anime', 'Aurum · Gold Hour', 'Glows brighter than the sunset.', 'She poses on a golden beach at sunset in a gold metallic two-piece swimsuit and gold body jewellery.'],
+    ['common', 'real', 'Jin-ah · First Class', 'Upgraded. Obviously.', 'She relaxes in a private jet seat in a champagne silk blouse and a fitted cream skirt, holding a glass of champagne.'],
+    ['rare', 'real', 'Sol · Penthouse', 'The top floor was built for her.', 'She stands at a penthouse window at golden hour in a gold sequinned mini dress, the skyline glowing beneath her.'],
+    ['rare', 'anime', 'Halo · Solar Flare', 'Too bright to look away from.', 'She stands in a burst of sunlight in a white and gold bodysuit with flowing ribbons, golden light around her.'],
+    ['epic', 'anime', 'Celestia · Sun Throne', 'Every ray bows to her.', 'She lounges on a throne of light in a golden gown with a thigh-high slit and a radiant sun crown.'],
+    ['legendary', 'real', 'Empress Hwa · Zenith', 'The peak of everything.', 'She stands on a marble balcony above the clouds in a liquid-gold gown with a plunging neckline and a jewelled headpiece, the sun at its highest behind her.'],
+  ]},
 ]
+
+/** Series that stay locked until SECRET_UNLOCKS opens them. */
+export const FORGE_SECRET_SERIES = new Set(['eclipse', 'zenith'])
 
 export const FORGE_SERIES: ForgeSeries[] = RAW.map(s => ({
   id: s.id,
@@ -234,13 +254,14 @@ export interface PackPick {
  * A mixed pack: 2 Common, 2 Rare, 1 Epic, 1 Legendary from different series
  * where it can, both styles, skipping cards made recently, each with its own look.
  */
-export function pickPack(seed: string, recent: Iterable<string> = []): PackPick[] {
+export function pickPack(seed: string, recent: Iterable<string> = [], unlocked: Iterable<string> = []): PackPick[] {
   const skip = new Set(recent)
+  const opened = new Set(unlocked)
   const usedSeries = new Set<string>()
   const used = new Set<string>()
   const out: PackPick[] = []
   PACK_SHAPE.forEach((rarity, slot) => {
-    const pool = ALL.filter(c => c.rarity === rarity && !used.has(c.id))
+    const pool = ALL.filter(c => c.rarity === rarity && !used.has(c.id) && (!FORGE_SECRET_SERIES.has(c.series) || opened.has(c.series)))
     const ranked = [
       pool.filter(c => !skip.has(c.id) && !usedSeries.has(c.series)),
       pool.filter(c => !skip.has(c.id)),
@@ -255,13 +276,15 @@ export function pickPack(seed: string, recent: Iterable<string> = []): PackPick[
 }
 
 /**
- * A stand-in card of the same rarity, for when the image filter refuses one:
- * not already in the pack, recent cards avoided when possible, a fresh look.
+ * A card of the given rarity: a stand-in when the image filter refuses one, or a
+ * quest drop. Not already in the pack, recent cards and locked secret series
+ * avoided, with a fresh look.
  */
-export function replacementPick(rarity: ForgeRarity, exclude: Iterable<string>, seed: string, recent: Iterable<string> = []): PackPick | null {
+export function replacementPick(rarity: ForgeRarity, exclude: Iterable<string>, seed: string, recent: Iterable<string> = [], unlocked: Iterable<string> = []): PackPick | null {
   const skip = new Set(exclude)
   const old = new Set(recent)
-  const pool = ALL.filter(c => c.rarity === rarity && !skip.has(c.id))
+  const opened = new Set(unlocked)
+  const pool = ALL.filter(c => c.rarity === rarity && !skip.has(c.id) && (!FORGE_SECRET_SERIES.has(c.series) || opened.has(c.series)))
   const ranked = pool.filter(c => !old.has(c.id)).length ? pool.filter(c => !old.has(c.id)) : pool
   if (!ranked.length) return null
   return { card: ranked[hash(seed) % ranked.length], variant: hash(`${seed}:look`) % (MAX_VARIANT + 1) }
