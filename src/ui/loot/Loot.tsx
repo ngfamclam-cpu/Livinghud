@@ -24,6 +24,7 @@ import { Photo } from '../lifelog/Photo'
 import { SystemWindow } from '../SystemWindow'
 import { CardArt } from './CardArt'
 import { BulkImport } from './BulkImport'
+import { forgePack, type ForgeOutcome } from '../../db/forge'
 
 interface Reveal {
   card: Card
@@ -114,6 +115,7 @@ export function Collection({ player, summary, loot, custom, onClose }: { player:
         </SystemWindow>
       )}
 
+      {filter === 'custom' && <ForgePanel />}
       {filter === 'custom' && <CardMaker custom={custom} />}
 
       <SystemWindow title="Binder">
@@ -167,6 +169,48 @@ export function CollectionPanel({ loot, onOpen }: { loot: LootDrop[]; onOpen: ()
 }
 
 /** Make your own cards from images you pick: they drop like the rest. */
+const FORGE_FAIL: Record<Exclude<ForgeOutcome, { ok: true }>['reason'], string> = {
+  'no-sync': 'Turn on cloud sync first (More → Settings → Sync). The forge only works for a save that is in the cloud.',
+  'not-configured': 'Cloudflare isn’t connected. Check CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in Vercel, then redeploy.',
+  limit: 'Today’s free Cloudflare allowance is used up. It resets every day; try again tomorrow.',
+  failed: 'The image service didn’t answer. Try again in a minute.',
+}
+
+/** Pack Forge: Cloudflare's free image model makes a 6-card pack from one series. */
+function ForgePanel() {
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [result, setResult] = useState<ForgeOutcome | null>(null)
+  const run = async () => {
+    setResult(null)
+    setProgress({ done: 0, total: 6 })
+    try {
+      setResult(await forgePack((done, total) => setProgress({ done, total })))
+    } catch (e) {
+      setResult({ ok: false, reason: 'failed', made: 0, series: '', message: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setProgress(null)
+    }
+  }
+  return (
+    <SystemWindow title="Pack Forge">
+      <p className="muted">
+        Six new cards from one themed series, made by Cloudflare’s free image model: Common and Rare in anime style, Epic and Legendary photo-real. About a minute per pack. Fictional adults only.
+      </p>
+      {progress && <p className="system-line">Forging {progress.done}/{progress.total}…</p>}
+      {result?.ok && <p className="system-line">{result.series}: {result.made} cards forged and added to your binder.</p>}
+      {result && !result.ok && (
+        <p className="muted error">
+          {result.made > 0 ? `${result.made} card${result.made === 1 ? '' : 's'} made, then: ` : ''}{FORGE_FAIL[result.reason]}
+          {result.message ? ` (${result.message})` : ''}
+        </p>
+      )}
+      <div className="row end">
+        <button className="small" disabled={!!progress} onClick={run}>{progress ? 'Forging…' : 'Forge a test pack'}</button>
+      </div>
+    </SystemWindow>
+  )
+}
+
 function CardMaker({ custom }: { custom: CustomCard[] }) {
   const [photoId, setPhotoId] = useState<string | null>(null)
   const [name, setName] = useState('')
