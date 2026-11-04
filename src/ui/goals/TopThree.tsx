@@ -26,7 +26,7 @@ export function TopThree({ summary, goals, planning, onPlanning, onHistory }: {
               <li key={i} className={item.done ? 'done' : ''}>
                 <label className="goal-check">
                   <input type="checkbox" checked={item.done} onChange={() => toggleGoal(today.id, i)} />
-                  <span>{item.text}</span>
+                  <span>{item.text}{item.source === 'reflection' && <small className="goal-from"> from reflection</small>}</span>
                 </label>
               </li>
             ))}
@@ -68,13 +68,13 @@ function GoalForm({ summary, goals, onDone }: { summary: Summary; goals: DayGoal
   const current = goals.find(g => g.day === day)
   const carry = forToday ? [] : unfinished(today)
   const [texts, setTexts] = useState<string[]>(() => {
-    const start = current?.items.map(i => i.text) ?? []
+    const start = current?.items.filter(i => !i.source).map(i => i.text) ?? []
     return Array.from({ length: GOALS_PER_DAY }, (_, i) => start[i] ?? '')
   })
   const switchDay = (toToday: boolean) => {
     setForToday(toToday)
     const g = goals.find(x => x.day === (toToday ? summary.today : addDays(summary.today, 1)))
-    const start = g?.items.map(i => i.text) ?? []
+    const start = g?.items.filter(i => !i.source).map(i => i.text) ?? []
     setTexts(Array.from({ length: GOALS_PER_DAY }, (_, i) => start[i] ?? ''))
   }
   const addCarry = (t: string) => setTexts(list => {
@@ -92,7 +92,7 @@ function GoalForm({ summary, goals, onDone }: { summary: Summary; goals: DayGoal
     <div className="form goal-form">
       <div className="tabs-inline">
         <button className={`chip ${!forToday ? 'picked' : ''}`} onClick={() => switchDay(false)}>Tomorrow</button>
-        {!(today?.items.length) && <button className={`chip ${forToday ? 'picked' : ''}`} onClick={() => switchDay(true)}>Today</button>}
+        {!today?.items.some(i => !i.source) && <button className={`chip ${forToday ? 'picked' : ''}`} onClick={() => switchDay(true)}>Today</button>}
       </div>
       {texts.map((t, i) => (
         <label key={i}>

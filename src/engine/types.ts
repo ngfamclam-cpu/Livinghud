@@ -433,6 +433,8 @@ export interface GoalItem {
   done: boolean
   /** When it was ticked off (ms). */
   doneAt: number | null
+  /** 'reflection' = the "adjust tomorrow" answer from the previous day's reflection (an extra, on top of the top 3). */
+  source?: 'reflection'
 }
 
 /** "Tomorrow's top 3": the goals set for one game day. */

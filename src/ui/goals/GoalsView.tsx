@@ -94,7 +94,7 @@ export function GoalsView({ goals, summary, onDay }: { goals: DayGoals[]; summar
                   <li key={i} className={item.done ? 'done' : ''}>
                     <label className="goal-check">
                       <input type="checkbox" checked={item.done} onChange={() => toggleGoal(g.id, i)} aria-label={`${item.text} done`} />
-                      <span>{item.text}</span>
+                      <span>{item.text}{item.source === 'reflection' && <small className="goal-from"> from reflection</small>}</span>
                     </label>
                   </li>
                 ))}
