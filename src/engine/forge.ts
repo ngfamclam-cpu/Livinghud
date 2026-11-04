@@ -1,17 +1,24 @@
 // Pack Forge: card packs made by an image model (Cloudflare Workers AI). The
-// catalog of prompts lives here so the server only ever sends prompts from
-// this list (a public build can't be used to make arbitrary images), and the
+// catalog of prompts lives here so the server only ever sends prompts built
+// from this list (the endpoint can't be used to make arbitrary images), and the
 // app knows each card's name, flavour line and rarity before the image exists.
+//
+// Owner's brief (Nov 2026): sultry and sexy, a mix of lingerie, rave fits and
+// sexy-in-other-ways looks; photo-real women are East Asian and feminine; both
+// styles at every rarity. Limits: fictional adults only, no nudity (pasties
+// declined), no sexual acts. These are private custom cards, not shared drops.
 //
 // No imports on purpose: api/forge.ts loads this file directly on the server.
 
 export type ForgeRarity = 'common' | 'rare' | 'epic' | 'legendary'
+export type ForgeStyle = 'real' | 'anime'
 
 export interface ForgeCard {
-  /** `<series>-<n>`, e.g. "neon-3". */
+  /** `<series>-<n>`, e.g. "rave-3". */
   id: string
   series: string
   rarity: ForgeRarity
+  style: ForgeStyle
   name: string
   text: string
   scene: string
@@ -23,99 +30,141 @@ export interface ForgeSeries {
   cards: ForgeCard[]
 }
 
-const SAFE = 'She is a fictional adult woman in her mid-20s, an original character who does not resemble any real person. Glamorous, confident and alluring, tasteful and fully clothed.'
-const STYLE = {
-  anime: 'Style: polished anime illustration, clean cel shading, vibrant colour, detailed eyes, soft rim light, trading card art.',
-  real: 'Style: photorealistic editorial photo, 85mm lens, shallow depth of field, natural skin texture, cinematic lighting.',
-}
-const FRAME = 'Portrait framing with her whole upper body in view, centred, a little headroom. No text, no logos, no watermark, no other people in focus.'
-
-type Row = [ForgeRarity, string, string, string]
+type Row = [ForgeRarity, ForgeStyle, string, string, string]
 
 const RAW: { id: string; name: string; rows: Row[] }[] = [
-  { id: 'neon', name: 'Neon Stage', rows: [
-    ['common', 'Lumi · Encore Glow', 'One more song. The crowd decided.', 'A girl mid-twirl in a sparkly silver stage outfit under pink and cyan spotlights, holding a microphone, confetti in the air.'],
-    ['common', 'Rhea · Soundcheck', 'Before the lights, the work.', 'A girl at an empty arena rehearsal in an oversized hoodie and headphones around her neck, grinning at the camera from the stage edge.'],
-    ['rare', 'Kiko · Fan Wave', 'Ten thousand light sticks, one wave back.', 'A girl on a runway stage waving to a sea of glowing light sticks, high ponytail, cropped jacket and pleated skirt.'],
-    ['rare', 'Sora · Backstage Mirror', 'Glitter is a lifestyle.', 'A girl at a backstage mirror ringed with bulbs, adding glitter to her cheek and winking at her reflection.'],
-    ['epic', 'Mira · Final Chorus', 'Arms up. Last note. Golden rain.', 'A woman centre stage in a sequinned dress, arms raised, a rain of golden confetti falling, the crowd as bokeh lights behind her.'],
-    ['legendary', 'Aurelle · Crown of Lights', 'The stage rises. So does she.', 'A woman on a rising stage platform in a crystal-beaded outfit, dramatic beams of white light, haze and sparks around her, a triumphant expression.'],
+  { id: 'after', name: 'After Hours', rows: [
+    ['common', 'real', 'Yuna · Late Checkout', 'Do not disturb. Ever.', 'She lounges on rumpled white sheets in a black lace bralette and matching high-waisted briefs, propped on one elbow, giving a slow, knowing look over her shoulder.'],
+    ['common', 'anime', 'Mio · Slip Away', 'One strap down, no plans up.', 'She sits on the edge of a velvet bed in a lavender satin slip with lace trim, one strap sliding off her shoulder, biting her lip playfully.'],
+    ['rare', 'real', 'Seo-yeon · Room 1204', 'The city is awake. So is she.', 'She stands by a rain-streaked hotel window in a red lace teddy under a sheer black robe, city lights behind her, one hand resting on the glass.'],
+    ['rare', 'anime', 'Rei · Pillow Talk', 'She heard everything you didn’t say.', 'She kneels on silk pillows in a white lace bodysuit and thigh-high stockings, hair tousled, looking up with a sultry smile.'],
+    ['epic', 'real', 'Mei · Mirror Mirror', 'Twice the trouble, both hers.', 'She leans against a mirrored wall in an emerald silk corset with lace stockings and garters, her reflection doubling her silhouette, smoky eye makeup.'],
+    ['legendary', 'real', 'Hana · Candle Hour', 'The last thing on your mind before sleep.', 'She reclines on a velvet chaise longue in black strappy lingerie, a sheer floor-length robe pooling around her, candles everywhere, her gaze fixed on the viewer.'],
   ]},
-  { id: 'festival', name: 'Festival Bloom', rows: [
-    ['common', 'Pixie · Glitter Check', 'Face glitter: applied. Plans: none.', 'A girl with festival braids and face glitter in a holographic top, sunny festival field and flags behind her.'],
-    ['common', 'Juno · Kandi Trade', 'PLUR, one bracelet at a time.', 'A girl holding up colourful bead bracelets with a big smile, pastel festival outfit, tents and string lights behind.'],
-    ['rare', 'Nova · Laser Line', 'The drop hits. She was ready.', 'A girl dancing under green and violet lasers holding a glowing LED fan, reflective jacket, smoke in the air.'],
-    ['rare', 'Wren · Sunrise Set', 'Survived the night. Earned the sunrise.', 'A girl wrapped in a blanket on a grassy hill at sunrise after a festival, tired happy smile, a distant stage glowing.'],
-    ['epic', 'Vela · Main Stage Drop', 'Front row, full volume.', 'A woman at the front barrier with arms up, pyrotechnic flames behind the stage, sequinned crop top and cargo pants, glitter catching the light.'],
-    ['legendary', 'Iris · Bloom Goddess', 'Where the music grows flowers.', 'A woman in a flowing iridescent cape standing before a giant neon flower art installation at night, petals glowing in pink and teal.'],
+  { id: 'rave', name: 'Rave Siren', rows: [
+    ['common', 'anime', 'Kiko · Glow Up', 'PLUR, with a little danger.', 'She dances in a rhinestone bikini top, a holographic mini skirt and fluffy leg warmers, glow sticks in her hands, glitter on her collarbones.'],
+    ['common', 'real', 'Jia · Bass Face', 'Felt it in the chest. Saw her first.', 'She stands in a festival crowd in a mesh crop top over a black bralette, low-rise cargo shorts and combat boots, body glitter, a confident smirk.'],
+    ['rare', 'real', 'Rin · Laser Halo', 'Lost in the drop, found on purpose.', 'She raises her arms under green lasers in a chainmail halter top and silver micro shorts, glitter shining on her skin, eyes half closed in the music.'],
+    ['rare', 'anime', 'Luna · Wings Out', 'Took flight at 2 a.m.', 'She poses on a festival stage in an iridescent butterfly-wing crop top, tiny shorts and platform boots, a glowing LED fan open behind her.'],
+    ['epic', 'anime', 'Nova · UV Riot', 'Glows brighter under black light.', 'She dances on a podium in a neon pink harness over a bralette, fishnet tights and a glowing visor, UV paint swirling across her skin.'],
+    ['legendary', 'real', 'Aurelle · Main Stage Queen', 'The headliner turned to watch her.', 'She stands at the main stage barrier at night in a crystal body chain over a sequinned bralette and high-cut festival bottoms, pyrotechnics behind her, wind in her long hair.'],
   ]},
-  { id: 'tokyo', name: 'Tokyo After Dark', rows: [
-    ['common', 'Mei · 2 A.M. Run', 'Iced coffee is a food group.', 'A girl in an oversized bomber jacket holding iced coffee outside a brightly lit convenience store late at night.'],
-    ['common', 'Yuna · Clear Umbrella', 'Rain looks better in neon.', 'A girl with a clear umbrella on a busy crossing in the rain, city signs glowing and reflecting on the wet street.'],
-    ['rare', 'Hana · Claw Machine Ace', 'First try. Obviously.', 'A girl in an arcade proudly holding a plush toy she won from a claw machine, colourful machine lights around her.'],
-    ['rare', 'Rin · Rooftop Signal', 'The whole city, on mute.', 'A girl in a leather jacket on a rooftop at night, the city skyline glittering behind her, wind in her hair.'],
-    ['epic', 'Kaede · Neon Alley', 'Every light in the alley points to her.', 'A woman in a satin slip dress under a long coat in a narrow neon alley, glowing signs reflected in puddles.'],
-    ['legendary', 'Akari · Midnight Rider', 'Last train left. She didn’t need it.', 'A woman in a racing jacket leaning on a sleek motorcycle on a bridge at night, city lights streaking behind her.'],
+  { id: 'neon', name: 'Neon Nights', rows: [
+    ['common', 'real', 'Mina · Last Call', 'Your tab. Her rules.', 'She sits on a bar stool in a tiny black sequinned mini dress, legs crossed, swirling a cocktail and looking straight into the camera.'],
+    ['common', 'anime', 'Momo · Bubblegum', 'Sweet until she isn’t.', 'She leans in a neon alley in a glossy red vinyl mini dress and thigh-high boots, blowing a pink bubble, eyes half lidded.'],
+    ['rare', 'anime', 'Akari · Midnight Drive', 'Keys optional. Trouble guaranteed.', 'She lies back across the hood of a sports car at night in a backless silver halter dress, neon reflections sliding over the paint.'],
+    ['rare', 'real', 'Sora · Strobe', 'One flash and she’s all you see.', 'She dances in a crowded club in a sheer black mesh dress over a satin bralette, a strobe catching her mid hair flip.'],
+    ['epic', 'real', 'Celeste · VIP Only', 'The rope lifts for her.', 'She stands in a private lounge in a plunging gold satin gown with a thigh-high slit, one hand on her hip, a champagne tower glowing behind her.'],
+    ['legendary', 'anime', 'Vesper · Velvet Throne', 'Kneel, or at least try to look away.', 'She sits on a velvet throne in a black latex bodysuit with a long sheer cape, crimson lighting, a slow dangerous smile.'],
   ]},
-  { id: 'seoul', name: 'Seoul Café Days', rows: [
-    ['common', 'Dahye · Latte Art', 'She tried a heart. It’s a heart.', 'A girl in a cream knit sweater holding a latte with heart latte art in a bright minimalist café.'],
-    ['common', 'Sena · Bookshop Corner', 'Just one more chapter.', 'A girl reading in a cosy bookshop corner surrounded by tall shelves and warm lamps.'],
-    ['rare', 'Haeun · Rainy Window', 'Rain outside, playlist inside.', 'A girl at a café window seat on a rainy day, earbuds in, smiling at the drops on the glass.'],
-    ['rare', 'Jia · Flour Fight', 'Baking is 40% flour on your face.', 'A girl baking in a sunny kitchen with flour on her cheek, laughing, apron over a striped top.'],
-    ['epic', 'Yerin · Autumn Courtyard', 'Golden leaves, slow afternoon.', 'A woman in a camel coat in a traditional hanok café courtyard with falling autumn leaves, warm afternoon light.'],
-    ['legendary', 'Seoa · River Golden Hour', 'The best plans have no plan.', 'A woman at a golden-hour riverside picnic, city bridge in the distance, sundress and denim jacket, sun flare.'],
+  { id: 'sun', name: 'Sun & Salt', rows: [
+    ['common', 'real', 'Kai · Wet Look', 'Salt water and bad ideas.', 'She walks out of turquoise water in a white string bikini, wet hair slicked back, laughing at the camera.'],
+    ['common', 'anime', 'Lani · Tan Lines', 'Flip her over in ten minutes.', 'She lies on a beach towel in a strappy black bikini, sunglasses pushed into her hair, looking back over her shoulder.'],
+    ['rare', 'real', 'Selene · Pool Edge', 'Out of office, into trouble.', 'She lounges at the edge of an infinity pool in a high-cut red one-piece swimsuit, arms folded on the ledge, sunset behind her.'],
+    ['rare', 'anime', 'Marisol · Rinse', 'Last shower before the sunset party.', 'She stands under an outdoor beach shower in a tropical-print bikini, water running down her back, eyes closed, smiling.'],
+    ['epic', 'real', 'Ploy · Deck Party', 'The yacht was the second-best view.', 'She poses on a yacht deck in a crochet bikini and a sheer wrap skirt, wind lifting her hair, limestone island cliffs behind her.'],
+    ['legendary', 'anime', 'Iris · Moon Lagoon', 'Some tides only rise at night.', 'She rises from a glowing lagoon at night in a shimmering pearl bikini and gold body jewellery, bioluminescent water swirling around her.'],
   ]},
-  { id: 'island', name: 'Island Escape', rows: [
-    ['common', 'Kai · Snorkel Break', 'The fish were judging her form.', 'A girl on a white-sand beach with a snorkel mask pushed up on her head, laughing, turquoise water behind.'],
-    ['common', 'Lani · Scooter Day', 'No map. Good vibes.', 'A girl on a scooter beside green rice terraces, sunglasses on her head, flowy summer shirt.'],
-    ['rare', 'Ploy · Night Market', 'Ordered one of everything.', 'A girl holding street food skewers at a lantern-lit night market, warm glowing stalls behind her.'],
-    ['rare', 'Amara · Temple Steps', 'Quiet morning, long climb, worth it.', 'A girl in a modest long sundress on ancient stone temple steps at sunrise, serene.'],
-    ['epic', 'Selene · Infinity Sunset', 'Out-of-office: forever.', 'A woman in elegant resort wear and a wide sun hat at an infinity pool edge at sunset, ocean meeting the sky.'],
-    ['legendary', 'Marisol · Lagoon Queen', 'Found the place from the screensaver.', 'A woman standing at the bow of a longtail boat in a lagoon framed by limestone cliffs, flowing linen dress, emerald water.'],
+  { id: 'soft', name: 'Soft Hours', rows: [
+    ['common', 'real', 'Dahye · Borrowed Shirt', 'It looks better on her. Obviously.', 'She sits on a sunny kitchen counter in an oversized white button-up shirt and knee socks, holding a coffee mug, a sleepy flirty smile.'],
+    ['common', 'anime', 'Hina · Steam', 'Mirror’s fogged. Her mind isn’t.', 'She is wrapped in a fluffy towel after a shower, wet hair over one shoulder, steam on the mirror behind her, a playful wink.'],
+    ['rare', 'real', 'Haeun · Lazy Sunday', 'Plans cancelled. Obviously.', 'She lies on her stomach on a bed in an off-shoulder knit sweater and cotton shorts, chin in her hands, kicking her feet, a flirty grin.'],
+    ['rare', 'anime', 'Yerin · Door’s Open', 'She was expecting you.', 'She leans in a doorway in a silk pyjama shirt unbuttoned at the top, hair messy, one hand on the frame, an inviting look.'],
+    ['epic', 'real', 'Seoa · Golden Robe', 'Golden hour, slower heartbeat.', 'She stands in golden window light in a cream satin robe tied loosely at the waist, one shoulder bare, hair falling across her face.'],
+    ['legendary', 'anime', 'Tsuki · Moonlit', 'The moon only rises for her.', 'She sits on a windowsill at night in a sheer white nightgown over lace lingerie, moonlight outlining her silhouette as she looks back at the viewer.'],
+  ]},
+  { id: 'power', name: 'Power Muse', rows: [
+    ['common', 'anime', 'Ms. Han · Overtime', 'Staying late was her idea.', 'She sits on an office desk in a fitted pencil skirt and a silk blouse unbuttoned low, glasses lowered, a pen resting on her lips.'],
+    ['common', 'real', 'Raya · Kickstand', 'Helmet off. Guard down? Never.', 'She leans on a motorcycle in a cropped leather jacket over a lace bralette and tight black jeans, helmet on her hip.'],
+    ['rare', 'real', 'Scarlett · Board Meeting', 'Motion carried. Unanimously.', 'She strides down a city street in a tailored oversized blazer over a black lace bralette, high heels and dark sunglasses.'],
+    ['rare', 'anime', 'Vex · Rain Check', 'She never cancels. She reschedules you.', 'She stands on a rooftop in the rain in a black leather corset top and high-waisted leather trousers, wet hair, smirking.'],
+    ['epic', 'anime', 'Aria · Corner Office', 'The view is the second thing you notice.', 'She lounges in a leather executive chair in a red bodycon dress, legs crossed up on the desk, a city skyline behind her, twirling a pen.'],
+    ['legendary', 'real', 'Noir · The Boss', 'She doesn’t chase. She replaces.', 'She poses in a moody studio in a sharp black tuxedo jacket with a deep neckline showing a glimpse of black lace, sheer stockings and stilettos, holding her lapel.'],
   ]},
   { id: 'iron', name: 'Iron Muse', rows: [
-    ['common', 'Tessa · Warm-up', 'Mobility first. Ego later.', 'A girl in athletic wear stretching on a mat in a bright gym, focused and calm.'],
-    ['common', 'Ivy · Bar Hang', 'One more rep than yesterday.', 'A girl hanging from a pull-up bar with a determined grin, gym lights above.'],
-    ['rare', 'Rena · Wrapped Up', 'Hands wrapped. Mind clear.', 'A girl wrapping her hands with boxing tape beside a heavy bag, moody gym lighting.'],
-    ['rare', 'Zia · Lane Six', 'The track is hers today.', 'A girl in a sprint start position on a running track at golden hour, long shadow behind her.'],
-    ['epic', 'Brynn · Chalk & Iron', 'Chalk up. Lift heavy.', 'A strong woman in a matching training set chalking her hands beside a loaded barbell, dramatic side light, chalk dust in the air.'],
-    ['legendary', 'Astra · Summit Dawn', 'Every step counted. So did she.', 'A woman in trail-running gear on a mountain summit at dawn, arms open, clouds below, sun breaking over the ridge.'],
+    ['common', 'real', 'Tessa · Cooldown', 'Earned every drop of that glow.', 'She stretches on a gym mat in a seamless sports bra and high-waisted leggings, glistening after a workout, a confident smile.'],
+    ['common', 'anime', 'Ivy · Hang Time', 'One more rep. For you.', 'She hangs from a pull-up bar in a cropped tank top and tiny running shorts, toned midriff, a playful grin.'],
+    ['rare', 'anime', 'Rena · Round Two', 'You lasted one round. Cute.', 'She wraps her hands beside a heavy bag in a black sports bra and boxing shorts, a sheen of sweat, a fierce gaze.'],
+    ['rare', 'real', 'Zia · Rest Set', 'She caught you looking. Again.', 'She sits on a weight bench in a fitted crop top and booty shorts, towel around her neck, glancing over at the camera.'],
+    ['epic', 'real', 'Brynn · Mirror Pump', 'Progress pic, for science.', 'She poses in a gym mirror in a strappy matching workout set, hand on her hip, chalk on her palms, golden side light.'],
+    ['legendary', 'anime', 'Astra · Summit Dawn', 'Every step counted. So did she.', 'She stands on a mountain summit at dawn in a sports bra and running shorts, wind in her ponytail, arms wide, clouds below.'],
   ]},
   { id: 'gate', name: 'Gatebreakers', rows: [
-    ['common', 'Neri · Rookie Hunter', 'E-rank today. Not forever.', 'A girl in light leather armour holding a dagger in front of a glowing blue portal in an alley, nervous but brave.'],
-    ['common', 'Lys · Field Medic', 'Nobody falls on her shift.', 'A girl healer in a white and blue coat holding a staff that glows with green light inside a stone dungeon.'],
-    ['rare', 'Vex · Rooftop Archer', 'She never misses twice.', 'A girl archer on a city rooftop at night drawing a bow with a glowing arrow, a portal swirling in the sky.'],
-    ['rare', 'Noor · Shadow Summoner', 'Her pack follows no one else.', 'A girl in a dark hooded coat with violet eyes, shadowy wolves made of smoke circling her feet.'],
-    ['epic', 'Seraphine · Gate Knight', 'The gate closes when she says so.', 'A woman knight in sleek silver armour with a glowing sword in a ruined dungeon hall, embers in the air, cinematic.'],
-    ['legendary', 'Morrigan · Violet Gate Queen', 'Rank: beyond measuring.', 'A woman with a crown of violet light and a long dark cape before an enormous violet portal, glowing silhouettes of an army behind her.'],
-  ]},
-  { id: 'date', name: 'Date Night', rows: [
-    ['common', 'Coco · Movie Night', 'She picked the movie. You get popcorn.', 'A girl on a cosy couch with a bowl of popcorn and a blanket, playful smile, TV glow on her face.'],
-    ['common', 'Bree · Picnic Plan', 'She packed snacks for two.', 'A girl on a picnic blanket in a park holding strawberries, sundress, soft afternoon light.'],
-    ['rare', 'Jade · Karaoke Booth', 'She chose the duet. No escape.', 'A girl singing into a microphone in a neon karaoke booth, pointing at the camera with a wink.'],
-    ['rare', 'Raya · Rooftop Bar', 'One drink. Two stories. Three laughs.', 'A girl at a rooftop bar holding a cocktail, city lights behind her, little black dress, leaning on the railing.'],
-    ['epic', 'Scarlett · Candlelight', 'Reservation for two, under your name.', 'A woman in an elegant red dress at a candlelit restaurant table, warm golden light, a confident smile.'],
-    ['legendary', 'Celeste · The Gala', 'The whole room turned. She only looked at you.', 'A woman in a floor-length shimmering gown on a grand staircase under chandeliers, glancing back over her shoulder.'],
+    ['common', 'anime', 'Neri · Gate Runner', 'E-rank today. Not forever.', 'She grips a dagger before a glowing blue portal in fitted leather armour with a low neckline and thigh-high boots.'],
+    ['common', 'real', 'Lys · Wildwood', 'Follow her and get lost on purpose.', 'She stands in a misty forest in a sheer green elven gown with silver leaf jewellery and delicate pointed ears, a bow on her back.'],
+    ['rare', 'anime', 'Noor · Hexfire', 'Her spells don’t miss.', 'She summons violet flames in a black witch’s corset dress with a high slit and a wide-brimmed hat.'],
+    ['rare', 'real', 'Amara · Temple Dancer', 'The gate opened for her dance.', 'She poses in a ruined temple in a gold and crimson dancer’s costume with a coin belt and flowing veils, bare midriff.'],
+    ['epic', 'anime', 'Seraphine · Gate Knight', 'The gate closes when she says so.', 'She kneels in a throne room in sleek silver corset-shaped armour with a flowing cape, a glowing sword in her hand.'],
+    ['legendary', 'real', 'Empress Ryu · Violet Gate', 'Rank: beyond measuring.', 'She stands before an enormous violet portal in a dark queen’s gown with a plunging neckline and a crown of violet light, glowing silhouettes of an army behind her.'],
   ]},
 ]
 
 export const FORGE_SERIES: ForgeSeries[] = RAW.map(s => ({
   id: s.id,
   name: s.name,
-  cards: s.rows.map(([rarity, name, text, scene], i) => ({ id: `${s.id}-${i}`, series: s.id, rarity, name, text, scene })),
+  cards: s.rows.map(([rarity, style, name, text, scene], i) => ({ id: `${s.id}-${i}`, series: s.id, rarity, style, name, text, scene })),
 }))
 
-export const forgeCard = (id: string): ForgeCard | undefined => FORGE_SERIES.flatMap(s => s.cards).find(c => c.id === id)
+const ALL = FORGE_SERIES.flatMap(s => s.cards)
+export const forgeCard = (id: string): ForgeCard | undefined => ALL.find(c => c.id === id)
 
-/** Common and Rare are drawn in anime style; Epic and Legendary are photo-real. */
-export const forgeStyle = (r: ForgeRarity): 'anime' | 'real' => (r === 'epic' || r === 'legendary' ? 'real' : 'anime')
+// Variety: each forging picks a look, so the same card never comes out twice the same.
+const HERITAGE = ['a Korean', 'a Japanese', 'a Chinese', 'a Taiwanese', 'a Korean', 'a Japanese', 'a Vietnamese', 'a Thai']
+const HAIR_REAL = [
+  'long straight glossy black hair',
+  'soft wavy dark brown hair with curtain bangs',
+  'a sleek high ponytail',
+  'a messy low bun with loose strands framing her face',
+  'a chic shoulder-length bob',
+  'long hair with honey-brown highlights',
+  'long silky hair with see-through bangs',
+  'loose beach waves in chestnut brown',
+]
+const HAIR_ANIME = [
+  'long flowing black hair',
+  'pastel pink twin-length hair',
+  'silver-white hair with a side part',
+  'long lavender hair',
+  'a high ponytail of deep red hair',
+  'honey-blonde waves',
+  'a sleek navy bob',
+  'long dark hair with blue streaks',
+]
+const LIGHT = [
+  'Warm golden-hour light.',
+  'Neon pink and electric blue light.',
+  'Soft diffused window light.',
+  'Moody low-key light with a warm rim light.',
+  'Direct flash at night, glossy and editorial.',
+  'Flickering warm candlelight.',
+]
 
-/** The full prompt sent to the image model. */
-export const forgePrompt = (c: ForgeCard): string => `${c.scene} ${SAFE} ${STYLE[forgeStyle(c.rarity)]} ${FRAME}`
+const FEMME_REAL = 'She is a stunning, very feminine woman in her mid-20s with a delicate heart-shaped face, soft jawline, big expressive eyes, long lashes, glossy full lips, flawless dewy skin and a slender hourglass figure, wearing glamorous makeup'
+const FEMME_ANIME = 'She is a gorgeous, very feminine adult woman in her mid-20s with mature curvy proportions, elegant features, long lashes and glossy lips'
+const SAFE = 'Sultry, seductive and confident, a glamour pin-up mood. She is a fictional adult who does not resemble any real person. No nudity: no exposed nipples or genitals, no sexual acts.'
+const STYLE: Record<ForgeStyle, string> = {
+  real: 'Style: photorealistic high-end glamour photography, 85mm lens, shallow depth of field, natural skin texture, flattering light, magazine quality.',
+  anime: 'Style: polished modern anime key art, detailed glossy eyes, soft gradient cel shading, rich colour, trading card art.',
+}
+const FRAME = 'Portrait framing from the thighs up, centred, a little headroom. No text, no logos, no watermark, no other people in focus.'
+
+const pick = <T,>(list: T[], n: number) => list[Math.abs(n) % list.length]
+
+/** The full prompt sent to the image model. `variant` picks the look (heritage, hair, light). */
+export function forgePrompt(c: ForgeCard, variant = 0): string {
+  const v = Math.max(0, Math.floor(variant))
+  if (c.style === 'real') {
+    return `Photo of ${pick(HERITAGE, v)} woman. ${FEMME_REAL}, with ${pick(HAIR_REAL, v >> 3)}. ${c.scene} ${pick(LIGHT, v >> 6)} ${SAFE} ${STYLE.real} ${FRAME}`
+  }
+  return `Anime illustration of a woman. ${FEMME_ANIME}, with ${pick(HAIR_ANIME, v >> 3)}. ${c.scene} ${pick(LIGHT, v >> 6)} ${SAFE} ${STYLE.anime} ${FRAME}`
+}
 
 /** Cards per pack, and the image model's detail level (FLUX.1 schnell: 1-8 steps). */
 export const PACK_CARDS = 6
-export const FORGE_STEPS = 6
+export const FORGE_STEPS = 8
+export const MAX_VARIANT = 9999
+/** Rarity mix of one pack, in reveal order (rarest last). */
+const PACK_SHAPE: ForgeRarity[] = ['common', 'common', 'rare', 'rare', 'epic', 'legendary']
 
 function hash(s: string): number {
   let h = 2166136261
@@ -123,14 +172,31 @@ function hash(s: string): number {
   return h >>> 0
 }
 
+export interface PackPick {
+  card: ForgeCard
+  variant: number
+}
+
 /**
- * Picks a pack: one series (seeded, skipping the series of the last pack when
- * possible) and every card in it, rarest last so the pack ends on a high.
+ * A mixed pack: 2 Common, 2 Rare, 1 Epic, 1 Legendary from different series
+ * where it can, both styles, skipping cards made recently, each with its own look.
  */
-export function pickPack(seed: string, lastSeries: string | null = null): { series: ForgeSeries; cards: ForgeCard[] } {
-  const options = FORGE_SERIES.filter(s => s.id !== lastSeries)
-  const series = options[hash(seed) % options.length]
-  const order: ForgeRarity[] = ['common', 'rare', 'epic', 'legendary']
-  const cards = [...series.cards].sort((a, b) => order.indexOf(a.rarity) - order.indexOf(b.rarity)).slice(0, PACK_CARDS)
-  return { series, cards }
+export function pickPack(seed: string, recent: Iterable<string> = []): PackPick[] {
+  const skip = new Set(recent)
+  const usedSeries = new Set<string>()
+  const used = new Set<string>()
+  const out: PackPick[] = []
+  PACK_SHAPE.forEach((rarity, slot) => {
+    const pool = ALL.filter(c => c.rarity === rarity && !used.has(c.id))
+    const ranked = [
+      pool.filter(c => !skip.has(c.id) && !usedSeries.has(c.series)),
+      pool.filter(c => !skip.has(c.id)),
+      pool,
+    ].find(p => p.length > 0)!
+    const card = ranked[hash(`${seed}:${slot}`) % ranked.length]
+    used.add(card.id)
+    usedSeries.add(card.series)
+    out.push({ card, variant: hash(`${seed}:look:${slot}`) % (MAX_VARIANT + 1) })
+  })
+  return out
 }

@@ -1,7 +1,7 @@
 // Pack Forge, app side: asks api/forge.ts for each card's image, crops it with
 // the bulk-import tools, saves it as one of your cards and reveals it as a drop.
 
-import { pickPack, type ForgeCard } from '../engine'
+import { pickPack, type PackPick } from '../engine'
 import { addCustomCard, grantCard } from './actions'
 import { db, LOCAL_USER } from './db'
 import { addPhoto } from './photos'
@@ -15,11 +15,11 @@ export type ForgeOutcome =
 /** Two images at a time: quick, and gentle on the free allowance's rate limit. */
 const PARALLEL = 2
 
-async function makeImage(key: string, card: ForgeCard): Promise<Blob | { error: 'not-configured' | 'limit' | 'failed'; message?: string }> {
+async function makeImage(key: string, { card, variant }: PackPick): Promise<Blob | { error: 'not-configured' | 'limit' | 'failed'; message?: string }> {
   const res = await fetch('/api/forge', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-sync-key': key },
-    body: JSON.stringify({ cardId: card.id }),
+    body: JSON.stringify({ cardId: card.id, variant }),
   }).catch(() => null)
   if (!res) return { error: 'failed', message: 'No connection.' }
   if (!res.headers.get('content-type')?.includes('application/json')) return { error: 'not-configured', message: 'The forge is not on this server yet.' }
@@ -33,13 +33,16 @@ async function makeImage(key: string, card: ForgeCard): Promise<Blob | { error: 
   return new Blob([bytes], { type: 'image/jpeg' })
 }
 
-/** Forges one pack (6 cards from one series). Cards that were made are kept even if a later one fails. */
+/** Forges one mixed pack (2 Common, 2 Rare, 1 Epic, 1 Legendary). Cards that were made are kept even if a later one fails. */
 export async function forgePack(onProgress: (done: number, total: number) => void = () => {}): Promise<ForgeOutcome> {
   const player = await db.players.get(LOCAL_USER)
   const mine = await db.customCards.where('userId').equals(LOCAL_USER).toArray()
-  const last = mine.filter(c => c.forge).sort((a, b) => b.createdAt - a.createdAt)[0]
+  // Skip the cards from your last few packs so each pack feels new.
+  const recent = mine.filter(c => c.forge).sort((a, b) => b.createdAt - a.createdAt).slice(0, 18).map(c => c.forge!)
   const packId = `forge-${Date.now()}`
-  const { series, cards } = pickPack(`${player?.id ?? 'local'}:${packId}`, last?.forge?.split('-')[0] ?? null)
+  const picks = pickPack(`${player?.id ?? 'local'}:${packId}`, recent)
+  const cards = picks.map(p => p.card)
+  const series = { name: 'Mixed pack' }
   const key = syncKey()
   if (!key) return { ok: false, reason: 'no-sync', made: 0, series: series.name }
 
@@ -49,7 +52,7 @@ export async function forgePack(onProgress: (done: number, total: number) => voi
   onProgress(0, cards.length)
   for (let i = 0; i < cards.length && !failure; i += PARALLEL) {
     const batch = cards.slice(i, i + PARALLEL)
-    const results = await Promise.all(batch.map(c => makeImage(key, c)))
+    const results = await Promise.all(picks.slice(i, i + PARALLEL).map(p => makeImage(key, p)))
     results.forEach((r, j) => {
       if (r instanceof Blob) images[i + j] = r
       else failure = failure ?? r
