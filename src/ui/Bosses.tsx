@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BOSS_XP, MINUTES_PER_HIT, type Player, type StatKey, type Summary } from '../engine'
+import { BOSS_XP, MINUTES_PER_HIT, type Player, type StatKey, type Summary, statName } from '../engine'
 import { addBoss, hitBoss, removeBoss } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
@@ -34,7 +34,7 @@ export function Bosses({ player, summary, onFight }: { player: Player; summary: 
         {summary.bosses.map(({ boss, hpLeft, minutes }) => (
           <li key={boss.id} className={`person boss ${boss.defeatedAt ? 'defeated' : ''}`}>
             <div className="quest-main">
-              <span className="stat-key">{boss.stat}</span>
+              <span className="stat-key">{statName(boss.stat)}</span>
               <span className="quest-title">{boss.name}</span>
               <span className="routine-count">{boss.defeatedAt ? 'DEFEATED' : `${hpLeft}/${boss.hp} HP`}</span>
             </div>

@@ -13,6 +13,7 @@ import {
   type Player,
   type Quest,
   type Summary,
+  statName,
 } from '../engine'
 import { addMainFromTemplate, addSideFromTemplate, surpriseSeed } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
@@ -49,7 +50,7 @@ export function QuestOffers({ player, quests, completions, summary }: { player: 
           {sides.offers.map(o => (
             <li key={o.id} className={`offer-card kind-${o.kind} ${have(o.id) ? 'added' : ''}`}>
               <div className="offer-top">
-                <span className="stat-key">{o.stat}</span>
+                <span className="stat-key">{statName(o.stat)}</span>
                 <span className={`offer-kind ${o.kind}`}>{OFFER_KIND_NAMES[o.kind as OfferKind]}</span>
               </div>
               <b>{o.title}</b>
@@ -70,7 +71,7 @@ export function QuestOffers({ player, quests, completions, summary }: { player: 
           {mains.offers.map(o => (
             <li key={o.id} className={`offer-card main ${have(o.id) ? 'added' : ''}`}>
               <div className="offer-top">
-                <span className="stat-key">{o.stat}</span>
+                <span className="stat-key">{statName(o.stat)}</span>
                 <span className="offer-kind">{o.span} · {o.stages.length} stages</span>
               </div>
               <b>{o.title}</b>

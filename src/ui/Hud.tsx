@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, STATS, addDays, featureOn, dayExercises, formatAmount, questReward, dailyWeight, type Bill, type Completion, type DayGoals, type LootDrop, type Transaction, type Memory, type Player, type Quest, type Summary, type SurpriseClear } from '../engine'
+import { Fragment, useState, type ReactNode } from 'react'
+import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, addDays, featureOn, dayExercises, formatAmount, questReward, dailyWeight, type Bill, type Completion, type DayGoals, type LootDrop, type Transaction, type Memory, type Player, type Quest, type Summary, type SurpriseClear, statName } from '../engine'
 import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { SurpriseCard } from './SurpriseCard'
@@ -9,6 +9,8 @@ import { CollectionPanel } from './loot/Loot'
 import { MoneyPanel } from './finance/MoneyPanel'
 import { activeFocus, focusedMinutes } from '../db/focus'
 import { Bar } from './Bar'
+import { PenaltyZone, ComboPanel } from './IncentivePanels'
+import { useHudLayout, type PanelId } from './hudLayout'
 import { money, monthName } from './format'
 
 interface HudProps {
@@ -36,9 +38,12 @@ interface HudProps {
   transactions: Transaction[]
   bills: Bill[]
   onFinance: () => void
+  /** Opens the Customize HUD screen (phone layout). */
+  onCustomize?: () => void
 }
 
-export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop, memories, onLifeLog, goals, onGoals, loot, onCollection, transactions, bills, onFinance }: HudProps) {
+export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop, memories, onLifeLog, goals, onGoals, loot, onCollection, transactions, bills, onFinance, onCustomize }: HudProps) {
+  const layout = useHudLayout()
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
   const sides = active.filter(q => q.kind === 'side')
@@ -52,53 +57,137 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
   const { level, wallet, savings } = summary
   const weakest = player.stats.reduce((a, b) => ((summary.stats[b] ?? 0) < (summary.stats[a] ?? 0) ? b : a), player.stats[0])
 
+  const panels: Record<PanelId, ReactNode> = {
+    status:
+      !desktop && <SystemWindow title="Status" className="status">
+            <div className="player-line">
+              <div>
+                <div className="player-name">{player.name}</div>
+                {featureOn(player, 'badges') && player.title && summary.badges.some(b => b.title === player.title) && (
+                  <div className="player-title">{player.title}</div>
+                )}
+                {featureOn(player, 'badges') && summary.streakBonus.size > 0 && (
+                  <div className="muted">Streak bonus: +10% XP on {[...summary.streakBonus].map(statName).join(', ')}</div>
+                )}
+                <div className="muted">Rank {summary.rank} · {Math.round(summary.completionRate * 100)}% over 30 days</div>
+              </div>
+              <div className="level">
+                <small>LV.</small>
+                {level.level}
+              </div>
+            </div>
+            <Bar value={level.xpIntoLevel} max={level.xpForNext} label={`${level.xpIntoLevel} / ${level.xpForNext} XP`} />
+            {summary.penalty && <PenaltyLine summary={summary} difficulty={player.settings.difficulty} />}
+            {featureOn(player, 'report') && (
+              <div className="row end">
+                <button className="ghost small" onClick={onReport}>Weekly report</button>
+              </div>
+            )}
+
+            <div className="wallet">
+              <div>
+                <div className="muted">Reward Wallet · {monthName(wallet.month)}</div>
+                <div className="big">{money(wallet.available)} <small>to spend</small></div>
+                <div className="muted">Earned {money(wallet.earned)} of {money(wallet.budget)}</div>
+              </div>
+              <div className="vault">
+                <div className="muted">Vault</div>
+                <div className="big">{money(wallet.vault)}</div>
+              </div>
+            </div>
+            <Bar value={wallet.earned} max={wallet.budget} variant="gold" />
+            {savings.target > 0 || player.settings.savingsGoal.type === 'percent' ? (
+              <p className={`muted gate ${savings.met ? 'met' : ''}`}>
+                {savings.met
+                  ? `Savings goal met: ${money(savings.saved)} saved. The shop is open.`
+                  : `Shop locked until you save ${money(savings.target)} this month (${money(savings.saved)} so far).`}
+              </p>
+            ) : null}
+          </SystemWindow>,
+    dailies:
+      (
+            <SystemWindow title={`Daily Quest · ${doneCount}/${dailies.length}`}>
+              {doneCount === dailies.length && dailies.length > 0 && (
+                <p className="system-line clear">All daily quests cleared. Rest well, Player.</p>
+              )}
+              <ul className="quests">
+                {dailies.map(q => (
+                  <QuestRow
+                    key={q.id}
+                    quest={q}
+                    done={summary.todayDone.get(q.id)}
+                    streak={summary.streaks.get(q.id) ?? 0}
+                    routine={q.templateId === 'str-routine' ? summary.routine : null}
+                    onStartWorkout={onStartWorkout}
+                    pay={payOf(q)}
+                    onPhoto={q.templateId === 'int-photo' ? () => onLifeLog(true) : undefined}
+                    onPlan={q.templateId === 'agi-plan' ? () => setPlanning(true) : undefined}
+                  />
+                ))}
+              </ul>
+            </SystemWindow>
+          ),
+    combo:
+      featureOn(player, 'incentives') && <ComboPanel summary={summary} dailiesLeft={dailies.length - doneCount} />,
+    top3:
+      showTopThree && <TopThree summary={summary} goals={goals} planning={planning} onPlanning={setPlanning} onHistory={onGoals} />,
+    today:
+      featureOn(player, 'memories') && (
+            <TodayPage summary={summary} memories={memories} journaledToday={journaledToday} showJournal={featureOn(player, 'journal')} onLifeLog={onLifeLog} onJournal={onJournal} />
+          ),
+    money:
+      featureOn(player, 'finance') && <MoneyPanel summary={summary} finance={player.finance} transactions={transactions} bills={bills} onOpen={onFinance} />,
+    sides:
+      sides.length > 0 && (
+            <SystemWindow title={`Side Quests · this week ${sideDone}/${sides.length}`}>
+              <ul className="quests">
+                {sides.map(q => <QuestRow key={q.id} quest={q} done={summary.weekDone.get(q.id)} />)}
+              </ul>
+            </SystemWindow>
+          ),
+    stats:
+      !desktop && <SystemWindow title="Stats">
+            <ul className="stats">
+              {player.stats.map(key => (
+                <li key={key} className={key === weakest && dailies.length > 0 ? 'weakest' : ''}>
+                  <span className="stat-name">{statName(key)}</span>
+                  <Bar value={summary.stats[key] ?? 0} max={100} thin />
+                  <span className="stat-value">{summary.stats[key] ?? 0}</span>
+                </li>
+              ))}
+            </ul>
+          </SystemWindow>,
+    mains:
+      mains.length > 0 && (
+            <SystemWindow title="Main Quests">
+              <ul className="quests">
+                {mains.map(q => <MainQuestRow key={q.id} quest={q} summary={summary} />)}
+              </ul>
+            </SystemWindow>
+          ),
+    focus:
+      featureOn(player, 'focus') && <FocusPanel summary={summary} showBoss={featureOn(player, 'bosses')} onFocus={onFocus} />,
+    adventure:
+      featureOn(player, 'plans') && <AdventurePanel summary={summary} onPlans={onPlans} />,
+    journal:
+      featureOn(player, 'journal') && !featureOn(player, 'memories') && (
+            <SystemWindow title="Journal">
+              <div className="row">
+                <p className="muted grow">{journaledToday ? 'Today’s entry is saved. You can still add to it.' : 'Three questions, two taps. About two minutes.'}</p>
+                <button className="small" onClick={onJournal}>{journaledToday ? 'Open journal' : 'Write today’s entry'}</button>
+              </div>
+            </SystemWindow>
+          ),
+    collection:
+      featureOn(player, 'cards') && <CollectionPanel loot={loot} onOpen={onCollection} />,
+  }
+  const shown = layout.order.filter(id => layout.place[id] !== 'hidden' && panels[id])
+  const top = desktop ? shown : shown.filter(id => layout.place[id] === 'top')
+  const more = desktop ? [] : shown.filter(id => layout.place[id] === 'more')
+
   return (
     <main className="hud">
-      {!desktop && <SystemWindow title="Status" className="status">
-        <div className="player-line">
-          <div>
-            <div className="player-name">{player.name}</div>
-            {featureOn(player, 'badges') && player.title && summary.badges.some(b => b.title === player.title) && (
-              <div className="player-title">{player.title}</div>
-            )}
-            {featureOn(player, 'badges') && summary.streakBonus.size > 0 && (
-              <div className="muted">Streak bonus: +10% XP on {[...summary.streakBonus].join(', ')}</div>
-            )}
-            <div className="muted">Rank {summary.rank} · {Math.round(summary.completionRate * 100)}% over 30 days</div>
-          </div>
-          <div className="level">
-            <small>LV.</small>
-            {level.level}
-          </div>
-        </div>
-        <Bar value={level.xpIntoLevel} max={level.xpForNext} label={`${level.xpIntoLevel} / ${level.xpForNext} XP`} />
-        {summary.penalty && <PenaltyLine summary={summary} difficulty={player.settings.difficulty} />}
-        {featureOn(player, 'report') && (
-          <div className="row end">
-            <button className="ghost small" onClick={onReport}>Weekly report</button>
-          </div>
-        )}
-
-        <div className="wallet">
-          <div>
-            <div className="muted">Reward Wallet · {monthName(wallet.month)}</div>
-            <div className="big">{money(wallet.available)} <small>to spend</small></div>
-            <div className="muted">Earned {money(wallet.earned)} of {money(wallet.budget)}</div>
-          </div>
-          <div className="vault">
-            <div className="muted">Vault</div>
-            <div className="big">{money(wallet.vault)}</div>
-          </div>
-        </div>
-        <Bar value={wallet.earned} max={wallet.budget} variant="gold" />
-        {savings.target > 0 || player.settings.savingsGoal.type === 'percent' ? (
-          <p className={`muted gate ${savings.met ? 'met' : ''}`}>
-            {savings.met
-              ? `Savings goal met: ${money(savings.saved)} saved. The shop is open.`
-              : `Shop locked until you save ${money(savings.target)} this month (${money(savings.saved)} so far).`}
-          </p>
-        ) : null}
-      </SystemWindow>}
+      <PenaltyZone player={player} summary={summary} />
 
       {featureOn(player, 'memories') && <NewAreaBanner onSnap={() => onLifeLog(true)} />}
 
@@ -142,77 +231,18 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
         </SystemWindow>
       )}
 
-      {featureOn(player, 'plans') && <AdventurePanel summary={summary} onPlans={onPlans} />}
+      {top.map(id => <Fragment key={id}>{panels[id]}</Fragment>)}
 
-      {featureOn(player, 'focus') && <FocusPanel summary={summary} showBoss={featureOn(player, 'bosses')} onFocus={onFocus} />}
-
-      {featureOn(player, 'memories') && (
-        <TodayPage summary={summary} memories={memories} journaledToday={journaledToday} showJournal={featureOn(player, 'journal')} onLifeLog={onLifeLog} onJournal={onJournal} />
+      {more.length > 0 && (
+        <details className="hud-more">
+          <summary>More: {more.map(id => PANEL_SHORT[id]).join(', ')}</summary>
+          {more.map(id => <Fragment key={id}>{panels[id]}</Fragment>)}
+        </details>
       )}
-
-      {featureOn(player, 'journal') && !featureOn(player, 'memories') && (
-        <SystemWindow title="Journal">
-          <div className="row">
-            <p className="muted grow">{journaledToday ? 'Today’s entry is saved. You can still add to it.' : 'Three questions, two taps. About two minutes.'}</p>
-            <button className="small" onClick={onJournal}>{journaledToday ? 'Open journal' : 'Write today’s entry'}</button>
-          </div>
-        </SystemWindow>
-      )}
-
-      {!desktop && <SystemWindow title="Stats">
-        <ul className="stats">
-          {player.stats.map(key => (
-            <li key={key} className={key === weakest && dailies.length > 0 ? 'weakest' : ''}>
-              <span className="stat-key">{key}</span>
-              <span className="stat-name">{STATS.find(s => s.key === key)?.name}</span>
-              <Bar value={summary.stats[key] ?? 0} max={100} thin />
-              <span className="stat-value">{summary.stats[key] ?? 0}</span>
-            </li>
-          ))}
-        </ul>
-      </SystemWindow>}
-
-      {showTopThree && <TopThree summary={summary} goals={goals} planning={planning} onPlanning={setPlanning} onHistory={onGoals} />}
-
-      <SystemWindow title={`Daily Quest · ${doneCount}/${dailies.length}`}>
-        {doneCount === dailies.length && dailies.length > 0 && (
-          <p className="system-line clear">All daily quests cleared. Rest well, Player.</p>
-        )}
-        <ul className="quests">
-          {dailies.map(q => (
-            <QuestRow
-              key={q.id}
-              quest={q}
-              done={summary.todayDone.get(q.id)}
-              streak={summary.streaks.get(q.id) ?? 0}
-              routine={q.templateId === 'str-routine' ? summary.routine : null}
-              onStartWorkout={onStartWorkout}
-              pay={payOf(q)}
-              onPhoto={q.templateId === 'int-photo' ? () => onLifeLog(true) : undefined}
-              onPlan={q.templateId === 'agi-plan' ? () => setPlanning(true) : undefined}
-            />
-          ))}
-        </ul>
-      </SystemWindow>
-
-      {sides.length > 0 && (
-        <SystemWindow title={`Side Quests · this week ${sideDone}/${sides.length}`}>
-          <ul className="quests">
-            {sides.map(q => <QuestRow key={q.id} quest={q} done={summary.weekDone.get(q.id)} />)}
-          </ul>
-        </SystemWindow>
-      )}
-
-      {featureOn(player, 'finance') && <MoneyPanel summary={summary} finance={player.finance} transactions={transactions} bills={bills} onOpen={onFinance} />}
-
-      {featureOn(player, 'cards') && <CollectionPanel loot={loot} onOpen={onCollection} />}
-
-      {mains.length > 0 && (
-        <SystemWindow title="Main Quests">
-          <ul className="quests">
-            {mains.map(q => <MainQuestRow key={q.id} quest={q} summary={summary} />)}
-          </ul>
-        </SystemWindow>
+      {!desktop && onCustomize && (
+        <div className="row center">
+          <button className="ghost small" onClick={onCustomize}>Customize HUD</button>
+        </div>
       )}
     </main>
   )
@@ -232,6 +262,22 @@ interface RowProps {
   onPlan?: () => void
 }
 
+const PANEL_SHORT: Record<PanelId, string> = {
+  status: 'status',
+  dailies: 'dailies',
+  combo: 'combo',
+  top3: 'top 3',
+  today: 'today',
+  money: 'money',
+  sides: 'side quests',
+  stats: 'stats',
+  mains: 'main quests',
+  focus: 'focus',
+  adventure: 'adventure',
+  journal: 'journal',
+  collection: 'cards',
+}
+
 function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto, pay, onPlan }: RowProps) {
   const [open, setOpen] = useState(false)
   const routineParts = routine
@@ -244,7 +290,7 @@ function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto, p
   return (
     <li className={`quest ${done ? 'done' : ''}`}>
       <button className="quest-main" onClick={() => setOpen(o => !o)} aria-expanded={open}>
-        <span className="stat-key">{quest.stat}</span>
+        <span className="stat-key">{statName(quest.stat)}</span>
         <span className="quest-title">{quest.title}</span>
         {pay && !done && <span className="quest-pay" title="Full version pays">{money(pay.dollars)}</span>}
         {streak > 0 && <span className="streak" title={`${streak}-day streak`}>{streak}d</span>}
@@ -297,7 +343,7 @@ function MainQuestRow({ quest, summary }: { quest: Quest; summary: Summary }) {
   return (
     <li className={`quest main-quest ${progress.done ? 'done' : ''}`}>
       <button className="quest-main" onClick={() => setOpen(o => !o)} aria-expanded={open}>
-        <span className="stat-key">{quest.stat}</span>
+        <span className="stat-key">{statName(quest.stat)}</span>
         <span className="quest-title">{quest.title}</span>
         <span className="streak">{progress.cleared}/{stages.length}</span>
       </button>

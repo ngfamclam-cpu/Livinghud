@@ -64,6 +64,8 @@ export const SERIES: Record<string, string> = {
   'dungeon-pantry': 'Dungeon Pantry',
   rizz: 'Rizz & Romance',
   custom: 'My cards',
+  eclipse: 'Eclipse (secret · 7-day combo)',
+  zenith: 'Zenith (secret · 30-day combo)',
 }
 
 const idol = (id: string, name: string, scene: 'K' | 'J' | 'C', group: string, move: string, pose: Pose, rarity: Rarity, colors: [string, string], text: string): Card => ({
@@ -206,17 +208,39 @@ export const customCard = (c: { id: string; name: string; rarity: Rarity; text: 
   id: `custom-${c.id}`, kind: 'idol', name: c.name, rarity: c.rarity, text: c.text, photoId: c.photoId, series: 'custom',
 })
 
-const BUILT_IN: Card[] = [...IDOLS, ...ANIME, ...RELICS, ...RIZZ]
+
+/** Secret series: they only drop once your best combo unlocks them (see SECRET_UNLOCKS in incentives.ts). */
+export const SECRET_SERIES = new Set(['eclipse', 'zenith'])
+
+const secretAnime = (series: 'eclipse' | 'zenith', id: string, name: string, group: string, move: string, rarity: Rarity, colors: [string, string], portrait: Portrait, text: string): Card => ({
+  id: `${series}-${id}`, kind: 'idol', scene: 'A', name, group, move, rarity, colors, portrait, text, series,
+})
+const secretRelic = (series: 'eclipse' | 'zenith', id: string, name: string, icon: string, rarity: Rarity, text: string): Card => ({
+  id: `${series}-${id}`, kind: 'relic', name, icon, rarity, text, series,
+})
+
+const SECRET: Card[] = [
+  secretAnime('eclipse', 'noctis', 'Noctis', 'ECLIPSE', 'Blackout Spin', 'epic', ['#1b1035', '#7b2cbf'], { hair: '#0d0d1a', style: 'long', eyes: '#c77dff', outfit: '#3c096c', accent: 'crown', expression: 'cool' }, 'Only performs when the lights go out. Seven days earned her.'),
+  secretAnime('eclipse', 'umbra', 'Umbra', 'ECLIPSE', 'Shadow Step', 'epic', ['#0b132b', '#3a506b'], { hair: '#5bc0be', style: 'bob', eyes: '#6fffe9', outfit: '#1c2541', accent: 'headphones', expression: 'wink' }, 'Moves like a shadow you can hear.'),
+  secretAnime('eclipse', 'selene', 'Selene', 'ECLIPSE', 'Moonrise', 'legendary', ['#14213d', '#fca311'], { hair: '#e5e5e5', style: 'wavy', eyes: '#fca311', outfit: '#14213d', accent: 'star', expression: 'smile' }, 'Rises when everyone else gives up for the night.'),
+  secretRelic('eclipse', 'mask', 'Eclipse Mask', '🎭', 'epic', 'Worn by hunters who kept going a whole week straight.'),
+  secretRelic('eclipse', 'hourglass', 'Black Hourglass', '⏳', 'rare', 'Seven grains of sand. One for each perfect day.'),
+  secretAnime('zenith', 'astra', 'Astra', 'ZENITH', 'Supernova Encore', 'legendary', ['#fff3b0', '#e09f3e'], { hair: '#fefae0', style: 'twin', eyes: '#e09f3e', outfit: '#9e2a2b', accent: 'crown', expression: 'grin' }, 'A month of perfect days. The whole stadium chants your name.'),
+  secretAnime('zenith', 'solara', 'Solara', 'ZENITH', 'Sunburst', 'legendary', ['#ffbe0b', '#fb5607'], { hair: '#ff006e', style: 'pony', eyes: '#ffbe0b', outfit: '#8338ec', accent: 'star', expression: 'wink' }, 'Shines brightest at the top. You are at the top.'),
+  secretRelic('zenith', 'crown', 'Crown of Thirty Dawns', '👑', 'legendary', 'Forged from thirty sunrises you did not waste.'),
+]
+
+const BUILT_IN: Card[] = [...IDOLS, ...ANIME, ...RELICS, ...RIZZ, ...SECRET]
 /** Every card that can drop right now: the built-in set plus your own. */
 export const allCards = (): Card[] => [...BUILT_IN, ...customCards]
 export const CARDS = BUILT_IN
 export const cardById = (id: string) => allCards().find(c => c.id === id)
 
 /** What triggered a roll. Big moments drop better loot. */
-export type DropSource = 'boss' | 'main' | 'strength' | 'quest' | 'focus' | 'surprise' | 'goals'
+export type DropSource = 'boss' | 'main' | 'strength' | 'quest' | 'focus' | 'surprise' | 'goals' | 'perfect' | 'pack'
 
 /** Chance a source drops anything at all ("generous" setting). */
-export const DROP_CHANCE: Record<DropSource, number> = { boss: 1, main: 1, strength: 1, quest: 0.25, focus: 0.25, surprise: 0.5, goals: 0.5 }
+export const DROP_CHANCE: Record<DropSource, number> = { boss: 1, main: 1, strength: 1, quest: 0.25, focus: 0.25, surprise: 0.5, goals: 0.5, perfect: 1, pack: 1 }
 
 /** Rarity odds per source, as weights for common/rare/epic/legendary. */
 const RARITY_ODDS: Record<DropSource, [number, number, number, number]> = {
@@ -227,6 +251,8 @@ const RARITY_ODDS: Record<DropSource, [number, number, number, number]> = {
   focus: [55, 30, 12, 3],
   surprise: [50, 32, 14, 4],
   goals: [40, 40, 16, 4],
+  perfect: [0, 60, 30, 10],
+  pack: [35, 40, 18, 7],
 }
 
 /** A small, well-mixed hash so a roll is stable for the same source. */
@@ -241,7 +267,7 @@ const unit = (text: string) => hash(text) / 4294967296
 
 /** This month's featured series: its cards drop twice as often. Changes every month. */
 export function featuredSeries(month: string, seed: string): string {
-  const keys = Object.keys(SERIES).filter(k => k !== 'custom')
+  const keys = Object.keys(SERIES).filter(k => k !== 'custom' && !SECRET_SERIES.has(k))
   return keys[hash(`${seed}:series:${month}`) % keys.length]
 }
 
@@ -249,7 +275,13 @@ export function featuredSeries(month: string, seed: string): string {
  * Rolls a drop for something you just did. The same source always rolls the
  * same result (so undo and redo can't farm it). Returns null for no drop.
  */
-export function rollDrop(source: DropSource, sourceId: string, seed: string, month: string): Card | null {
+export function rollDrop(
+  source: DropSource,
+  sourceId: string,
+  seed: string,
+  month: string,
+  opts: { unlocked?: Set<string>; minRarity?: Rarity } = {},
+): Card | null {
   const base = `${seed}:${source}:${sourceId}`
   if (unit(`${base}:chance`) >= DROP_CHANCE[source]) return null
   const odds = RARITY_ODDS[source]
@@ -262,8 +294,10 @@ export function rollDrop(source: DropSource, sourceId: string, seed: string, mon
     }
     r -= odds[i]
   }
+  if (opts.minRarity && RARITIES.indexOf(rarity) < RARITIES.indexOf(opts.minRarity)) rarity = opts.minRarity
   const featured = featuredSeries(month, seed)
-  const pool = allCards().filter(c => c.rarity === rarity)
+  const open = (c: Card) => !SECRET_SERIES.has(c.series) || !!opts.unlocked?.has(c.series)
+  const pool = allCards().filter(c => c.rarity === rarity && open(c))
   const weights = pool.map(c => (c.series === featured ? 2 : 1))
   let pick = unit(`${base}:card`) * weights.reduce((a, b) => a + b, 0)
   for (let i = 0; i < pool.length; i++) {

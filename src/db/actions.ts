@@ -19,6 +19,13 @@ import {
   dailyWeight,
   GOALS_PER_DAY,
   rollDrop,
+  shopLock,
+  PACK_MILESTONES,
+  PACK_SIZE,
+  packMilestone,
+  defaultIncentives,
+  type Rarity,
+  type IncentiveSettings,
   setCustomCards,
   customCard,
   monthOf,
@@ -123,6 +130,7 @@ export async function awaken(answers: AwakeningAnswers): Promise<void> {
   })
   emit({ type: 'player.awakened', name: answers.name, stats: answers.stats })
   await (await import('./memories')).ensureMemoryQuest()
+  await ensureIncentives()
 }
 
 export async function updateSettings(patch: Partial<PlayerSettings>): Promise<void> {
@@ -155,7 +163,7 @@ export async function snapshot() {
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
     db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const [people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot, transactions] = await Promise.all([
+  const [people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot, transactions, penaltyClears] = await Promise.all([
     db.people.where('userId').equals(LOCAL_USER).toArray(),
     db.contacts.where('userId').equals(LOCAL_USER).toArray(),
     db.focusRuns.where('userId').equals(LOCAL_USER).toArray(),
@@ -168,9 +176,10 @@ export async function snapshot() {
     db.places.where('userId').equals(LOCAL_USER).toArray(),
     db.loot.where('userId').equals(LOCAL_USER).toArray(),
     db.transactions.where('userId').equals(LOCAL_USER).toArray(),
+    db.penaltyClears.where('userId').equals(LOCAL_USER).toArray(),
   ])
   const summary = summarize(player, quests, completions, new Date(), {
-    purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot, transactions,
+    purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot, transactions, penaltyClears,
   })
   return { player, quests, completions, purchases, savings, sets, people, contacts, focusRuns, bosses, summary }
 }
@@ -228,7 +237,9 @@ export async function completeQuest(
   const base = questReward(quest, version, player.settings.monthlyBudget, dailyShares, stage)
   // A 30-day streak on this stat's dailies adds 10% XP (never dollars) while it holds.
   const bonus = featureOn(player, 'badges') && summary.streakBonus.has(quest.stat) ? 1 + STREAK_BONUS : 1
-  const reward = { ...base, xp: Math.round(base.xp * bonus) }
+  // Perfect days in a row multiply quest XP (never dollars).
+  const comboBoost = featureOn(player, 'incentives') ? (summary.incentives?.multiplier ?? 1) : 1
+  const reward = { ...base, xp: Math.round(base.xp * bonus * comboBoost) }
   const completion: Completion = {
     id: newId(),
     userId: LOCAL_USER,
@@ -244,6 +255,7 @@ export async function completeQuest(
   await db.completions.add(completion)
   emit({ type: 'quest.completed', completion, questTitle: stage ? `${quest.title}: ${stage.title}` : quest.title, via })
   await dropLoot(quest.kind === 'main' ? 'main' : quest.templateId === 'str-routine' && version === 'full' ? 'strength' : 'quest', completion.id)
+  if (quest.kind === 'daily') await rewardPerfectDay(summary, day)
   if (stage && quest.stages?.[quest.stages.length - 1].id === stage.id) {
     emit({ type: 'mainQuest.cleared', questId: quest.id, questTitle: quest.title })
   }
@@ -268,6 +280,9 @@ export async function undoQuest(quest: Quest): Promise<void> {
   if (!done) return
   await db.completions.delete(done.id)
   await removeLootFrom(done.id)
+  if (quest.kind === 'daily') {
+    await db.loot.where('sourceId').anyOf([`perfect-${done.day}`, ...PACK_MILESTONES.flatMap(m => Array.from({ length: PACK_SIZE }, (_, i) => `pack-${done.day}-${m}-${i}`))]).delete()
+  }
   emit({ type: 'quest.undone', questId: quest.id, questTitle: quest.title })
 }
 
@@ -418,7 +433,7 @@ export async function updateReward(id: string, patch: Pick<RewardInput, 'title' 
  */
 export async function buyOneOff(input: RewardInput, keep: boolean): Promise<string | null> {
   const reward = newReward(input, Date.now())
-  const { summary } = await snapshot()
+  const { summary, player } = await snapshot()
   const check = checkPurchase(reward, {
     level: summary.level.level,
     stats: summary.stats,
@@ -426,6 +441,7 @@ export async function buyOneOff(input: RewardInput, keep: boolean): Promise<stri
     vault: summary.wallet.vault,
     savingsMet: summary.savings.met,
     mainQuestsCleared: summary.mainQuestsCleared,
+    locked: shopLock(summary.incentives, player.incentives, featureOn(player, 'penaltyQuest')),
   })
   if (!check.ok) return check.reason
   await db.rewards.add({ ...reward, active: keep })
@@ -438,7 +454,7 @@ export async function removeReward(reward: Reward): Promise<void> {
 
 /** Buys a reward if every gate passes. Returns why not when it can't. */
 export async function buyReward(reward: Reward): Promise<string | null> {
-  const { summary } = await snapshot()
+  const { summary, player } = await snapshot()
   const check = checkPurchase(reward, {
     level: summary.level.level,
     stats: summary.stats,
@@ -446,6 +462,7 @@ export async function buyReward(reward: Reward): Promise<string | null> {
     vault: summary.wallet.vault,
     savingsMet: summary.savings.met,
     mainQuestsCleared: summary.mainQuestsCleared,
+    locked: shopLock(summary.incentives, player.incentives, featureOn(player, 'penaltyQuest')),
   })
   if (!check.ok) return check.reason
 
@@ -933,7 +950,9 @@ export async function fundPlan(planId: string, amount: number): Promise<string |
 
 /** Books one part of a plan, paid from the plan's fund. The money is the gate: no level needed. */
 export async function bookPlanItem(planId: string, itemId: string): Promise<string | null> {
-  const { summary } = await snapshot()
+  const { summary, player } = await snapshot()
+  const locked = shopLock(summary.incentives, player.incentives, featureOn(player, 'penaltyQuest'))
+  if (locked) return locked
   const plan = await db.plans.get(planId)
   const status = summary.plans.find(p => p.plan.id === planId)
   const item = plan?.items.find(i => i.id === itemId)
@@ -1025,19 +1044,19 @@ export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places, db.goals, db.loot, db.customCards, db.transactions, db.bills]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places, db.goals, db.loot, db.customCards, db.transactions, db.bills, db.penaltyClears]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places', 'goals', 'loot', 'customCards', 'transactions', 'bills'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places', 'goals', 'loot', 'customCards', 'transactions', 'bills', 'penaltyClears'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills] = await Promise.all(
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears] = await Promise.all(
     tables().map(t => t.toArray()),
   )
   return {
     format: SAVE_FORMAT,
-    version: 14,
-    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills,
+    version: 15,
+    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears,
   }
 }
 
@@ -1076,6 +1095,7 @@ export async function importSave(json: string): Promise<void> {
     await db.customCards.bulkPut(data.customCards ?? [])
     await db.transactions.bulkPut(data.transactions ?? [])
     await db.bills.bulkPut(data.bills ?? [])
+    await db.penaltyClears.bulkPut(data.penaltyClears ?? [])
   })
 }
 
@@ -1174,13 +1194,13 @@ export async function trackFromReflection(item: { kind: 'daily' | 'side' | 'goal
  * Rolls a loot drop for something just done (see src/engine/loot.ts). The roll
  * is stable per source record, and each record drops at most once.
  */
-export async function dropLoot(source: DropSource, sourceId: string): Promise<void> {
+export async function dropLoot(source: DropSource, sourceId: string, opts: { minRarity?: Rarity; secrets?: Set<string> } = {}): Promise<void> {
   const player = await db.players.get(LOCAL_USER)
   if (!player || !featureOn(player, 'cards')) return
   if (await db.loot.where('sourceId').equals(sourceId).count()) return
   setCustomCards((await db.customCards.where('userId').equals(LOCAL_USER).toArray()).map(customCard))
   const today = dayKey(new Date(), player.settings.resetHour)
-  const card = rollDrop(source, sourceId, surpriseSeed(player), monthOf(today))
+  const card = rollDrop(source, sourceId, surpriseSeed(player), monthOf(today), { unlocked: opts.secrets ?? (await snapshot()).summary.incentives?.secrets, minRarity: opts.minRarity })
   if (!card) return
   const before = await db.loot.where('userId').equals(LOCAL_USER).filter(d => d.cardId === card.id).count()
   await db.loot.add({ id: newId(), userId: LOCAL_USER, cardId: card.id, source, sourceId, day: today, createdAt: Date.now() })
@@ -1230,4 +1250,55 @@ async function syncReflectionGoal(day: string, adjust: string, plannedOn: string
   }
   const items = current ? existing.items.map(i => (i === current ? item : i)) : [...existing.items, item]
   await db.goals.update(existing.id, { items, updatedAt: now })
+}
+
+// ---- Incentives: combo, perfect-day chest, card packs, shields, Penalty Quests ----
+
+/** Starts the incentive rules from today for a player who doesn't have them yet. */
+export async function ensureIncentives(): Promise<void> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player || player.incentives) return
+  await db.players.update(LOCAL_USER, { incentives: defaultIncentives(dayKey(new Date(), player.settings.resetHour)) })
+}
+
+export async function saveIncentiveSettings(patch: Partial<Omit<IncentiveSettings, 'since'>>): Promise<void> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player) return
+  const current = player.incentives ?? defaultIncentives(dayKey(new Date(), player.settings.resetHour))
+  const next = { ...current, ...patch }
+  next.threshold = Math.max(1, Math.min(5, Math.round(next.threshold)))
+  next.menu = next.menu.map(m => m.trim().slice(0, 80)).filter(Boolean).slice(0, 20)
+  await db.players.update(LOCAL_USER, { incentives: next, updatedAt: Date.now() })
+}
+
+/** After a daily clears: the perfect-day chest, and a card pack when the combo reaches a milestone. */
+async function rewardPerfectDay(before: Summary, day: string): Promise<void> {
+  const { summary, player } = await snapshot()
+  if (!featureOn(player, 'incentives') || !summary.incentives || day !== summary.today) return
+  if (before.incentives?.perfectToday || !summary.incentives.perfectToday) return
+  const secrets = summary.incentives.secrets
+  emit({ type: 'perfect.day', combo: summary.incentives.combo, multiplier: summary.incentives.multiplier })
+  await dropLoot('perfect', `perfect-${day}`, { minRarity: 'rare', secrets })
+  const milestone = packMilestone(before.incentives?.combo ?? 0, summary.incentives.combo)
+  if (milestone) {
+    emit({ type: 'combo.pack', combo: milestone })
+    for (let i = 0; i < PACK_SIZE; i++) await dropLoot('pack', `pack-${day}-${milestone}-${i}`, { minRarity: i === 0 ? 'epic' : undefined, secrets })
+  }
+}
+
+/** Marks today's (or an older) open Penalty Quest as done (honour system). */
+export async function clearPenaltyQuest(day: string, task: string): Promise<void> {
+  if (await db.penaltyClears.where('day').equals(day).filter(c => c.userId === LOCAL_USER).count()) return
+  await db.penaltyClears.add({ id: newId(), userId: LOCAL_USER, day, kind: 'done', task, createdAt: Date.now() })
+  emit({ type: 'penalty.cleared', task, shield: false })
+}
+
+/** Spends a Shield to cancel an open Penalty Quest. */
+export async function spendShield(day: string, task: string): Promise<boolean> {
+  const { summary } = await snapshot()
+  if (!summary.incentives || summary.incentives.shields < 1) return false
+  if (await db.penaltyClears.where('day').equals(day).filter(c => c.userId === LOCAL_USER).count()) return false
+  await db.penaltyClears.add({ id: newId(), userId: LOCAL_USER, day, kind: 'shield', task, createdAt: Date.now() })
+  emit({ type: 'penalty.cleared', task, shield: true })
+  return true
 }

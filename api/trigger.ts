@@ -6,6 +6,8 @@
 // GET  /api/trigger?t=TOKEN&x=EXERCISE[&n=1]    queue logged exercise (e.g. a posture check-in)
 // GET  /api/trigger?t=TOKEN&inbox=1             list waiting completions (the app)
 // POST /api/trigger?t=TOKEN&ack=1  {ids: [...]} remove handled completions (the app)
+// GET  /api/trigger?t=TOKEN&status=1            Penalty Zone status for a phone game lock: {locked, task}
+// POST /api/trigger?t=TOKEN&setstatus=1 {locked, task}  the app updates it when a Penalty Quest opens or clears
 //
 // The inbox is one small file per player, updated with version checks so two
 // writes at the same moment can't lose each other. Only a hash of the token is stored.
@@ -45,6 +47,24 @@ export async function handle(request: Request, store: Store = blobStore, now = D
       const done = new Set(ids)
       const ok = await update(store, path, items => items.filter(i => !done.has(i.id)))
       return ok ? jsonResponse({ ok: true }) : jsonResponse({ error: 'busy' }, 503)
+    }
+
+    // Penalty Zone status for phone automations (MacroDroid game lock).
+    const statusPath = `status/${await sha256(token)}.json`
+    if (request.method === 'GET' && url.searchParams.has('status')) {
+      const stored = await store.read(statusPath)
+      let status = { locked: false, task: '' }
+      try {
+        if (stored) status = { ...status, ...JSON.parse(stored.body) }
+      } catch {
+        // A damaged status file reads as unlocked.
+      }
+      return jsonResponse({ locked: !!status.locked, task: String(status.task ?? '').slice(0, 120) })
+    }
+    if (request.method === 'POST' && url.searchParams.has('setstatus')) {
+      const body = (await request.json().catch(() => ({}))) as { locked?: unknown; task?: unknown }
+      await store.write(statusPath, JSON.stringify({ locked: body.locked === true, task: typeof body.task === 'string' ? body.task.slice(0, 120) : '', at: now }))
+      return jsonResponse({ ok: true })
     }
 
     if (request.method === 'GET' || request.method === 'POST') {

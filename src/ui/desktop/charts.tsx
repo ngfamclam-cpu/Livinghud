@@ -164,7 +164,7 @@ export function ColumnChart({
 }
 
 /** The stat hexagon: one axis per stat, 0-100. Values are labelled at each point. */
-export function Radar({ values, size = 220 }: { values: { key: string; value: number }[]; size?: number }) {
+export function Radar({ values, size = 220 }: { values: { key: string; label?: string; value: number }[]; size?: number }) {
   const c = size / 2
   const r = c - 44
   const n = values.length
@@ -175,7 +175,7 @@ export function Radar({ values, size = 220 }: { values: { key: string; value: nu
   const ring = (v: number) => values.map((_, i) => at(i, v).join(',')).join(' ')
   if (n < 3) return null
   return (
-    <svg className="radar" viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`Stats: ${values.map(v => `${v.key} ${v.value}`).join(', ')}`}>
+    <svg className="radar" viewBox={`-40 0 ${size + 80} ${size}`} role="img" aria-label={`Stats: ${values.map(v => `${v.label ?? v.key} ${v.value}`).join(', ')}`}>
       {[25, 50, 75, 100].map(v => <polygon key={v} className="grid" points={ring(v)} />)}
       {values.map((_, i) => {
         const [x, y] = at(i, 100)
@@ -185,8 +185,9 @@ export function Radar({ values, size = 220 }: { values: { key: string; value: nu
       {values.map((v, i) => {
         const [x, y] = at(i, 122)
         return (
-          <text key={v.key} className="radar-label" x={x} y={y + 4} textAnchor="middle">
-            {v.key} <tspan className="radar-value">{v.value}</tspan>
+          <text key={v.key} className="radar-label" x={x} y={y - 2} textAnchor="middle">
+            {v.label ?? v.key}
+            <tspan className="radar-value" x={x} dy="1.15em">{v.value}</tspan>
           </text>
         )
       })}

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { SURPRISE_XP, dailySurprise, emit, surpriseState, type Player, type Summary, type SurpriseClear } from '../engine'
+import { SURPRISE_XP, dailySurprise, emit, surpriseState, type Player, type Summary, type SurpriseClear, statName } from '../engine'
 import { clearSurprise, surpriseSeed } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 
@@ -33,7 +33,7 @@ export function SurpriseCard({ player, summary, cleared, now }: { player: Player
       <p className="system-line">{s.challenge.text}</p>
       {state === 'open' ? (
         <div className="row">
-          <span className="muted grow">{s.challenge.stat} · +{SURPRISE_XP} XP · {minutesLeft} min left</span>
+          <span className="muted grow">{statName(s.challenge.stat)} · +{SURPRISE_XP} XP · {minutesLeft} min left</span>
           <button className="small" onClick={() => clearSurprise()}>Done</button>
         </div>
       ) : (

@@ -21,25 +21,26 @@ import { Finance } from './ui/finance/Finance'
 import { Collection, LootReveal } from './ui/loot/Loot'
 import { Briefing } from './ui/Briefing'
 import { briefingSeen } from './ui/briefingSeen'
-import { customCard, dayKey, featureOn, setCustomCards } from './engine'
+import { customCard, dayKey, featureOn, setCustomCards, shopLock } from './engine'
+import { pushPenaltyStatus } from './db/triggers'
 import { Desktop } from './ui/desktop/Desktop'
+import { CustomizeHud, MoreMenu, type MoreItem } from './ui/More'
 import { setPref, usePrefs, useWide } from './ui/desktop/prefs'
 
-type Tab = 'hud' | 'quests' | 'log' | 'party' | 'shop' | 'settings'
+type Tab = 'hud' | 'quests' | 'log' | 'shop' | 'more'
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'hud', label: 'Status' },
+  { key: 'hud', label: 'Today' },
   { key: 'quests', label: 'Quests' },
   { key: 'log', label: 'Log' },
-  { key: 'party', label: 'Party' },
   { key: 'shop', label: 'Shop' },
-  { key: 'settings', label: 'Settings' },
+  { key: 'more', label: 'More' },
 ]
 
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
-  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | 'collection' | 'finance' | null>(null)
+  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | 'collection' | 'finance' | 'party' | 'settings' | 'customize' | null>(null)
   const [logCamera, setLogCamera] = useState(0)
   const [planId, setPlanId] = useState<string | null>(null)
   const [briefingDone, setBriefingDone] = useState(false)
@@ -50,7 +51,7 @@ export default function App() {
     document.documentElement.dataset.look = prefs.look
   }, [prefs.look])
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
@@ -74,10 +75,11 @@ export default function App() {
       db.customCards.where('userId').equals(LOCAL_USER).toArray(),
       db.transactions.where('userId').equals(LOCAL_USER).toArray(),
       db.bills.where('userId').equals(LOCAL_USER).toArray(),
+      db.penaltyClears.where('userId').equals(LOCAL_USER).toArray(),
     ])
     // Your own cards join the card set before anything reads it.
     setCustomCards(customCards.map(customCard))
-    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills }
+    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears }
   })
 
   if (!data) return null
@@ -91,7 +93,7 @@ export default function App() {
   }
 
   const { player, quests, rewards, purchases, savings, sets, people, contacts, focusRuns, bosses } = data
-  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises, plans: data.plans, planFunds: data.planFunds, memories: data.memories, places: data.places, loot: data.loot, transactions: data.transactions })
+  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises, plans: data.plans, planFunds: data.planFunds, memories: data.memories, places: data.places, loot: data.loot, transactions: data.transactions, penaltyClears: data.penaltyClears })
   const reportInput = {
     stats: player.stats,
     quests,
@@ -119,7 +121,13 @@ export default function App() {
     setFocusPreset(preset)
     setScreen('focus')
   }
-  const theme = <ThemeApplier theme={featureOn(player, 'loot') && player.theme && summary.themes.includes(player.theme) ? player.theme : 'system'} />
+  const lock = shopLock(summary.incentives, player.incentives, featureOn(player, 'penaltyQuest'))
+  const theme = (
+    <>
+      <ThemeApplier theme={featureOn(player, 'loot') && player.theme && summary.themes.includes(player.theme) ? player.theme : 'system'} />
+      <PenaltyStatusSync locked={!!lock} task={lock ? (summary.incentives?.penalty?.task ?? '') : ''} />
+    </>
+  )
   const briefing = showBriefing && (
     <Briefing player={player} quests={quests} summary={summary} onClose={() => setBriefingDone(true)} onReport={() => { setBriefingDone(true); setScreen('report') }} />
   )
@@ -141,8 +149,22 @@ export default function App() {
     setScreen(null)
     setTab('log')
   }
-  const tabs = TABS.filter(t => (t.key !== 'party' || featureOn(player, 'party')) && (t.key !== 'log' || featureOn(player, 'memories')))
+  const tabs = TABS.filter(t => t.key !== 'log' || featureOn(player, 'memories'))
   const current = tabs.some(t => t.key === tab) ? tab : 'hud'
+
+  const moreItems: MoreItem[] = [
+    featureOn(player, 'party') && { key: 'party', label: 'Party', hint: 'Friends, family, bonds', open: () => setScreen('party') },
+    featureOn(player, 'finance') && { key: 'finance', label: 'Finances', hint: 'Spending, bills, reports', open: () => setScreen('finance') },
+    featureOn(player, 'cards') && { key: 'collection', label: 'Card collection', hint: 'Your binder', open: () => setScreen('collection') },
+    featureOn(player, 'plans') && { key: 'plans', label: 'Plans', hint: 'Raves, festivals, trips', open: () => openPlans() },
+    featureOn(player, 'journal') && { key: 'journal', label: 'Journal', hint: 'Today’s reflection', open: () => setScreen('journal') },
+    { key: 'goals', label: 'Top 3 history', hint: 'Goals and stats', open: () => setScreen('goals') },
+    featureOn(player, 'focus') && { key: 'focus', label: 'Focus dungeon', hint: 'Timed focus, bosses', open: () => openFocus() },
+    featureOn(player, 'report') && { key: 'report', label: 'Weekly report', hint: 'Your grade this week', open: () => setScreen('report') },
+    { key: 'workout', label: 'Workout', hint: 'Training and posture', open: () => setScreen('workout') },
+    { key: 'customize', label: 'Customize HUD', hint: 'What shows on Today', open: () => setScreen('customize') },
+    { key: 'settings', label: 'Settings', hint: 'Features, sync, penalties', open: () => setScreen('settings') },
+  ].filter((i): i is MoreItem => !!i)
 
   if (screen) {
     return (
@@ -151,6 +173,14 @@ export default function App() {
           <Workout summary={summary} sets={sets} player={player} onClose={() => setScreen(null)} onScan={() => setScreen('scan')} />
         )}
         {screen === 'scan' && <PostureScan scans={data.scans} onClose={() => setScreen('workout')} />}
+        {screen === 'party' && (
+          <>
+            <div className="row end back-bar"><button className="ghost small" onClick={() => setScreen(null)}>Back</button></div>
+            <Party summary={summary} contacts={contacts} />
+          </>
+        )}
+        {screen === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setScreen(null)} />}
+        {screen === 'customize' && <CustomizeHud onClose={() => setScreen(null)} />}
         {screen === 'finance' && <Finance summary={summary} finance={player.finance} transactions={data.transactions} bills={data.bills} onClose={() => setScreen(null)} />}
         {screen === 'collection' && <Collection player={player} summary={summary} loot={data.loot} custom={data.customCards} onClose={() => setScreen(null)} />}
         {screen === 'goals' && (
@@ -184,20 +214,27 @@ export default function App() {
         ))}
         {wide && <button onClick={() => setPref('layout', 'auto')}>PC dashboard</button>}
       </nav>
-      {current === 'party' && <Party summary={summary} contacts={contacts} />}
       {current === 'log' && (
         <LifeLog key={logCamera} data={{ ...data, player }} summary={summary} startCamera={logCamera > 0} onJournal={() => setScreen('journal')} onClose={() => { setLogCamera(0); setTab('hud') }} />
       )}
-      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} memories={data.memories} onLifeLog={openLog} goals={data.goals} onGoals={() => setScreen('goals')} loot={data.loot} onCollection={() => setScreen('collection')} transactions={data.transactions} bills={data.bills} onFinance={() => setScreen('finance')} />}
+      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} memories={data.memories} onLifeLog={openLog} goals={data.goals} onGoals={() => setScreen('goals')} loot={data.loot} onCollection={() => setScreen('collection')} transactions={data.transactions} bills={data.bills} onFinance={() => setScreen('finance')} onCustomize={() => setScreen('customize')} />}
       {current === 'quests' && <QuestBoard player={player} quests={quests} completions={data.completions} summary={summary} onFight={bossId => openFocus({ bossId })} />}
       {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} onPlans={() => openPlans()} />}
-      {current === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setTab('hud')} />}
+      {current === 'more' && <MoreMenu items={moreItems} />}
       {briefing}
       <SystemToasts />
-        {featureOn(player, 'cards') && <LootReveal />}
+      {featureOn(player, 'cards') && <LootReveal />}
       {theme}
     </>
   )
+}
+
+/** Keeps the phone game-lock link in step with the Penalty Zone (sends only on change). */
+function PenaltyStatusSync({ locked, task }: { locked: boolean; task: string }) {
+  useEffect(() => {
+    void pushPenaltyStatus(locked, task)
+  }, [locked, task])
+  return null
 }
 
 /** Puts the equipped loot theme on the page (CSS picks colours from data-theme). */

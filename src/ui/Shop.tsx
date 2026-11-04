@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   featureOn,
+  shopLock,
   RANK_MIN_LEVEL,
   REWARD_RANKS,
   REWARD_TEMPLATES,
@@ -15,6 +16,7 @@ import {
   type SavingsEntry,
   type StatKey,
   type Summary,
+  statName,
 } from '../engine'
 import { addReward, addSuggestedRewards, buyReward, deleteSavings, logSavings, refundPurchase, removeReward } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
@@ -42,6 +44,7 @@ export function Shop({ player, rewards, purchases, savings, summary, onPlans }: 
     vault: wallet.vault,
     savingsMet: summary.savings.met,
     mainQuestsCleared: summary.mainQuestsCleared,
+    locked: shopLock(summary.incentives, player.incentives, featureOn(player, 'penaltyQuest')),
   }
   const owned = new Set(active.map(r => r.templateId))
   const missingSuggested = REWARD_TEMPLATES.filter(t => !owned.has(t.id)).map(t => t.id)
@@ -114,7 +117,7 @@ export function Shop({ player, rewards, purchases, savings, summary, onPlans }: 
                       <small className="muted">
                         {r.category}
                         {r.special !== 'none' && ` · ${SPECIAL_LABEL[r.special]}`}
-                        {r.statGate && ` · needs ${r.statGate.stat} ${r.statGate.min}`}
+                        {r.statGate && ` · needs ${statName(r.statGate.stat)} ${r.statGate.min}`}
                       </small>
                     </div>
                     <span className="price">{money(r.price)}</span>
@@ -153,7 +156,7 @@ export function Shop({ player, rewards, purchases, savings, summary, onPlans }: 
               <li key={p.id}>
                 <span className="stat-key">{p.rank}</span>
                 <span className="quest-title">
-                  {p.title} <small className="muted">{p.day} · {money(p.price)}{p.xp > 0 && ` · +${p.xp} ${p.stat} XP`}</small>
+                  {p.title} <small className="muted">{p.day} · {money(p.price)}{p.xp > 0 && ` · +${p.xp} ${statName(p.stat)} XP`}</small>
                 </span>
                 {p.day === summary.today && !p.planId && <button className="ghost small" onClick={() => refundPurchase(p)}>Refund</button>}
               </li>

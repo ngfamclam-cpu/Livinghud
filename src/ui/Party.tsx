@@ -27,7 +27,7 @@ export function Party({ summary, contacts }: { summary: Summary; contacts: Conta
     <main className="hud">
       <SystemWindow title={`Party · ${bonds.length}`}>
         <p className="muted">
-          The people in your life and how long since you were in touch. Logging contact earns CHA XP: message +{CONTACT_XP.message}, call +{CONTACT_XP.call},
+          The people in your life and how long since you were in touch. Logging contact earns Charisma XP: message +{CONTACT_XP.message}, call +{CONTACT_XP.call},
           hangout +{CONTACT_XP.hangout}, date +{CONTACT_XP.date}. Any contact clears your reach-out daily.
         </p>
         {weakening.length > 0 && (

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DAILY_TEMPLATES, featureOn, MAIN_TEMPLATES, SIDE_TEMPLATES, SIDE_XP, SIDE_PAY_SHARE, type Completion, type Player, type Quest, type StatKey, type Summary } from '../engine'
+import { DAILY_TEMPLATES, featureOn, MAIN_TEMPLATES, SIDE_TEMPLATES, SIDE_XP, SIDE_PAY_SHARE, type Completion, type Player, type Quest, type StatKey, type Summary, statName } from '../engine'
 import { addCustomMain, addDailyQuest, addMainFromTemplate, addSideFromTemplate, addSideQuest, archiveQuest } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { Bosses } from './Bosses'
@@ -37,7 +37,7 @@ export function QuestBoard({ player, quests, completions, summary, onFight }: { 
         <ul className="board-list">
           {dailies.map(q => (
             <li key={q.id}>
-              <span className="stat-key">{q.stat}</span>
+              <span className="stat-key">{statName(q.stat)}</span>
               <span className="quest-title">{q.title}</span>
               <button className="ghost small" onClick={() => remove(q)}>Remove</button>
             </li>
@@ -47,7 +47,7 @@ export function QuestBoard({ player, quests, completions, summary, onFight }: { 
         <div className="choices">
           {DAILY_TEMPLATES.filter(t => player.stats.includes(t.stat) && !activeTemplates.has(t.id) && t.id !== 'int-photo' && t.id !== 'str-routine').map(t => (
             <button key={t.id} className="choice" onClick={() => addDailyQuest({ stat: t.stat, title: t.title, description: t.description, minVersion: t.minVersion, templateId: t.id })}>
-              <span className="stat-key">{t.stat}</span>
+              <span className="stat-key">{statName(t.stat)}</span>
               <span><b>{t.title}</b><br /><small>Minimum: {t.minVersion}</small></span>
               <span className="add">+</span>
             </button>
@@ -61,7 +61,7 @@ export function QuestBoard({ player, quests, completions, summary, onFight }: { 
         <ul className="board-list">
           {sides.map(q => (
             <li key={q.id}>
-              <span className="stat-key">{q.stat}</span>
+              <span className="stat-key">{statName(q.stat)}</span>
               <span className="quest-title">{q.title}</span>
               <button className="ghost small" onClick={() => remove(q)}>Remove</button>
             </li>
@@ -71,7 +71,7 @@ export function QuestBoard({ player, quests, completions, summary, onFight }: { 
         <div className="choices">
           {SIDE_TEMPLATES.filter(t => player.stats.includes(t.stat) && !activeTemplates.has(t.id)).map(t => (
             <button key={t.id} className="choice" onClick={() => addSideFromTemplate(t.id)}>
-              <span className="stat-key">{t.stat}</span>
+              <span className="stat-key">{statName(t.stat)}</span>
               <span><b>{t.title}</b><br /><small>Minimum: {t.minVersion}</small></span>
               <span className="add">+</span>
             </button>
@@ -87,7 +87,7 @@ export function QuestBoard({ player, quests, completions, summary, onFight }: { 
             const p = summary.mainProgress.get(q.id)
             return (
               <li key={q.id}>
-                <span className="stat-key">{q.stat}</span>
+                <span className="stat-key">{statName(q.stat)}</span>
                 <span className="quest-title">{q.title} <small className="muted">{p?.cleared ?? 0}/{q.stages?.length ?? 0} stages</small></span>
                 <button className="ghost small" onClick={() => remove(q)}>Remove</button>
               </li>
@@ -98,7 +98,7 @@ export function QuestBoard({ player, quests, completions, summary, onFight }: { 
         <div className="choices">
           {MAIN_TEMPLATES.filter(t => player.stats.includes(t.stat) && !activeTemplates.has(t.id)).map(t => (
             <button key={t.id} className="choice" onClick={() => addMainFromTemplate(t.id)}>
-              <span className="stat-key">{t.stat}</span>
+              <span className="stat-key">{statName(t.stat)}</span>
               <span><b>{t.title}</b><br /><small>{t.stages.length} stages: {t.stages.map(s => s.title).join(' → ')}</small></span>
               <span className="add">+</span>
             </button>

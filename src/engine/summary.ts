@@ -14,6 +14,7 @@ import { TRAVEL_IDS, TRAVEL_XP, earnedBadges, longestStreak, streakBonuses, unlo
 import { travelCounts } from './memories'
 import { starUpXp } from './loot'
 import { financeXp } from './finance'
+import { incentiveState, type IncentiveState, type PenaltyClear } from './incentives'
 import type { Transaction, LootDrop, Memory, Place, Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, Plan, PlanFund, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
 export const STAT_WINDOW_DAYS = 30
@@ -98,6 +99,8 @@ export interface Summary {
   restDays: Set<string>
   /** Active plans (raves, festivals, trips), soonest first. */
   plans: PlanStatus[]
+  /** Combo meter, perfect days, shields and any open Penalty Quest; null before the rules start. */
+  incentives: IncentiveState | null
   /** Distinct places, cities and countries in the Life log. */
   travel: { places: number; cities: number; countries: number }
   /** The plan with raised targets the System offers after 3 clean weeks; null when not due. */
@@ -120,6 +123,7 @@ export interface Logs {
   places?: Place[]
   loot?: LootDrop[]
   transactions?: Transaction[]
+  penaltyClears?: PenaltyClear[]
 }
 
 const weight = (c: Completion) => (c.version === 'full' ? 1 : 0.5)
@@ -129,7 +133,7 @@ export function summarize(
   quests: Quest[],
   completions: Completion[],
   now: Date,
-  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [], surprises = [], plans = [], planFunds = [], memories = [], places = [], loot = [], transactions = [] }: Logs = {},
+  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [], surprises = [], plans = [], planFunds = [], memories = [], places = [], loot = [], transactions = [], penaltyClears = [] }: Logs = {},
 ): Summary {
   const today = dayKey(now, player.settings.resetHour)
   const week = weekOf(today)
@@ -175,7 +179,25 @@ export function summarize(
         })
       : null
   for (const [m, lost] of penalty?.dollarsLost ?? []) earnedBy.set(m, (earnedBy.get(m) ?? 0) - lost)
-  const totalXp = Math.max(0, rawXp - (penalty?.xpLost ?? 0))
+  // Combo, perfect days, shields and Penalty Quests (src/engine/incentives.ts).
+  const incentivesOn = player.features?.incentives !== false
+  const penaltyQuestOn = player.features?.penaltyQuest !== false
+  const incentives =
+    player.incentives && (incentivesOn || penaltyQuestOn)
+      ? incentiveState(
+          {
+            dailies: quests.filter(q => q.kind === 'daily' && q.active).map(q => ({ id: q.id, since: dayKey(new Date(q.createdAt), resetHour) })),
+            doneOn,
+            restDays: recoveryDays,
+          },
+          player.incentives,
+          penaltyClears,
+          today,
+          `${player.id}:${player.createdAt}`,
+          penaltyQuestOn,
+        )
+      : null
+  const totalXp = Math.max(0, rawXp + (incentivesOn ? (incentives?.perfectXp ?? 0) : 0) - (penalty?.xpLost ?? 0))
 
   const spentBy = new Map<string, number>()
   let vaultSpent = 0
@@ -317,6 +339,7 @@ export function summarize(
     focusToday: focusRuns.filter(r => r.day === today).reduce((sum, r) => sum + r.minutes, 0),
     party: partyBonds(people, contacts, today, at => dayKey(new Date(at), player.settings.resetHour)),
     travel,
+    incentives,
     routineOffer: progressionDue(routineFullDays, recoveryDays, today, player.routineReviewedOn) ? raisePlan(plan) : null,
   }
 }

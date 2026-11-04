@@ -6,6 +6,7 @@ import { SystemWindow } from './SystemWindow'
 import { SyncPanel } from './CloudSync'
 import { PhotoStorage } from './lifelog/PhotoStorage'
 import { Automations } from './Automations'
+import { IncentiveSettingsPanel } from './IncentiveSettings'
 import { TitlesLoot } from './TitlesLoot'
 import { FEATURES, featureOn } from '../engine'
 import { setFeature } from '../db/actions'
@@ -108,6 +109,7 @@ export function Settings({ player, quests, summary, onClose }: { player: Player;
         </ul>
       </SystemWindow>
 
+      {(featureOn(player, 'penaltyQuest') || featureOn(player, 'incentives')) && <IncentiveSettingsPanel player={player} />}
       <Automations player={player} quests={quests} />
 
       <SyncPanel />

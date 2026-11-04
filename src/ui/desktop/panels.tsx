@@ -14,12 +14,14 @@ import {
   statHistory,
   weeklyReport,
   featureOn,
+  shopLock,
   goalProgress,
   REWARD_IDEAS,
   type FeedKind,
   type ReportInput,
   type StatKey,
   type Summary,
+  statName,
 } from '../../engine'
 import { SystemWindow } from '../SystemWindow'
 import { Bar } from '../Bar'
@@ -90,7 +92,7 @@ export function ProfileCard({ data, summary }: { data: DashData; summary: Summar
         <div className="level"><small>LV.</small><CountUp value={summary.level.level} /></div>
       </div>
       <Bar value={summary.level.xpIntoLevel} max={summary.level.xpForNext} label={`${summary.level.xpIntoLevel} / ${summary.level.xpForNext} XP · ${summary.totalXp} total`} />
-      <Radar values={player.stats.map(k => ({ key: k, value: summary.stats[k] ?? 0 }))} />
+      <Radar values={player.stats.map(k => ({ key: k, label: statName(k), value: summary.stats[k] ?? 0 }))} />
       <dl className="lifetime">
         {totals.map(([k, v]) => (
           <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
@@ -119,18 +121,18 @@ export function StatTrends({ data, summary }: { data: DashData; summary: Summary
           return (
             <li key={k}>
               <button className={`stat-tile ${stat === k ? 'on' : ''}`} onClick={() => setPicked(k)} aria-pressed={stat === k}>
-                <span className="stat-key">{k}</span>
+                <span className="stat-key">{statName(k)}</span>
                 <span className="stat-tile-value"><CountUp value={now} /></span>
                 <span className={`delta ${delta === null || delta === 0 ? '' : delta > 0 ? 'up' : 'down'}`}>
                   {delta === null ? 'new' : delta === 0 ? '= 7d' : `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta)} 7d`}
                 </span>
-                <Sparkline values={values} label={`${k} over 30 days`} />
+                <Sparkline values={values} label={`${statName(k)} over 30 days`} />
               </button>
             </li>
           )
         })}
       </ul>
-      <p className="muted chart-title">{STATS.find(s => s.key === stat)?.name} ({stat}), score at the end of each day</p>
+      <p className="muted chart-title">{STATS.find(s => s.key === stat)?.name}, score at the end of each day</p>
       <LineChart points={history.map(h => ({ x: h.day, y: h.stats[stat] ?? 0, label: shortDay(h.day) }))} max={100} label={`${stat} score over the last 30 days`} />
     </SystemWindow>
   )
@@ -387,7 +389,7 @@ export function Timeline({ data }: { data: DashData }) {
           {shown.map(e => (
             <li key={e.id} className={`log-${e.kind}`}>
               <time className="log-time" dateTime={new Date(e.at).toISOString()}>{ago(e.at)}</time>
-              {e.stat ? <span className="stat-key">{e.stat}</span> : <span className="stat-key">SYS</span>}
+              {e.stat ? <span className="stat-key">{statName(e.stat)}</span> : <span className="stat-key">System</span>}
               <span className="log-text">{e.text}</span>
               {e.gain && <span className="log-gain">{e.gain}</span>}
             </li>
@@ -420,6 +422,7 @@ function Goals({ data, summary, onShop }: { data: DashData; summary: Summary; on
     vault: summary.wallet.vault,
     savingsMet: summary.savings.met,
     mainQuestsCleared: summary.mainQuestsCleared,
+    locked: shopLock(summary.incentives, data.player.incentives, featureOn(data.player, 'penaltyQuest')),
   }
   return (
     <div className="plan-list">

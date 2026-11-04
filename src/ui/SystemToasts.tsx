@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { categoryName, onGameEvent, type GameEvent } from '../engine'
+import { categoryName, onGameEvent, type GameEvent, statName } from '../engine'
 
 interface Toast {
   id: number
@@ -24,7 +24,7 @@ function toastFor(event: GameEvent): Toast | null {
       return { id: nextId++, text: `MAIN QUEST CLEARED: ${event.questTitle}. S-rank rewards are within reach.`, big: true }
     case 'reward.purchased': {
       const p = event.purchase
-      const xp = p.xp > 0 ? `  +${p.xp} ${p.stat} XP` : ''
+      const xp = p.xp > 0 ? `  +${p.xp} ${statName(p.stat)} XP` : ''
       return { id: nextId++, text: `${p.rank}-rank reward claimed: ${p.title}. Enjoy it.${xp}` }
     }
     case 'reward.refunded':
@@ -36,7 +36,7 @@ function toastFor(event: GameEvent): Toast | null {
     case 'workout.set':
       return { id: nextId++, text: `${event.name} +${event.amount}  (${Math.min(event.total, event.target)}/${event.target})` }
     case 'contact.logged':
-      return { id: nextId++, text: `${event.name}: ${event.kind} logged  +${event.xp} CHA XP` }
+      return { id: nextId++, text: `${event.name}: ${event.kind} logged  +${event.xp} Charisma XP` }
     case 'focus.ended':
       return event.cleared
         ? { id: nextId++, text: `DUNGEON CLEARED: ${event.label}  ${event.minutes} min  +${event.xp} XP`, big: true }
@@ -59,6 +59,14 @@ function toastFor(event: GameEvent): Toast | null {
       return { id: nextId++, text: `BOOKED: ${event.label} for ${event.name} ($${event.cost.toFixed(2)})`, big: true }
     case 'tracking.added':
       return { id: nextId++, text: `Now tracking: ${event.title} (${event.kind === 'daily' ? 'daily quest' : event.kind === 'side' ? 'weekly side quest' : "tomorrow's top 3"})`, big: true }
+    case 'perfect.day':
+      return { id: nextId++, text: `PERFECT DAY. Chest unlocked · combo ${event.combo} (×${event.multiplier.toFixed(1)} XP)`, big: true }
+    case 'combo.pack':
+      return { id: nextId++, text: `${event.combo}-DAY COMBO: card pack unlocked!`, big: true }
+    case 'penalty.cleared':
+      return event.shield
+        ? { id: nextId++, text: 'Shield used. Penalty Quest cancelled.', big: true }
+        : { id: nextId++, text: `Penalty Quest cleared: ${event.task}. The Shop is open again.`, big: true }
     case 'finance.logged':
       return { id: nextId++, text: `${event.kind === 'income' ? 'Income' : 'Spent'}: $${event.amount.toFixed(2)} · ${categoryName(event.category)}` }
     case 'goal.done':
