@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { handle } from './forge'
 import { sha256, normalizeKey } from '../server/blob'
 import { memoryStore } from '../server/memoryStore'
-import { FORGE_SERIES, forgeCard, forgePrompt, pickPack } from '../src/engine/forge'
+import { FORGE_SERIES, forgeCard, forgePrompt, pickPack, replacementPick } from '../src/engine/forge'
 
 const KEY = 'ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ2'
 const req = (body: unknown, key: string | null = KEY) =>
@@ -88,6 +88,18 @@ describe('softer retry', () => {
 })
 
 describe('pack picking', () => {
+  it('finds a stand-in of the same rarity that is not already in the pack', () => {
+    const pack = pickPack('seed-9')
+    const ids = pack.map(p => p.card.id)
+    for (const p of pack) {
+      const r = replacementPick(p.card.rarity, ids, `x:${p.card.id}`)!
+      expect(r.card.rarity).toBe(p.card.rarity)
+      expect(ids).not.toContain(r.card.id)
+    }
+    const allEpic = FORGE_SERIES.flatMap(s => s.cards).filter(c => c.rarity === 'epic').map(c => c.id)
+    expect(replacementPick('epic', allEpic, 'none')).toBeNull()
+  })
+
   it('gives a mixed 2/2/1/1 pack from different series, rarest last', () => {
     const pack = pickPack('seed-1')
     expect(pack.map(p => p.card.rarity)).toEqual(['common', 'common', 'rare', 'rare', 'epic', 'legendary'])
