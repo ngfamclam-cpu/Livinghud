@@ -17,6 +17,7 @@ import { Report } from './ui/Report'
 import { Plans } from './ui/Plans'
 import { LifeLog } from './ui/lifelog/LifeLog'
 import { GoalsView } from './ui/goals/GoalsView'
+import { Finance } from './ui/finance/Finance'
 import { Collection, LootReveal } from './ui/loot/Loot'
 import { Briefing } from './ui/Briefing'
 import { briefingSeen } from './ui/briefingSeen'
@@ -38,7 +39,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
-  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | 'collection' | null>(null)
+  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | 'collection' | 'finance' | null>(null)
   const [logCamera, setLogCamera] = useState(0)
   const [planId, setPlanId] = useState<string | null>(null)
   const [briefingDone, setBriefingDone] = useState(false)
@@ -49,7 +50,7 @@ export default function App() {
     document.documentElement.dataset.look = prefs.look
   }, [prefs.look])
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
@@ -71,10 +72,12 @@ export default function App() {
       db.goals.where('userId').equals(LOCAL_USER).toArray(),
       db.loot.where('userId').equals(LOCAL_USER).toArray(),
       db.customCards.where('userId').equals(LOCAL_USER).toArray(),
+      db.transactions.where('userId').equals(LOCAL_USER).toArray(),
+      db.bills.where('userId').equals(LOCAL_USER).toArray(),
     ])
     // Your own cards join the card set before anything reads it.
     setCustomCards(customCards.map(customCard))
-    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards }
+    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills }
   })
 
   if (!data) return null
@@ -88,7 +91,7 @@ export default function App() {
   }
 
   const { player, quests, rewards, purchases, savings, sets, people, contacts, focusRuns, bosses } = data
-  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises, plans: data.plans, planFunds: data.planFunds, memories: data.memories, places: data.places, loot: data.loot })
+  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises, plans: data.plans, planFunds: data.planFunds, memories: data.memories, places: data.places, loot: data.loot, transactions: data.transactions })
   const reportInput = {
     stats: player.stats,
     quests,
@@ -102,6 +105,8 @@ export default function App() {
     resetHour: player.settings.resetHour,
     weakening: summary.party.filter(b => b.weakening).map(b => b.person.name),
     goals: data.goals,
+    transactions: data.transactions,
+    finance: player.finance,
   }
   // Not on signup day: the Awakening already says hello.
   const signupDay = dayKey(new Date(player.createdAt), player.settings.resetHour) === summary.today
@@ -146,6 +151,7 @@ export default function App() {
           <Workout summary={summary} sets={sets} player={player} onClose={() => setScreen(null)} onScan={() => setScreen('scan')} />
         )}
         {screen === 'scan' && <PostureScan scans={data.scans} onClose={() => setScreen('workout')} />}
+        {screen === 'finance' && <Finance summary={summary} finance={player.finance} transactions={data.transactions} bills={data.bills} onClose={() => setScreen(null)} />}
         {screen === 'collection' && <Collection player={player} summary={summary} loot={data.loot} custom={data.customCards} onClose={() => setScreen(null)} />}
         {screen === 'goals' && (
           <main className="hud">
@@ -182,7 +188,7 @@ export default function App() {
       {current === 'log' && (
         <LifeLog key={logCamera} data={{ ...data, player }} summary={summary} startCamera={logCamera > 0} onJournal={() => setScreen('journal')} onClose={() => { setLogCamera(0); setTab('hud') }} />
       )}
-      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} memories={data.memories} onLifeLog={openLog} goals={data.goals} onGoals={() => setScreen('goals')} loot={data.loot} onCollection={() => setScreen('collection')} />}
+      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} memories={data.memories} onLifeLog={openLog} goals={data.goals} onGoals={() => setScreen('goals')} loot={data.loot} onCollection={() => setScreen('collection')} transactions={data.transactions} bills={data.bills} onFinance={() => setScreen('finance')} />}
       {current === 'quests' && <QuestBoard player={player} quests={quests} completions={data.completions} summary={summary} onFight={bossId => openFocus({ bossId })} />}
       {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} onPlans={() => openPlans()} />}
       {current === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setTab('hud')} />}

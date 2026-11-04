@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { addDays, weeklyReport, type ReportInput, type Summary } from '../engine'
+import { addDays, weekFinance, weeklyReport, type ReportInput, type Summary } from '../engine'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
 
@@ -10,6 +10,8 @@ export function Report({ summary, input, onClose }: { summary: Summary; input: R
   const [which, setWhich] = useState<'last' | 'this'>('last')
   const start = which === 'last' ? addDays(summary.week, -7) : summary.week
   const r = weeklyReport(input, start)
+  const money = input.transactions?.length ? weekFinance(input.transactions, input.finance, start) : null
+  const dollars = (n: number) => `$${n.toFixed(2)}`
 
   return (
     <main className="hud">
@@ -48,6 +50,17 @@ export function Report({ summary, input, onClose }: { summary: Summary; input: R
           <dt>People contacted</dt><dd>{r.contacts}</dd>
           <dt>Journal</dt><dd>{r.journalEntries} entries{r.avgMood !== null && `, mood ${r.avgMood.toFixed(1)}/5`}</dd>
           {r.goalsPlanned > 0 && <><dt>Top 3 goals</dt><dd>{r.goalsDone}/{r.goalsPlanned} done ({Math.round((100 * r.goalsDone) / r.goalsPlanned)}%)</dd></>}
+          {money && (
+            <>
+              <dt>Money spent</dt>
+              <dd>
+                {dollars(money.totals.spent)}
+                {money.pace !== null && (money.underPace ? ` · under the weekly pace of ${dollars(money.pace)} ✓` : ` · over the weekly pace of ${dollars(money.pace)}`)}
+              </dd>
+              <dt>Income · saved</dt>
+              <dd>{dollars(money.totals.income)} · {dollars(money.totals.saved)}</dd>
+            </>
+          )}
         </dl>
         <p className="system-line">{r.suggestion}</p>
       </SystemWindow>

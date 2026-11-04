@@ -28,6 +28,7 @@ export type GameEvent =
   | { type: 'surprise.appeared'; text: string }
   | { type: 'memory.added'; photos: number }
   | { type: 'goal.done'; text: string; allDone: boolean }
+  | { type: 'finance.logged'; kind: 'expense' | 'income'; amount: number; category: string }
   | { type: 'loot.card'; cardId: string; copies: number; starUp: boolean }
   | { type: 'tracking.added'; kind: 'daily' | 'side' | 'goal'; title: string }
   | { type: 'plan.funded'; name: string; amount: number }

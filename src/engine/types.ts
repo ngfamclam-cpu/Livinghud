@@ -57,6 +57,8 @@ export interface Player {
   features?: Partial<Record<FeatureKey, boolean>>
   /** The Life log switch paused the photo quest (so switching it back on resumes it). */
   memoryQuestPaused?: boolean
+  /** The finance tracker's monthly limit and options. */
+  finance?: FinanceSettings
   /** Reward ideas starred in the Shop to work toward. */
   favoriteRewards?: string[]
   /** The title shown under the player's name, chosen from earned badges. */
@@ -231,7 +233,7 @@ export interface PostureScan {
 }
 
 /** Optional parts of the game the player can switch off in Settings. */
-export type FeatureKey = 'plans' | 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises' | 'memories' | 'cards'
+export type FeatureKey = 'plans' | 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises' | 'memories' | 'cards' | 'finance'
 
 export type Circle = 'friend' | 'family' | 'dating' | 'work'
 
@@ -466,4 +468,46 @@ export interface CustomCard {
   photoId: string
   createdAt: number
   updatedAt: number
+}
+
+/** One entry in the finance tracker. Real money; never game dollars. */
+export interface Transaction {
+  id: string
+  userId: string
+  /** Game day, YYYY-MM-DD. */
+  day: string
+  /** 'nospend' marks a day you checked and spent nothing (amount 0). */
+  kind: 'expense' | 'income' | 'nospend'
+  amount: number
+  /** An ExpenseCategory or IncomeCategory key (see src/engine/finance.ts). */
+  category: string
+  note: string
+  /** Set when this is a bill payment. */
+  billId: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+/** A recurring bill or subscription. */
+export interface Bill {
+  id: string
+  userId: string
+  name: string
+  amount: number
+  category: string
+  cycle: 'weekly' | 'monthly' | 'yearly'
+  /** The next day it's due, YYYY-MM-DD. */
+  nextDue: string
+  active: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface FinanceSettings {
+  /** Monthly spending limit in dollars; 0 = none. */
+  limit: number
+  /** Whether bill payments count toward the limit. */
+  billsInLimit: boolean
+  /** The day the limit was first set: XP only counts from here. */
+  since: string
 }

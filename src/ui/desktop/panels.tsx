@@ -351,7 +351,7 @@ const FILTERS: { key: 'all' | FeedKind[]; label: string }[] = [
   { key: ['set'], label: 'Training' },
   { key: ['contact'], label: 'Party' },
   { key: ['focus', 'boss'], label: 'Focus' },
-  { key: ['reward', 'savings', 'plan'], label: 'Money' },
+  { key: ['reward', 'savings', 'plan', 'money'], label: 'Money' },
   { key: ['journal', 'memory'], label: 'Journal' },
   { key: ['goal'], label: 'Goals' },
   { key: ['loot'], label: 'Loot' },

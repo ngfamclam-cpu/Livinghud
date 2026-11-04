@@ -843,3 +843,23 @@ button.photo { cursor: zoom-in; }
 .draft-remove { position: absolute; top: 4px; right: 4px; background: rgba(0, 0, 0, 0.65); }
 .draft-zoom { flex-direction: row; align-items: center; gap: 8px; margin: 0; font-size: 0.8rem; }
 .draft-zoom input { padding: 0; flex: 1; }
+
+/* ---- Finance tracker ---- */
+.quick-add { display: grid; grid-template-columns: 110px 1fr; gap: 8px; margin: 8px 0; }
+.quick-add input { padding: 8px 10px; }
+.quick-add input[type=number] { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.category-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pace-line { margin: 4px 0 8px; }
+.pace-line.near { color: var(--gold); }
+.pace-line.over { color: var(--danger); }
+.bills-due { margin-top: 8px; }
+.category-bars .stat-value { min-width: 96px; text-align: right; }
+.entry-day { margin-bottom: 8px; }
+.entry-day-head { margin: 6px 0 2px; font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.entry-kind { width: 16px; text-align: center; font-weight: 700; color: var(--danger); }
+.entry-kind.income { color: var(--good); }
+.edit-entry { flex-direction: column; align-items: stretch !important; gap: 6px; }
+.edit-entry input, .edit-entry select { padding: 6px 8px; }
+.report-stats { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0; }
+.report-stats dt { color: var(--muted); font-size: 0.85rem; }
+.report-stats dd { margin: 0; }
