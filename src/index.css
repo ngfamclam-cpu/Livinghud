@@ -873,3 +873,4 @@ button.photo { cursor: zoom-in; }
 .reflect-head { display: flex; align-items: center; gap: 8px; }
 .reflect-text { color: var(--text); font-size: 0.98rem; }
 .prompt-tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 6px; }
+.goal-from { margin-left: 6px; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }

@@ -212,7 +212,7 @@ function DayPage({
               <li key={i} className={item.done ? 'done' : ''}>
                 <label className="goal-check">
                   <input type="checkbox" checked={item.done} onChange={() => toggleGoal(topThree.id, i)} />
-                  <span>{item.text}</span>
+                  <span>{item.text}{item.source === 'reflection' && <small className="goal-from"> from reflection</small>}</span>
                 </label>
               </li>
             ))}

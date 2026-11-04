@@ -841,6 +841,7 @@ export async function saveJournal(
   }
   if (existing) await db.journal.update(existing.id, entry)
   else await db.journal.add({ id: newId(), userId: LOCAL_USER, day: summary.today, createdAt: now, ...entry })
+  await syncReflectionGoal(addDays(summary.today, 1), entry.adjust, summary.today)
 
   const quest = quests.find(q => q.active && q.kind === 'daily' && q.templateId === 'int-journal')
   const version = journalVersion(entry)
@@ -1105,10 +1106,12 @@ export async function saveGoals(day: string, texts: string[]): Promise<void> {
   const clean = texts.map(t => t.trim().slice(0, 140)).filter(Boolean).slice(0, GOALS_PER_DAY)
   const now = Date.now()
   const existing = await db.goals.where('day').equals(day).filter(g => g.userId === LOCAL_USER).first()
-  const items = clean.map(text => {
-    const before = existing?.items.find(i => i.text === text)
+  const planned = clean.map(text => {
+    const before = existing?.items.find(i => i.text === text && !i.source)
     return { text, done: before?.done ?? false, doneAt: before?.doneAt ?? null }
   })
+  // The reflection's "adjust tomorrow" goal rides along on top of the top 3.
+  const items = [...planned, ...(existing?.items.filter(i => i.source === 'reflection') ?? [])]
   if (existing) await db.goals.update(existing.id, { items, updatedAt: now })
   else await db.goals.add({ id: newId(), userId: LOCAL_USER, day, plannedOn: summary.today, items, createdAt: now, updatedAt: now })
 
@@ -1203,4 +1206,28 @@ export async function deleteCustomCard(id: string): Promise<void> {
   await db.loot.where('userId').equals(LOCAL_USER).filter(d => d.cardId === `custom-${id}`).delete()
   const { deletePhotos } = await import('./photos')
   await deletePhotos([c.photoId])
+}
+
+/**
+ * Puts the reflection's "adjust tomorrow" answer into tomorrow's goals as an
+ * extra item to cross off (on top of the top 3). Editing the answer updates it;
+ * clearing it removes it, unless it's already been ticked off.
+ */
+async function syncReflectionGoal(day: string, adjust: string, plannedOn: string): Promise<void> {
+  const text = adjust.trim().slice(0, 140)
+  const now = Date.now()
+  const existing = await db.goals.where('day').equals(day).filter(g => g.userId === LOCAL_USER).first()
+  const current = existing?.items.find(i => i.source === 'reflection')
+  if (current?.done) return
+  if (!text) {
+    if (existing && current) await db.goals.update(existing.id, { items: existing.items.filter(i => i !== current), updatedAt: now })
+    return
+  }
+  const item = { text, done: false, doneAt: null, source: 'reflection' as const }
+  if (!existing) {
+    await db.goals.add({ id: newId(), userId: LOCAL_USER, day, plannedOn, items: [item], createdAt: now, updatedAt: now })
+    return
+  }
+  const items = current ? existing.items.map(i => (i === current ? item : i)) : [...existing.items, item]
+  await db.goals.update(existing.id, { items, updatedAt: now })
 }
