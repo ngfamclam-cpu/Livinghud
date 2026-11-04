@@ -233,7 +233,7 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
           {page === 'scan' && <PostureScan scans={data.scans} onClose={() => setPage('workout')} />}
           {page === 'plans' && <Plans summary={summary} openId={planId} onClose={home} />}
           {page === 'report' && <Report summary={summary} input={reportInput} onClose={home} />}
-          {page === 'journal' && <Journal player={player} summary={summary} entries={data.journal} completions={data.completions} quests={quests} onClose={home} />}
+          {page === 'journal' && <Journal player={player} summary={summary} entries={data.journal} completions={data.completions} quests={quests} goals={data.goals} onClose={home} />}
           {page === 'focus' && <Focus player={player} quests={quests} summary={summary} runs={data.focusRuns} preset={focusPreset} onClose={home} />}
         </div>
       </div>

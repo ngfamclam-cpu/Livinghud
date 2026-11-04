@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { WEEKDAYS, dailyPrompt, journalPatterns, type Completion, type JournalEntry, type Player, type Quest, type StatKey, type Summary, type TrackedFromReflection } from '../engine'
+import { ANSWERS_FOR_FULL, THEME_NAMES, WEEKDAYS, answeredCount, dailyQuestions, journalPatterns, swapQuestion, type Completion, type DailyQuestion, type DayGoals, type JournalEntry, type Player, type Quest, type StatKey, type Summary, type TrackedFromReflection } from '../engine'
 import { saveJournal, surpriseSeed, trackFromReflection } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { Bar } from './Bar'
@@ -13,19 +13,26 @@ interface Props {
   entries: JournalEntry[]
   completions: Completion[]
   quests: Quest[]
+  goals?: DayGoals[]
   onClose: () => void
 }
 
-export function Journal({ player, summary, entries, completions, quests, onClose }: Props) {
+export function Journal({ player, summary, entries, completions, quests, goals, onClose }: Props) {
   const todays = entries.find(e => e.day === summary.today)
   const [wentWell, setWentWell] = useState(todays?.wentWell ?? '')
   const [drained, setDrained] = useState(todays?.drained ?? '')
   const [adjust, setAdjust] = useState(todays?.adjust ?? '')
   const [mood, setMood] = useState(todays?.mood ?? 3)
   const [energy, setEnergy] = useState(todays?.energy ?? 3)
-  // The random question stays the one you answered, even if the pool changes later.
-  const prompt = todays?.prompt || dailyPrompt(summary.today, surpriseSeed(player))
-  const [promptAnswer, setPromptAnswer] = useState(todays?.promptAnswer ?? '')
+  const ctx = { day: summary.today, seed: surpriseSeed(player), entries, goals, stats: summary.stats }
+  // Today's evolving questions. Once you've answered some, those stay exactly as asked.
+  const [questions, setQuestions] = useState<DailyQuestion[]>(() => {
+    const fresh = dailyQuestions(ctx)
+    const kept = (todays?.answers ?? []).map(a => ({ id: a.id, theme: a.theme as DailyQuestion['theme'], text: a.question }))
+    return [...kept, ...fresh.filter(q => !kept.some(k => k.id === q.id))].slice(0, Math.max(kept.length, fresh.length))
+  })
+  const [answers, setAnswers] = useState<Record<string, string>>(() => Object.fromEntries((todays?.answers ?? []).map(a => [a.id, a.answer])))
+  const [skipped, setSkipped] = useState<string[]>([])
   const [tracked, setTracked] = useState<TrackedFromReflection[]>([])
   const [saved, setSaved] = useState(false)
 
@@ -34,27 +41,74 @@ export function Journal({ player, summary, entries, completions, quests, onClose
   const patterns = journalPatterns(entries, dailyDone, dailies.length, summary.today)
   const past = [...entries].filter(e => e.day !== summary.today).sort((a, b) => b.day.localeCompare(a.day)).slice(0, 14)
 
+  const answerList = questions.filter(q => (answers[q.id] ?? '').trim()).map(q => ({ id: q.id, theme: q.theme, question: q.text, answer: answers[q.id] }))
+  const count = answeredCount({ wentWell, drained, adjust, promptAnswer: todays?.promptAnswer, answers: answerList })
+  const touch = () => setSaved(false)
+
+  const swap = (q: DailyQuestion) => {
+    const shown = questions.map(x => x.id)
+    const next = swapQuestion(ctx, [...shown, ...skipped], skipped.length + 1)
+    if (!next) return
+    setQuestions(list => list.map(x => (x.id === q.id ? next : x)))
+    setAnswers(a => {
+      const rest = { ...a }
+      delete rest[q.id]
+      return rest
+    })
+    setSkipped(list => [...list, q.id])
+    touch()
+  }
+
   const save = async () => {
-    await saveJournal({ wentWell, drained, adjust, mood, energy, prompt, promptAnswer, tracked })
+    await saveJournal({ wentWell, drained, adjust, mood, energy, answers: answerList, skipped, tracked })
     setSaved(true)
   }
 
+  const classic = (id: string, label: string, value: string, set: (v: string) => void) => (
+    <label key={id} className={`reflect-q ${value.trim() ? 'answered' : ''}`}>
+      <span className="reflect-text">{label}</span>
+      <textarea rows={2} value={value} onChange={e => { set(e.target.value); touch() }} />
+    </label>
+  )
+
   return (
     <main className="hud">
-      <SystemWindow title={`Journal · ${summary.today}`}>
-        <label>What went well?<textarea rows={2} value={wentWell} onChange={e => { setWentWell(e.target.value); setSaved(false) }} /></label>
-        <label>What drained me?<textarea rows={2} value={drained} onChange={e => { setDrained(e.target.value); setSaved(false) }} /></label>
-        <label>One thing to adjust tomorrow<textarea rows={2} value={adjust} onChange={e => { setAdjust(e.target.value); setSaved(false) }} /></label>
-        <label className="random-prompt">
-          <span><span className="prompt-tag">Today's question</span> {prompt}</span>
-          <textarea rows={2} value={promptAnswer} onChange={e => { setPromptAnswer(e.target.value); setSaved(false) }} />
-        </label>
-        <Rating label="Mood" names={MOODS} value={mood} onChange={v => { setMood(v); setSaved(false) }} />
-        <Rating label="Energy" names={ENERGY} value={energy} onChange={v => { setEnergy(v); setSaved(false) }} />
-        <p className="muted">All three prompts clears the journal daily; one line counts as the minimum. You can come back and edit today's entry.</p>
+      <SystemWindow title={`Reflection · ${summary.today}`}>
+        <p className={`reflect-count ${count >= ANSWERS_FOR_FULL ? 'done' : ''}`}>
+          {count >= ANSWERS_FOR_FULL ? `${count} answered ✓ full clear` : `Answer any ${ANSWERS_FOR_FULL}: ${count}/${ANSWERS_FOR_FULL}`}
+          <small className="muted"> · every question is optional; one or two count as the minimum</small>
+        </p>
+
+        <h3>Today's questions</h3>
+        {questions.map(q => (
+          <div key={q.id} className={`reflect-q evolving ${(answers[q.id] ?? '').trim() ? 'answered' : ''}`}>
+            <div className="reflect-head">
+              <span className="prompt-tag">{THEME_NAMES[q.theme] ?? q.theme}</span>
+              {q.why && <small className="muted">{q.why}</small>}
+              <span className="grow" />
+              {!(answers[q.id] ?? '').trim() && <button className="ghost small" onClick={() => swap(q)} title="Ask me something else">Swap</button>}
+            </div>
+            <label>
+              <span className="reflect-text">{q.text}</span>
+              <textarea rows={q.theme === 'ideas' ? 3 : 2} value={answers[q.id] ?? ''} onChange={e => { const v = e.target.value; setAnswers(a => ({ ...a, [q.id]: v })); touch() }} />
+            </label>
+          </div>
+        ))}
+
+        <h3>The classics</h3>
+        {classic('wentWell', 'What went well?', wentWell, setWentWell)}
+        {classic('drained', 'What drained me?', drained, setDrained)}
+        {classic('adjust', 'One thing to adjust tomorrow', adjust, setAdjust)}
+        {todays?.prompt && todays.promptAnswer && (
+          <p className="muted">Earlier today: {todays.prompt} {todays.promptAnswer}</p>
+        )}
+
+        <Rating label="Mood" names={MOODS} value={mood} onChange={v => { setMood(v); touch() }} />
+        <Rating label="Energy" names={ENERGY} value={energy} onChange={v => { setEnergy(v); touch() }} />
+        <p className="muted">Questions learn from you: follow-ups on what you wrote, patterns in what drains you, goals that slip, and more of the themes you write about most. Swapping a question tells the System to ask fewer like it.</p>
         <div className="row end">
           {saved && <span className="cleared">Saved</span>}
-          <button disabled={!(wentWell.trim() || drained.trim() || adjust.trim() || promptAnswer.trim())} onClick={save}>{todays ? 'Update entry' : 'Save entry'}</button>
+          <button disabled={count === 0} onClick={save}>{todays ? 'Update entry' : 'Save entry'}</button>
         </div>
       </SystemWindow>
 
@@ -129,6 +183,7 @@ function PastEntry({ entry }: { entry: JournalEntry }) {
           {entry.drained && <p><b>Drained me:</b> {entry.drained}</p>}
           {entry.adjust && <p><b>Adjust:</b> {entry.adjust}</p>}
           {entry.prompt && entry.promptAnswer && <p><b>{entry.prompt}</b> {entry.promptAnswer}</p>}
+          {(entry.answers ?? []).map(a => <p key={a.id}><b>{a.question}</b> {a.answer}</p>)}
           {entry.tracked?.length ? <p className="muted">Started tracking: {entry.tracked.map(t => t.title).join(', ')}</p> : null}
         </div>
       )}

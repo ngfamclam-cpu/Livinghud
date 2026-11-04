@@ -322,6 +322,10 @@ export interface JournalEntry {
   promptAnswer?: string
   /** Things you started tracking from this reflection. */
   tracked?: TrackedFromReflection[]
+  /** Answers to the day's evolving questions (the classics stay in their own fields). */
+  answers?: ReflectionAnswer[]
+  /** Question ids you swapped away, so the System asks fewer like them. */
+  skipped?: string[]
   createdAt: number
   updatedAt: number
 }
@@ -510,4 +514,11 @@ export interface FinanceSettings {
   billsInLimit: boolean
   /** The day the limit was first set: XP only counts from here. */
   since: string
+}
+
+export interface ReflectionAnswer {
+  id: string
+  theme: string
+  question: string
+  answer: string
 }

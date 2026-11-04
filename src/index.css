@@ -863,3 +863,13 @@ button.photo { cursor: zoom-in; }
 .report-stats { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0; }
 .report-stats dt { color: var(--muted); font-size: 0.85rem; }
 .report-stats dd { margin: 0; }
+
+/* ---- Evolving reflection ---- */
+.reflect-count { font-weight: 700; color: var(--gold); margin-bottom: 10px; }
+.reflect-count.done { color: var(--good); }
+.reflect-q { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; padding-left: 10px; border-left: 2px solid rgba(47, 143, 255, 0.3); }
+.reflect-q.answered { border-left-color: var(--good); }
+.reflect-q label { margin: 0; }
+.reflect-head { display: flex; align-items: center; gap: 8px; }
+.reflect-text { color: var(--text); font-size: 0.98rem; }
+.prompt-tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 6px; }

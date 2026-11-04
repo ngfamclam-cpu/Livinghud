@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useState } from 'react'
+import { Fragment, Suspense, lazy, useMemo, useState } from 'react'
 import {
   activityFeed,
   addDays,
@@ -227,6 +227,12 @@ function DayPage({
             {reflection.drained && <><dt>Drained me</dt><dd>{reflection.drained}</dd></>}
             {reflection.adjust && <><dt>Adjust tomorrow</dt><dd>{reflection.adjust}</dd></>}
             {reflection.prompt && reflection.promptAnswer && <><dt>{reflection.prompt}</dt><dd>{reflection.promptAnswer}</dd></>}
+            {(reflection.answers ?? []).map(a => (
+              <Fragment key={a.id}>
+                <dt>{a.question}</dt>
+                <dd>{a.answer}</dd>
+              </Fragment>
+            ))}
             {reflection.tracked?.length ? <><dt>Started tracking</dt><dd>{reflection.tracked.map(t => t.title).join(', ')}</dd></> : null}
             <dt>Mood · energy</dt>
             <dd>{MOODS[reflection.mood - 1]} · {reflection.energy}/5</dd>

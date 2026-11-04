@@ -821,7 +821,7 @@ export async function removeBoss(id: string): Promise<void> {
  * the journal daily: all three prompts is the full quest, one line the minimum.
  */
 export async function saveJournal(
-  input: Pick<JournalEntry, 'wentWell' | 'drained' | 'adjust' | 'mood' | 'energy'> & Partial<Pick<JournalEntry, 'prompt' | 'promptAnswer' | 'tracked'>>,
+  input: Pick<JournalEntry, 'wentWell' | 'drained' | 'adjust' | 'mood' | 'energy'> & Partial<Pick<JournalEntry, 'prompt' | 'promptAnswer' | 'tracked' | 'answers' | 'skipped'>>,
 ): Promise<void> {
   const { summary, quests } = await snapshot()
   const now = Date.now()
@@ -835,6 +835,8 @@ export async function saveJournal(
     adjust: input.adjust.trim(),
     promptAnswer: input.promptAnswer?.trim() ?? existing?.promptAnswer ?? '',
     tracked,
+    answers: (input.answers ?? existing?.answers ?? []).map(a => ({ ...a, answer: a.answer.trim() })),
+    skipped: [...new Set([...(existing?.skipped ?? []), ...(input.skipped ?? [])])],
     updatedAt: now,
   }
   if (existing) await db.journal.update(existing.id, entry)

@@ -162,7 +162,7 @@ export default function App() {
         {screen === 'plans' && <Plans summary={summary} openId={planId} onClose={() => setScreen(null)} />}
         {screen === 'report' && <Report summary={summary} input={reportInput} onClose={() => setScreen(null)} />}
         {screen === 'journal' && (
-          <Journal player={player} summary={summary} entries={data.journal} completions={data.completions} quests={quests} onClose={() => setScreen(null)} />
+          <Journal player={player} summary={summary} entries={data.journal} completions={data.completions} quests={quests} goals={data.goals} onClose={() => setScreen(null)} />
         )}
         {screen === 'focus' && (
           <Focus player={player} quests={quests} summary={summary} runs={focusRuns} preset={focusPreset} onClose={() => setScreen(null)} />
