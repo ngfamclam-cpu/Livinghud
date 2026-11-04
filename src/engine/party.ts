@@ -64,6 +64,7 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'surprises', name: 'Surprise challenges', description: 'Once a day a small quest appears at a random moment; do it within an hour for 30 XP.' },
   { key: 'memories', name: 'Life log and photo a day', description: 'Notes, a daily photo and the places you go, with a map and the "Photo of the day" daily quest.' },
   { key: 'cards', name: 'Loot drops and card collection', description: 'Collectible cards (fictional idols, odd relics, a playing-card deck) that drop from quests; duplicates power cards up for XP.' },
+  { key: 'finance', name: 'Finance tracker', description: 'Log spending, income and bills; a monthly limit, weekly check-ins and monthly reports; WLT XP for staying under.' },
   { key: 'journal', name: 'Reflection journal', description: 'Three prompts a day, mood and energy, and the patterns over time.' },
 ]
 

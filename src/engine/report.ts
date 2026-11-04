@@ -4,7 +4,7 @@
 import { playerRank } from './economy'
 import { BOSS_XP } from './focus'
 import { addDays, dayKey } from './time'
-import type { DayGoals, Boss, Completion, Contact, FocusRun, JournalEntry, Purchase, Quest, RewardRank, StatKey } from './types'
+import type { FinanceSettings, Transaction, DayGoals, Boss, Completion, Contact, FocusRun, JournalEntry, Purchase, Quest, RewardRank, StatKey } from './types'
 
 export interface ReportInput {
   stats: StatKey[]
@@ -21,6 +21,9 @@ export interface ReportInput {
   weakening: string[]
   /** Tomorrow's top 3 goals, if the player sets them. */
   goals?: DayGoals[]
+  /** The finance tracker's entries and limit, for the weekly money check-in. */
+  transactions?: Transaction[]
+  finance?: FinanceSettings
 }
 
 export interface WeekReport {

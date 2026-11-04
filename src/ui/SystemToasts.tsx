@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { onGameEvent, type GameEvent } from '../engine'
+import { categoryName, onGameEvent, type GameEvent } from '../engine'
 
 interface Toast {
   id: number
@@ -59,6 +59,8 @@ function toastFor(event: GameEvent): Toast | null {
       return { id: nextId++, text: `BOOKED: ${event.label} for ${event.name} ($${event.cost.toFixed(2)})`, big: true }
     case 'tracking.added':
       return { id: nextId++, text: `Now tracking: ${event.title} (${event.kind === 'daily' ? 'daily quest' : event.kind === 'side' ? 'weekly side quest' : "tomorrow's top 3"})`, big: true }
+    case 'finance.logged':
+      return { id: nextId++, text: `${event.kind === 'income' ? 'Income' : 'Spent'}: $${event.amount.toFixed(2)} · ${categoryName(event.category)}` }
     case 'goal.done':
       return event.allDone
         ? { id: nextId++, text: `ALL THREE GOALS DONE. Today belongs to you.`, big: true }

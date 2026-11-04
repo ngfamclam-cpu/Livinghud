@@ -2,7 +2,7 @@
 // Phase 5 adds Supabase sync on top; records already carry userId + timestamps.
 
 import Dexie, { type EntityTable } from 'dexie'
-import type { CustomCard, LootDrop, DayGoals, Memory, Place, Boss, Completion, Contact, ExerciseSet, FocusRun, JournalEntry, Person, Plan, PlanFund, Player, SurpriseClear, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
+import type { Bill, Transaction, CustomCard, LootDrop, DayGoals, Memory, Place, Boss, Completion, Contact, ExerciseSet, FocusRun, JournalEntry, Person, Plan, PlanFund, Player, SurpriseClear, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
 
 export const LOCAL_USER = 'local'
 
@@ -38,6 +38,8 @@ export const db = new Dexie('livinghud') as Dexie & {
   goals: EntityTable<DayGoals, 'id'>
   loot: EntityTable<LootDrop, 'id'>
   customCards: EntityTable<CustomCard, 'id'>
+  transactions: EntityTable<Transaction, 'id'>
+  bills: EntityTable<Bill, 'id'>
 }
 
 db.version(1).stores({
@@ -113,4 +115,10 @@ db.version(12).stores({
 // Loot cards you make from your own images.
 db.version(13).stores({
   customCards: 'id, userId',
+})
+
+// The finance tracker: spending, income and bills.
+db.version(14).stores({
+  transactions: 'id, userId, day',
+  bills: 'id, userId',
 })

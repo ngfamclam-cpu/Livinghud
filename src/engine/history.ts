@@ -7,7 +7,8 @@ import { CONTACT_NAMES } from './party'
 import { statScores } from './summary'
 import { addDays, dayKey, daysBetween, monthOf } from './time'
 import { RARITY_NAMES, cardById } from './loot'
-import type { LootDrop, DayGoals, Memory, Boss, Completion, Contact, ExerciseKey, ExerciseSet, FocusRun, JournalEntry, Person, Player, PlanFund, Purchase, Quest, SavingsEntry, StatKey, SurpriseClear } from './types'
+import { categoryName } from './finance'
+import type { Transaction, LootDrop, DayGoals, Memory, Boss, Completion, Contact, ExerciseKey, ExerciseSet, FocusRun, JournalEntry, Person, Player, PlanFund, Purchase, Quest, SavingsEntry, StatKey, SurpriseClear } from './types'
 
 export interface CalendarDay {
   day: string
@@ -144,7 +145,7 @@ export function exerciseHistory(sets: ExerciseSet[], exercise: ExerciseKey, toda
   return out
 }
 
-export type FeedKind = 'loot' | 'goal' | 'memory' | 'quest' | 'reward' | 'set' | 'contact' | 'focus' | 'boss' | 'journal' | 'surprise' | 'savings' | 'plan'
+export type FeedKind = 'money' | 'loot' | 'goal' | 'memory' | 'quest' | 'reward' | 'set' | 'contact' | 'focus' | 'boss' | 'journal' | 'surprise' | 'savings' | 'plan'
 
 export interface FeedEntry {
   id: string
@@ -176,6 +177,7 @@ export function activityFeed(
     memories?: Memory[]
     goals?: DayGoals[]
     loot?: LootDrop[]
+    transactions?: Transaction[]
   },
   limit: number,
 ): FeedEntry[] {
@@ -213,6 +215,10 @@ export function activityFeed(
   }
   for (const m of logs.memories ?? []) {
     out.push({ id: m.id, at: m.at, kind: 'memory', text: m.note ? `Memory: ${m.note.length > 60 ? `${m.note.slice(0, 57)}…` : m.note}` : 'Memory saved', gain: m.photos.length ? `📷 ${m.photos.length}` : '', stat: null })
+  }
+  for (const t of logs.transactions ?? []) {
+    const label = t.kind === 'nospend' ? 'No-spend day' : `${t.kind === 'income' ? 'Income' : 'Spent'}: ${t.note || categoryName(t.category)}`
+    out.push({ id: t.id, at: t.createdAt, kind: 'money', text: label, gain: t.kind === 'nospend' ? '✓' : `${t.kind === 'income' ? '+' : '−'}${dollars(t.amount)}`, stat: 'WLT' })
   }
   for (const d of logs.loot ?? []) {
     const c = cardById(d.cardId)

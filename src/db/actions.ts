@@ -155,7 +155,7 @@ export async function snapshot() {
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
     db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const [people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot] = await Promise.all([
+  const [people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot, transactions] = await Promise.all([
     db.people.where('userId').equals(LOCAL_USER).toArray(),
     db.contacts.where('userId').equals(LOCAL_USER).toArray(),
     db.focusRuns.where('userId').equals(LOCAL_USER).toArray(),
@@ -167,15 +167,16 @@ export async function snapshot() {
     db.memories.where('userId').equals(LOCAL_USER).toArray(),
     db.places.where('userId').equals(LOCAL_USER).toArray(),
     db.loot.where('userId').equals(LOCAL_USER).toArray(),
+    db.transactions.where('userId').equals(LOCAL_USER).toArray(),
   ])
   const summary = summarize(player, quests, completions, new Date(), {
-    purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot,
+    purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot, transactions,
   })
   return { player, quests, completions, purchases, savings, sets, people, contacts, focusRuns, bosses, summary }
 }
 
 /** Announces level-ups, a full wallet and a met savings goal after any change. */
-async function announceProgress(before: Summary): Promise<void> {
+export async function announceProgress(before: Summary): Promise<void> {
   const { summary: after } = await snapshot()
   if (after.level.level > before.level.level) emit({ type: 'level.up', level: after.level.level })
   const { budget } = after.wallet
@@ -1021,19 +1022,19 @@ export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places, db.goals, db.loot, db.customCards]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places, db.goals, db.loot, db.customCards, db.transactions, db.bills]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places', 'goals', 'loot', 'customCards'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places', 'goals', 'loot', 'customCards', 'transactions', 'bills'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards] = await Promise.all(
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills] = await Promise.all(
     tables().map(t => t.toArray()),
   )
   return {
     format: SAVE_FORMAT,
-    version: 13,
-    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards,
+    version: 14,
+    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills,
   }
 }
 
@@ -1070,6 +1071,8 @@ export async function importSave(json: string): Promise<void> {
     await db.goals.bulkPut(data.goals ?? [])
     await db.loot.bulkPut(data.loot ?? [])
     await db.customCards.bulkPut(data.customCards ?? [])
+    await db.transactions.bulkPut(data.transactions ?? [])
+    await db.bills.bulkPut(data.bills ?? [])
   })
 }
 
