@@ -999,3 +999,100 @@ button.photo { cursor: zoom-in; }
 .search-text.full { white-space: pre-wrap; color: inherit; }
 .search-hit mark { background: rgba(255, 207, 92, 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
 .center-text { text-align: center; }
+
+/* ---- Companion, alive ---- */
+.companion-stage { position: relative; display: grid; justify-items: center; gap: 6px; }
+.companion-speech {
+  position: relative; max-width: 100%; padding: 8px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18); font-size: 0.92rem; text-align: center; min-height: 2.4em;
+}
+.companion-speech::after { content: ''; position: absolute; left: 50%; bottom: -7px; width: 12px; height: 12px; transform: translateX(-50%) rotate(45deg); background: inherit; border-right: inherit; border-bottom: inherit; }
+.companion-touch { position: relative; background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0; cursor: pointer; touch-action: manipulation; border-radius: 50%; }
+.companion-touch:focus-visible { outline: 2px solid var(--accent); border-radius: 50%; }
+.companion-particle { position: absolute; top: 40%; font-size: 1.4rem; pointer-events: none; animation: companion-float 1.4s ease-out forwards; }
+@keyframes companion-float { from { transform: translateY(0) scale(0.6); opacity: 1; } to { transform: translateY(-70px) scale(1.2); opacity: 0; } }
+.companion-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.companion-hearts { color: #ff6fae; letter-spacing: 2px; }
+.companion-hearts .muted { color: rgba(255, 255, 255, 0.2); }
+.companion-actions { justify-content: center; gap: 8px; flex-wrap: wrap; }
+.companion-art .c-crack { fill: none; stroke: #9b6bff; stroke-width: 2; stroke-linecap: round; }
+.companion-art .c-mouth { fill: none; stroke: #1b1033; stroke-width: 2.6; stroke-linecap: round; }
+.companion-art .c-aura { animation: c-pulse 3s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+.companion-art .c-body-group { transform-origin: 60px 100px; animation: c-breathe 3.2s ease-in-out infinite; }
+.companion-art .c-eyes { transform-origin: 60px 62px; transform-box: view-box; animation: c-blink 5s infinite; }
+.companion-art .c-tail, .companion-art .c-tail-tip { transform-origin: 84px 88px; transform-box: view-box; animation: c-wag 1.6s ease-in-out infinite; }
+.companion-art.mood-happy .c-tail, .companion-art.mood-happy .c-tail-tip { animation-duration: 0.6s; }
+.companion-art.mood-sulky .c-tail, .companion-art.mood-sulky .c-tail-tip { animation: none; }
+.companion-art .c-wing { transform-origin: 60px 64px; transform-box: view-box; animation: c-flap 1.8s ease-in-out infinite; }
+.companion-art .c-sparkles path { animation: c-twinkle 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.companion-art .c-sparkles path:nth-child(2) { animation-delay: 0.7s; }
+.companion-art .c-sparkles path:nth-child(3) { animation-delay: 1.4s; }
+.companion-art .c-wobble { transform-origin: 60px 104px; transform-box: view-box; animation: c-wobble 2.6s ease-in-out infinite; }
+.companion-art.mood-sulky .c-body-group { filter: saturate(0.6); }
+.companion-art.act-pet .c-body-group { animation: c-squish 0.5s ease-in-out 2; }
+.companion-art.act-feed .c-chew { animation: c-chew 0.25s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.companion-art.act-play .c-body-group { animation: c-jump 0.6s ease-in-out 2; }
+.companion-art.act-play { animation: c-spin 1.2s ease-in-out; }
+.companion-art.egg.act-pet .c-wobble, .companion-art.egg.act-play .c-wobble { animation: c-wobble 0.3s ease-in-out 4; }
+@keyframes c-breathe { 50% { transform: scale(1.03, 0.98); } }
+@keyframes c-blink { 0%, 46%, 50%, 100% { transform: scaleY(1); } 48% { transform: scaleY(0.1); } }
+@keyframes c-wag { 50% { transform: rotate(14deg); } }
+@keyframes c-flap { 50% { transform: scaleX(1.08) translateY(-2px); } }
+@keyframes c-twinkle { 50% { transform: scale(0.4); opacity: 0.3; } }
+@keyframes c-wobble { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+@keyframes c-pulse { 50% { opacity: 0.6; transform: scale(1.06); } }
+@keyframes c-squish { 50% { transform: scale(1.12, 0.88); } }
+@keyframes c-chew { 50% { transform: scaleY(0.4); } }
+@keyframes c-jump { 50% { transform: translateY(-14px); } }
+@keyframes c-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .companion-art *, .companion-art, .companion-particle { animation: none !important; }
+}
+
+/* ---- Shadow Legion, alive ---- */
+.legion-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; }
+.legion-stats span { display: grid; padding: 6px 2px; border-radius: var(--radius); background: rgba(90, 43, 214, 0.18); }
+.legion-stats b { font-size: 1.2rem; color: #d7c8ff; text-shadow: 0 0 8px #7a3cff; }
+.legion-stats small { color: var(--muted); font-size: 0.7rem; }
+.legion-next { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.legion-next span { display: block; height: 100%; background: linear-gradient(90deg, #5a2bd6, #b48cff); box-shadow: 0 0 8px #9b6bff; }
+.legion-next.small { height: 4px; }
+.legion-field {
+  position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; padding: 12px 8px;
+  border-radius: var(--radius); background: radial-gradient(ellipse at 50% 120%, rgba(122, 60, 255, 0.35), rgba(10, 6, 30, 0.6) 70%);
+}
+.legion-slot { display: grid; justify-items: center; gap: 0; padding: 4px 2px; background: none; border: 1px solid transparent; border-radius: var(--radius); color: inherit; cursor: pointer; animation: legion-idle 3.4s ease-in-out infinite; }
+.legion-slot:hover, .legion-slot.picked { border-color: rgba(180, 140, 255, 0.6); background: rgba(122, 60, 255, 0.15); }
+.legion-slot.dormant { cursor: default; opacity: 0.35; filter: grayscale(0.6); }
+.legion-slot .slot-name { font-size: 0.7rem; color: #d7c8ff; }
+.legion-slot .slot-level { font-size: 0.64rem; color: var(--muted); }
+.legion-slot.arising .shadow-figure { animation: legion-arise 2.4s ease-in-out infinite; }
+.legion-field.mustering .legion-slot { animation: legion-rally 0.4s ease-in-out 3; }
+.battle-cry {
+  position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; pointer-events: none; font-weight: 800; font-size: 1.6rem;
+  letter-spacing: 0.08em; color: #e9dcff; text-shadow: 0 0 10px #9b6bff, 0 0 24px #5a2bd6; animation: cry-in 2.6s ease-out forwards;
+}
+.shadow-figure .sf-fill, .shadow-figure .sf-cape { fill: #0b0718; stroke: #8b5cff; stroke-width: 1; }
+.shadow-figure .sf-cape { fill: #160c33; }
+.shadow-figure .sf-steel { fill: #2a1d4f; stroke: #b48cff; stroke-width: 1; }
+.shadow-figure .sf-steel-line { fill: none; stroke: #b48cff; stroke-width: 2; stroke-linecap: round; }
+.shadow-figure .sf-glow-line { fill: none; stroke: #d7c8ff; stroke-width: 0.8; opacity: 0.7; }
+.shadow-figure .sf-orb { fill: #b48cff; filter: drop-shadow(0 0 4px #b48cff); animation: c-pulse 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.shadow-figure .sf-crown { fill: #ffd34d; filter: drop-shadow(0 0 3px #ffb347); }
+.shadow-figure .sf-eyes rect { fill: #c9a7ff; filter: drop-shadow(0 0 3px #b48cff) drop-shadow(0 0 6px #7a3cff); animation: sf-flicker 3.8s infinite; }
+.shadow-figure.veteran .sf-eyes rect { fill: #ffd98a; filter: drop-shadow(0 0 3px #ffb347) drop-shadow(0 0 6px #ff7a3d); }
+.shadow-figure .sf-shadow { fill: rgba(122, 60, 255, 0.35); }
+.shadow-figure { filter: drop-shadow(0 0 6px rgba(122, 60, 255, 0.55)); overflow: visible; }
+.shadow-figure.kind-elite { filter: drop-shadow(0 0 8px rgba(255, 180, 70, 0.5)); }
+.soldier-card { display: grid; gap: 6px; padding: 12px; border: 1px solid rgba(180, 140, 255, 0.45); border-radius: var(--radius); background: rgba(40, 18, 90, 0.35); }
+.soldier-card p { margin: 0; }
+.soldier-card-head { display: flex; gap: 10px; align-items: center; }
+.soldier-rank { color: #d7c8ff; font-weight: 700; }
+@keyframes legion-idle { 50% { transform: translateY(-2px); } }
+@keyframes legion-arise { 0%, 100% { filter: drop-shadow(0 0 4px #9b6bff); } 50% { filter: drop-shadow(0 0 14px #c9a7ff) brightness(1.4); } }
+@keyframes legion-rally { 50% { transform: translateY(-8px) scale(1.08); } }
+@keyframes sf-flicker { 0%, 90%, 100% { opacity: 1; } 93% { opacity: 0.3; } 96% { opacity: 0.9; } }
+@keyframes cry-in { 0% { opacity: 0; transform: scale(0.6); } 15% { opacity: 1; transform: scale(1.1); } 80% { opacity: 1; transform: scale(1); } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .legion-slot, .shadow-figure *, .battle-cry { animation: none !important; }
+}

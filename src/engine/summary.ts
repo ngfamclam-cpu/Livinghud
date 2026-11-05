@@ -16,8 +16,8 @@ import { starUpXp } from './loot'
 import { financeXp } from './finance'
 import { incentiveState, perfectDays, type IncentiveState, type PenaltyClear } from './incentives'
 import {
-  GATE_NEEDED, GATE_XP, HIDDEN_XP, extraDollarsByDay, JOBS, PLATES, couponById, companionState, earnedHidden, gateCount, goldenQuestId, jobById, luckyRoll, redGate, rollReward, shadowLegion, wildcardOffers,
-  type BonusRecord, type CompanionMood, type CompanionStage, type Coupon, type Hidden, type Job, type RedGate, type Soldier, type WildcardOffer,
+  GATE_NEEDED, GATE_XP, HIDDEN_XP, extraDollarsByDay, JOBS, PLATES, couponById, companionState, earnedHidden, gateCount, goldenQuestId, jobById, luckyRoll, redGate, rollReward, shadowLegion, soldierProfiles, legionTitle, wildcardOffers,
+  type BonusRecord, type CompanionMood, type SoldierProfile, type CompanionStage, type Coupon, type Hidden, type Job, type RedGate, type Soldier, type WildcardOffer,
 } from './extras'
 import type { Transaction, LootDrop, Memory, Place, Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, Plan, PlanFund, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
@@ -130,7 +130,9 @@ export interface ExtrasState {
   hidden: Hidden[]
   job: Job | null
   nextJob: { job: Job; checks: { label: string; done: boolean }[]; ready: boolean } | null
-  legion: Soldier[]
+  legion: SoldierProfile[]
+  legionPower: number
+  legionTitle: string
   legionNextIn: number
   companion: { stage: CompanionStage; next: CompanionStage | null; mood: CompanionMood; name: string } | null
 }
@@ -390,6 +392,7 @@ export function summarize(
   const taken = new Set(jobsTaken.map(j => j.value))
   const nextJob = JOBS.find(j => !taken.has(j.id)) ?? null
   const missedYesterday = todayDailies.filter(q => dayKey(new Date(q.createdAt), player.settings.resetHour) <= addDays(today, -1) && !completions.some(c => c.questId === q.id && c.day === addDays(today, -1))).length
+  const profiles = soldierProfiles(seed, legion.soldiers, player.legion, completions)
   const extras: ExtrasState = {
     on: extrasOn,
     golden: extrasOn ? goldenQuestId(seed, today, todayDailies) : null,
@@ -409,7 +412,9 @@ export function summarize(
     hidden,
     job: legionOn ? (jobById(jobsTaken[jobsTaken.length - 1]?.value ?? '') ?? null) : null,
     nextJob: legionOn && nextJob ? { job: nextJob, checks: nextJob.trial.map(t => ({ label: t.label, done: t.done(jobInput) })), ready: nextJob.trial.every(t => t.done(jobInput)) } : null,
-    legion: legion.soldiers,
+    legion: profiles,
+    legionPower: profiles.reduce((n, p) => n + p.power, 0),
+    legionTitle: legionTitle(legion.soldiers.length),
     legionNextIn: legion.nextIn,
     companion: player.features?.companion !== false
       ? { ...companionState(incentives?.bestCombo ?? 0, todayDailies.filter(q => todayDone.has(q.id)).length, todayDailies.length, missedYesterday), name: player.companionName || 'Pip' }

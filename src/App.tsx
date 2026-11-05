@@ -201,7 +201,7 @@ export default function App() {
         {screen === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setScreen(null)} />}
         {screen === 'customize' && <CustomizeHud onClose={() => setScreen(null)} />}
         {screen === 'search' && <Search data={data} onOpen={openFromSearch} onClose={() => setScreen(null)} />}
-        {screen === 'rewards' && <RewardsScreen player={player} summary={summary} onClose={() => setScreen(null)} />}
+        {screen === 'rewards' && <RewardsScreen player={player} summary={summary} quests={quests} onClose={() => setScreen(null)} />}
         {screen === 'finance' && <Finance summary={summary} finance={player.finance} transactions={data.transactions} bills={data.bills} onClose={() => setScreen(null)} />}
         {screen === 'collection' && <Collection player={player} summary={summary} loot={data.loot} custom={data.customCards} onClose={() => setScreen(null)} />}
         {screen === 'goals' && (

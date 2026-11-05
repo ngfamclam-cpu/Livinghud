@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  COUPONS, GATE_MINUTES, JOBS, PLATES, rollPay, scalePay, collection, companionState, couponFor, earnedHidden, foilFor, gateCount, goldenQuestId, luckyRoll, redGate, rollReward, shadowLegion, summarize, wildcardOffers,
+  COUPONS, GATE_MINUTES, JOBS, PLATES, rollPay, scalePay, companionLine, soldierProfiles, legionTitle, collection, companionState, couponFor, earnedHidden, foilFor, gateCount, goldenQuestId, luckyRoll, redGate, rollReward, shadowLegion, summarize, wildcardOffers,
   type BonusRecord, type Boss, type Completion, type Player, type Quest,
 } from './index'
 
@@ -157,5 +157,26 @@ describe('summary', () => {
     expect(summarize(player, [q], list, now).streaks.get('a')).toBe(1)
     const save = record('wildcard-use', '', '2026-11-05', { questId: 'a' })
     expect(summarize(player, [q], list, now, { bonuses: [save] }).streaks.get('a')).toBe(5)
+  })
+})
+
+describe('alive companion and legion', () => {
+  it('talks about your day', () => {
+    const base = { name: 'Pip', mood: 'calm' as const, stage: 'sprite', hour: 14, dailiesLeft: 2, dailiesTotal: 5, combo: 0 }
+    const lines = new Set(Array.from({ length: 10 }, (_, n) => companionLine(base, n)))
+    expect([...lines].some(l => l.includes('2'))).toBe(true)
+    expect(companionLine({ ...base, dailiesLeft: 0 }, 0)).toMatch(/perfect|did it|knew/i)
+    expect(companionLine({ ...base, stage: 'egg' }, 0)).toMatch(/egg|inside|glowing/)
+  })
+
+  it('levels guards up every 3 clears of their quest and names armies by size', () => {
+    const soldier = { id: 's1', kind: 'Archer' as const, name: 'Kael the Archer', veteran: false, at: 0 }
+    const clears = Array.from({ length: 7 }, (_, i) => done('q', `2026-11-0${i + 1}`, 1000 + i))
+    const [idle] = soldierProfiles('s', [soldier], undefined, clears)
+    expect(idle).toMatchObject({ level: 1, rank: 'Recruit', guardQuestId: null, displayName: 'Kael the Archer' })
+    const [guard] = soldierProfiles('s', [soldier], { guards: { s1: { questId: 'q', at: 0 } }, names: { s1: 'Robin' } }, clears)
+    expect(guard).toMatchObject({ level: 3, progress: 1, guardClears: 7, displayName: 'Robin', rank: 'Soldier' })
+    expect(guard.power).toBeGreaterThan(idle.power)
+    expect([legionTitle(0), legionTitle(3), legionTitle(12), legionTitle(30), legionTitle(80)]).toEqual(['Empty ranks', 'Warband', 'Company', 'Battalion', 'Legion'])
   })
 })

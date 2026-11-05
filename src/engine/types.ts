@@ -67,6 +67,8 @@ export interface Player {
   plate?: string
   /** Your companion's name. */
   companionName?: string
+  /** Shadow Legion: renamed soldiers and guard posts (see LegionPrefs). */
+  legion?: import('./extras').LegionPrefs
   /** Reward ideas starred in the Shop to work toward. */
   favoriteRewards?: string[]
   /** The title shown under the player's name, chosen from earned badges. */
