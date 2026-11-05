@@ -16,7 +16,7 @@ import { starUpXp } from './loot'
 import { financeXp } from './finance'
 import { incentiveState, perfectDays, type IncentiveState, type PenaltyClear } from './incentives'
 import {
-  GATE_NEEDED, GATE_XP, HIDDEN_XP, JOBS, PLATES, couponById, companionState, earnedHidden, gateCount, goldenQuestId, jobById, luckyRoll, redGate, rollReward, shadowLegion, wildcardOffers,
+  GATE_NEEDED, GATE_XP, HIDDEN_XP, extraDollarsByDay, JOBS, PLATES, couponById, companionState, earnedHidden, gateCount, goldenQuestId, jobById, luckyRoll, redGate, rollReward, shadowLegion, wildcardOffers,
   type BonusRecord, type CompanionMood, type CompanionStage, type Coupon, type Hidden, type Job, type RedGate, type Soldier, type WildcardOffer,
 } from './extras'
 import type { Transaction, LootDrop, Memory, Place, Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, Plan, PlanFund, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
@@ -226,6 +226,9 @@ export function summarize(
   // When a month ends, whatever the wallet didn't spend rolls into the Vault too.
   const earnedBy = new Map<string, number>()
   for (const c of completions) earnedBy.set(monthOf(c.day), (earnedBy.get(monthOf(c.day)) ?? 0) + c.dollars)
+  // Surprise rewards pay dollars too, more for better ones (owner's call; see EXTRA_PAY).
+  const extraPay = extrasOn ? extraDollarsByDay(bonuses, perfectList, budget, legionOn) : new Map<string, number>()
+  for (const [d, amount] of extraPay) earnedBy.set(monthOf(d), (earnedBy.get(monthOf(d)) ?? 0) + amount)
   // Penalties (if on) come off XP and that month's earnings.
   const resetHour = player.settings.resetHour
   const doneOn = new Map<string, Set<string>>()

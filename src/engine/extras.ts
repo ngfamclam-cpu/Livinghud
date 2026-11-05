@@ -3,7 +3,10 @@
 // wildcards, hidden achievements, and Job Changes that raise the Shadow Legion.
 // Everything here is pure and derived; the few things that are earned at a
 // moment (a roll, a coupon, a wildcard, a job change) are BonusRecords in the
-// save. All of it pays XP, cards or coupons, never dollars.
+// save. They pay XP, cards and coupons, and (owner's call, Nov 2026) real
+// dollars too: the better the reward, the more it pays (EXTRA_PAY). Those
+// dollars land in the month's wallet like quest pay, so past the budget they
+// overflow into the Vault.
 // Original names throughout (the look is inspired by Solo Leveling, not copied).
 
 import { addDays } from './time'
@@ -27,7 +30,7 @@ const startOfDay = (day: string) => {
 }
 
 /** Saved moments: rolls, Red Gate clears, coupons (earned and used), wildcards (earned and used), job changes. */
-export type BonusKind = 'roll' | 'gate' | 'coupon' | 'coupon-use' | 'wildcard' | 'wildcard-use' | 'job'
+export type BonusKind = 'roll' | 'gate' | 'coupon' | 'coupon-use' | 'wildcard' | 'wildcard-use' | 'job' | 'hidden'
 
 export interface BonusRecord {
   id: string
@@ -42,6 +45,50 @@ export interface BonusRecord {
   /** wildcard-use: the daily it saved. */
   questId?: string
   createdAt: number
+}
+
+// ---- Dollar pay ----
+
+/**
+ * What each reward pays at the default $150 budget (scaled to your budget):
+ * better rewards pay more. Golden Quest pay is added to that completion.
+ */
+export const EXTRA_PAY = {
+  golden: 2,
+  gate: 3,
+  perfect: 1,
+  hidden: 1,
+  job: { shadowcaller: 10, 'legion-captain': 20, 'night-sovereign': 30 } as Record<string, number>,
+}
+
+/** The Lucky Roll pays by how high you roll (a 1 pays nothing). */
+export function rollPay(n: number): number {
+  if (n <= 1) return 0
+  if (n <= 9) return 0.5
+  if (n <= 15) return 1
+  if (n <= 17) return 2
+  if (n <= 19) return 3
+  return 5
+}
+
+/** Scales a $150-budget amount to your monthly budget, to the cent. */
+export const scalePay = (amount: number, budget: number) => Math.round(amount * (budget / 150) * 100) / 100
+
+/**
+ * Bonus dollars per game day from rolls, Red Gates, perfect-day chests, hidden
+ * achievements and Job Changes (Golden Quest pay is already on its completion).
+ */
+export function extraDollarsByDay(bonuses: BonusRecord[], perfectDays: string[], budget: number, legionOn: boolean): Map<string, number> {
+  const out = new Map<string, number>()
+  const add = (day: string, amount: number) => out.set(day, (out.get(day) ?? 0) + scalePay(amount, budget))
+  for (const b of bonuses) {
+    if (b.kind === 'roll') add(b.day, rollPay(Number(b.value)))
+    if (b.kind === 'gate') add(b.day, EXTRA_PAY.gate)
+    if (b.kind === 'hidden') add(b.day, EXTRA_PAY.hidden)
+    if (b.kind === 'job' && legionOn) add(b.day, EXTRA_PAY.job[b.value] ?? 0)
+  }
+  for (const d of perfectDays) add(d, EXTRA_PAY.perfect)
+  return out
 }
 
 // ---- Golden Quest ----

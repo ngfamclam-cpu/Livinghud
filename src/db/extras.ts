@@ -3,6 +3,7 @@
 // Rules live in src/engine/extras.ts; this only records the moments.
 
 import {
+  EXTRA_PAY, rollPay, scalePay,
   GATE_NEEDED, couponById, couponFor, emit, featureOn, gateCount, gateWildcard, jobById, luckyRoll, redGate, rollReward, rollsCoupon,
   type BonusKind, type BonusRecord, type Completion, type Quest, type Summary,
 } from '../engine'
@@ -48,7 +49,7 @@ export async function afterDailyCleared(completion: Completion): Promise<void> {
   const seed = surpriseSeed(player)
   const day = completion.day
   if (completion.golden) {
-    emit({ type: 'extra', title: 'Golden Quest cleared', text: `Triple XP: +${completion.xp} XP. An Epic-or-better card is on its way.` })
+    emit({ type: 'extra', title: 'Golden Quest cleared', text: `Triple XP: +${completion.xp} XP and +$${completion.dollars.toFixed(2)}. An Epic-or-better card is on its way.` })
     await dropLoot('golden', `golden-${day}`, { minRarity: 'epic' })
     if (rollsCoupon(seed, 'golden', `golden-${day}`)) await giveCoupon(seed, day, `golden-${day}`)
   }
@@ -59,7 +60,7 @@ export async function afterDailyCleared(completion: Completion): Promise<void> {
   if (gateCount(gate, completions, dailyIds) < GATE_NEEDED) return
   const before = summary
   await addBonus('gate', day, `gate-${day}`, '')
-  emit({ type: 'extra', title: 'Red Gate closed', text: '+40 XP and a card from the other side.' })
+  emit({ type: 'extra', title: 'Red Gate closed', text: `+40 XP, +$${scalePay(EXTRA_PAY.gate, player.settings.monthlyBudget).toFixed(2)} and a card from the other side.` })
   await dropLoot('gate', `gate-${day}`, { minRarity: 'rare' })
   if (rollsCoupon(seed, 'gate', `gate-${day}`)) await giveCoupon(seed, day, `gate-${day}`)
   if (gateWildcard(seed, day)) await giveWildcard(day, `gate-${day}`)
@@ -98,7 +99,8 @@ export async function rollTheDice(): Promise<number | null> {
   const n = luckyRoll(seed, day)
   const reward = rollReward(n)
   await addBonus('roll', day, `roll-${day}`, String(n))
-  emit({ type: 'extra', title: `You rolled ${n}`, text: reward.text })
+  const pay = scalePay(rollPay(n), player.settings.monthlyBudget)
+  emit({ type: 'extra', title: `You rolled ${n}`, text: pay > 0 ? `${reward.text} Plus $${pay.toFixed(2)}.` : reward.text })
   if (reward.card) await dropLoot('roll', `roll-${day}`, { minRarity: reward.card })
   if (reward.coupon) await giveCoupon(seed, day, `roll-${day}`)
   if (reward.wildcard) await giveWildcard(day, `roll-${day}`)
@@ -130,7 +132,7 @@ export async function takeJobChange(): Promise<void> {
   const next = summary.extras.nextJob
   if (!next?.ready) return
   await addBonus('job', summary.today, `job-${next.job.id}`, next.job.id)
-  emit({ type: 'extra', title: `Job Change: ${next.job.title}`, text: `${next.job.blurb} +${next.job.xp} XP.` })
+  emit({ type: 'extra', title: `Job Change: ${next.job.title}`, text: `${next.job.blurb} +${next.job.xp} XP and +$${scalePay(EXTRA_PAY.job[next.job.id] ?? 0, summary.wallet.budget).toFixed(2)}.` })
   await announceProgress(summary)
 }
 

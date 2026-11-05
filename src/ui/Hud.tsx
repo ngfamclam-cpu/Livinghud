@@ -304,7 +304,7 @@ function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto, p
     <li className={`quest ${done ? 'done' : ''} ${golden ? 'golden' : ''}`}>
       <button className="quest-main" onClick={() => setOpen(o => !o)} aria-expanded={open}>
         <span className="stat-key">{statName(quest.stat)}</span>
-        <span className="quest-title">{quest.title}{golden && <span className="golden-tag" title="Golden Quest: triple XP and an Epic-or-better card"> ✦ GOLDEN ×3</span>}</span>
+        <span className="quest-title">{quest.title}{golden && <span className="golden-tag" title="Golden Quest: triple XP, a dollar bonus and an Epic-or-better card"> ✦ GOLDEN ×3</span>}</span>
         {pay && !done && <span className="quest-pay" title="Full version pays">{money(pay.dollars)}</span>}
         {streak > 0 && <span className="streak" title={`${streak}-day streak`}>{streak}d</span>}
       </button>

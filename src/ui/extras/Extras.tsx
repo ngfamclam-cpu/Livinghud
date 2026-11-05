@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { COMPANION_STAGES, HIDDEN, JOBS, PLATES, QUESTS_PER_SOLDIER, featureOn, type Player, type Quest, type Soldier, type Summary } from '../../engine'
+import { COMPANION_STAGES, EXTRA_PAY, HIDDEN, JOBS, scalePay, PLATES, QUESTS_PER_SOLDIER, featureOn, type Player, type Quest, type Soldier, type Summary } from '../../engine'
 import { nameCompanion, redeemCoupon, rollTheDice, setPlate, takeJobChange, playWildcard } from '../../db/extras'
 import { SystemWindow } from '../SystemWindow'
 import { CompanionArt } from './Companion'
@@ -10,6 +10,7 @@ const minutesLeft = (until: number, now: number) => Math.max(0, Math.ceil((until
 export function ExtrasAlerts({ summary, quests, now }: { summary: Summary; quests: Quest[]; now: Date }) {
   const x = summary.extras
   const [rolling, setRolling] = useState(false)
+  const pay = (amount: number) => `$${scalePay(amount, summary.wallet.budget).toFixed(2)}`
   if (!x.on) return null
   const t = now.getTime()
   const gate = x.gate && t >= x.gate.opensAt && (t < x.gate.closesAt || x.gate.cleared) ? x.gate : null
@@ -27,7 +28,7 @@ export function ExtrasAlerts({ summary, quests, now }: { summary: Summary; quest
           <div className="gate-pips" aria-label={`${gate.count} of ${gate.needed}`}>
             {Array.from({ length: gate.needed }, (_, i) => <span key={i} className={i < gate.count ? 'on' : ''} />)}
           </div>
-          <p className="muted">Reward: +40 XP, a Rare-or-better card, maybe a coupon or a wildcard. Miss it and nothing is lost.</p>
+          <p className="muted">Reward: +40 XP, {pay(EXTRA_PAY.gate)}, a Rare-or-better card, maybe a coupon or a wildcard. Miss it and nothing is lost.</p>
         </SystemWindow>
       )}
       {gate?.cleared && t < gate.closesAt && <p className="system-line gate-closed">Red Gate closed. Well fought.</p>}
@@ -36,7 +37,7 @@ export function ExtrasAlerts({ summary, quests, now }: { summary: Summary; quest
           <p className="system-line">Perfect day{x.rollDay !== summary.today ? ' yesterday' : ''}! Roll the d20 for a bonus.</p>
           <div className="row">
             <span className={`d20 ${rolling ? 'rolling' : ''}`} aria-hidden="true">{rolling ? '?' : '20'}</span>
-            <p className="muted grow">2–9: +10 XP · 10–15: +25 · 16–17: +40 and a coupon · 18–19: Rare card and a wildcard · 20: Legendary card. A 1 curses you for the day.</p>
+            <p className="muted grow">2–9: +10 XP, {pay(0.5)} · 10–15: +25 XP, {pay(1)} · 16–17: +40 XP, {pay(2)} and a coupon · 18–19: {pay(3)}, Rare card and a wildcard · 20: {pay(5)} and a Legendary card. A 1 curses you for the day.</p>
           </div>
           <div className="row end"><button disabled={rolling} onClick={roll}>{rolling ? 'Rolling…' : 'Roll the d20'}</button></div>
         </SystemWindow>
@@ -122,7 +123,7 @@ export function RewardsScreen({ player, summary, onClose }: { player: Player; su
                 {x.nextJob.checks.map(c => <li key={c.label} className={c.done ? 'done' : ''}>{c.done ? '✔' : '◇'} {c.label}</li>)}
               </ul>
               <div className="row end">
-                <button disabled={!x.nextJob.ready} onClick={() => void takeJobChange()}>{x.nextJob.ready ? `Become a ${x.nextJob.job.title} (+${x.nextJob.job.xp} XP)` : 'Trial not complete'}</button>
+                <button disabled={!x.nextJob.ready} onClick={() => void takeJobChange()}>{x.nextJob.ready ? `Become a ${x.nextJob.job.title} (+${x.nextJob.job.xp} XP, +$${scalePay(EXTRA_PAY.job[x.nextJob.job.id] ?? 0, summary.wallet.budget).toFixed(2)})` : 'Trial not complete'}</button>
               </div>
             </>
           ) : (

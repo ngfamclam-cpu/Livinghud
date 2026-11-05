@@ -23,6 +23,8 @@ import {
   GOLDEN_XP_MULT,
   HIDDEN_XP,
   PLATES,
+  EXTRA_PAY,
+  scalePay,
   shopLock,
   PACK_MILESTONES,
   PACK_SIZE,
@@ -213,7 +215,14 @@ export async function announceProgress(before: Summary): Promise<void> {
   const a = after.extras
   const b = before.extras
   const hadHidden = new Set(b.hidden.map(h => h.id))
-  for (const h of a.hidden) if (!hadHidden.has(h.id)) emit({ type: 'extra', title: `Hidden achievement: ${h.title}`, text: `${h.description}. +${HIDDEN_XP} XP.` })
+  for (const h of a.hidden) if (!hadHidden.has(h.id)) emit({ type: 'extra', title: `Hidden achievement: ${h.title}`, text: `${h.description}. +${HIDDEN_XP} XP · +$${scalePay(EXTRA_PAY.hidden, after.wallet.budget).toFixed(2)}.` })
+  // Each hidden achievement pays its dollars once, on the day it's first seen.
+  if (a.hidden.length) {
+    const recorded = new Set((await db.bonuses.where('kind').equals('hidden').toArray()).filter(r => r.userId === LOCAL_USER).map(r => r.value))
+    for (const h of a.hidden) {
+      if (!recorded.has(h.id)) await db.bonuses.add({ id: newId(), userId: LOCAL_USER, kind: 'hidden', day: after.today, sourceId: `hidden-${h.id}`, value: h.id, createdAt: Date.now() })
+    }
+  }
   for (const id of a.plates) if (!b.plates.includes(id)) emit({ type: 'extra', title: 'New name plate', text: `${PLATES.find(p => p.id === id)?.name ?? id} unlocked. Equip it in Settings.` })
   if (a.companion && b.companion && a.companion.stage.id !== b.companion.stage.id) emit({ type: 'extra', title: `${a.companion.name} evolved!`, text: `Now a ${a.companion.stage.name}.` })
   if (a.legion.length > b.legion.length) {
@@ -268,7 +277,8 @@ export async function completeQuest(
     version,
     ...(stage ? { stageId: stage.id } : {}),
     xp: reward.xp,
-    dollars: reward.dollars,
+    // The Golden Quest also pays a bonus in dollars (EXTRA_PAY).
+    dollars: golden ? Math.round((reward.dollars + scalePay(EXTRA_PAY.golden, player.settings.monthlyBudget)) * 100) / 100 : reward.dollars,
     ...(golden ? { golden: true } : {}),
     createdAt: Date.now(),
   }

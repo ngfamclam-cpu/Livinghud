@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  COUPONS, GATE_MINUTES, JOBS, PLATES, collection, companionState, couponFor, earnedHidden, foilFor, gateCount, goldenQuestId, luckyRoll, redGate, rollReward, shadowLegion, summarize, wildcardOffers,
+  COUPONS, GATE_MINUTES, JOBS, PLATES, rollPay, scalePay, collection, companionState, couponFor, earnedHidden, foilFor, gateCount, goldenQuestId, luckyRoll, redGate, rollReward, shadowLegion, summarize, wildcardOffers,
   type BonusRecord, type Boss, type Completion, type Player, type Quest,
 } from './index'
 
@@ -50,6 +50,8 @@ describe('lucky roll, foil and coupons', () => {
     expect(rollReward(20)).toMatchObject({ card: 'legendary', coupon: true, xp: 100 })
     expect(rollReward(18).wildcard).toBe(true)
     for (let n = 2; n <= 20; n++) expect(rollReward(n).xp).toBeGreaterThanOrEqual(rollReward(n - 1).xp)
+    for (let n = 2; n <= 20; n++) expect(rollPay(n)).toBeGreaterThanOrEqual(rollPay(n - 1))
+    expect([rollPay(1), rollPay(20), scalePay(2, 75)]).toEqual([0, 5, 1])
   })
 
   it('makes about 1 in 15 drops foil, and a foil counts as two copies', () => {
@@ -135,6 +137,17 @@ describe('summary', () => {
     expect(s.extras.wildcards).toBe(1)
     expect(s.extras.job?.title).toBe('Shadowcaller')
     expect(summarize({ ...player, features: { extras: false, legion: false } }, [], [], now, { bonuses: [record('roll', '20')] }).totalXp).toBe(base)
+  })
+
+  it('pays dollars by how good the reward is, scaled to the budget', () => {
+    const now = new Date(2026, 10, 5, 12)
+    const base = summarize(player, [], [], now).wallet.earned
+    const bonuses = [record('roll', '20'), record('roll', '5', '2026-11-04'), record('gate', ''), record('job', 'shadowcaller'), record('hidden', 'grinder')]
+    // Roll 20 = $5, roll 5 = $0.50, gate $3, Shadowcaller $10, hidden $1.
+    expect(summarize(player, [], [], now, { bonuses }).wallet.earned - base).toBeCloseTo(19.5)
+    const rich = { ...player, settings: { ...player.settings, monthlyBudget: 300 } }
+    expect(summarize(rich, [], [], now, { bonuses }).wallet.earned).toBeCloseTo(39)
+    expect(summarize({ ...player, features: { extras: false } }, [], [], now, { bonuses }).wallet.earned).toBe(base)
   })
 
   it('a used wildcard keeps a streak alive', () => {
