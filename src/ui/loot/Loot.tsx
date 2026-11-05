@@ -27,6 +27,7 @@ interface Reveal {
   card: Card
   copies: number
   starUp: boolean
+  foil?: boolean
 }
 
 /** The drop reveal: a card flips in when loot drops. Queues if several drop at once. */
@@ -37,7 +38,7 @@ export function LootReveal() {
       onGameEvent(e => {
         if (e.type !== 'loot.card') return
         const card = cardById(e.cardId)
-        if (card) setQueue(q => [...q, { card, copies: e.copies, starUp: e.starUp }])
+        if (card) setQueue(q => [...q, { card, copies: e.copies, starUp: e.starUp, foil: e.foil }])
       }),
     [],
   )
@@ -47,13 +48,13 @@ export function LootReveal() {
   const close = () => setQueue(q => q.slice(1))
   return (
     <div className="overlay loot-reveal" role="dialog" aria-label={`Loot drop: ${current.card.name}`} onClick={close}>
-      <p className={`drop-title r-${current.card.rarity}`}>{RARITY_NAMES[current.card.rarity].toUpperCase()} DROP</p>
+      <p className={`drop-title r-${current.card.rarity}`}>{current.foil ? '✦ FOIL ' : ''}{RARITY_NAMES[current.card.rarity].toUpperCase()} DROP</p>
       <div className="flip-in">
-        <CardArt card={current.card} stars={starsNow} />
+        <CardArt card={current.card} stars={starsNow} foil={current.foil} />
       </div>
       <p className="drop-text">{current.card.text}</p>
       <p className="system-line">
-        {current.copies === 1 ? 'New card for your collection!' : current.starUp ? `Powered up to ${'★'.repeat(starsNow)}! +${STAR_UP_XP} XP` : `Duplicate ×${current.copies}. ${nextStar(current.copies)}`}
+        {current.foil ? 'Holographic! Counts as two copies. ' : ''}{current.copies <= (current.foil ? 2 : 1) ? 'New card for your collection!' : current.starUp ? `Powered up to ${'★'.repeat(starsNow)}! +${STAR_UP_XP} XP` : `Duplicate ×${current.copies}. ${nextStar(current.copies)}`}
       </p>
       <button className="arise" onClick={close}>Collect</button>
     </div>
@@ -116,7 +117,7 @@ export function Collection({ loot, custom, onClose }: { player?: Player; summary
             const e = owned.get(c.id)
             return (
               <button key={c.id} className="card-button" disabled={!e} onClick={() => setOpen(c)}>
-                <CardArt card={c} stars={e?.stars ?? 0} locked={!e} />
+                <CardArt card={c} stars={e?.stars ?? 0} locked={!e} foil={e?.foil} />
                 {e && e.copies > 1 && <span className="copies">×{e.copies}</span>}
               </button>
             )
@@ -129,7 +130,7 @@ export function Collection({ loot, custom, onClose }: { player?: Player; summary
       {open && entry && (
         <div className="overlay loot-reveal" role="dialog" aria-label={open.name} onClick={() => setOpen(null)}>
           <p className={`drop-title r-${open.rarity}`}>{RARITY_NAMES[open.rarity].toUpperCase()}</p>
-          <CardArt card={cardById(open.id) ?? open} stars={entry.stars} />
+          <CardArt card={cardById(open.id) ?? open} stars={entry.stars} foil={entry.foil} />
           <p className="drop-text">{open.text}</p>
           <p className="muted">
             ×{entry.copies} · {'★'.repeat(entry.stars)} · first found {new Date(entry.firstAt).toLocaleDateString()}

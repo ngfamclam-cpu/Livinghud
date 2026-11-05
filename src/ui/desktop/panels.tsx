@@ -82,7 +82,7 @@ export function ProfileCard({ data, summary }: { data: DashData; summary: Summar
       <div className="profile-head">
         <div className="rank-badge" aria-label={`Rank ${summary.rank}`}><span>{summary.rank}</span></div>
         <div className="grow">
-          <div className="player-name">{player.name}</div>
+          <div className={`player-name plate-${player.plate && summary.extras.plates.includes(player.plate) ? player.plate : 'plain'}`}>{player.name}</div>
           {title && <div className="player-title">{title}</div>}
           <div className="muted">
             {summary.badges.length} title{summary.badges.length === 1 ? '' : 's'}

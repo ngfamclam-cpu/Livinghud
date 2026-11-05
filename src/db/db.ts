@@ -2,7 +2,7 @@
 // Phase 5 adds Supabase sync on top; records already carry userId + timestamps.
 
 import Dexie, { type EntityTable } from 'dexie'
-import type { PenaltyClearRecord, Bill, Transaction, CustomCard, LootDrop, DayGoals, Memory, Place, Boss, Completion, Contact, ExerciseSet, FocusRun, JournalEntry, Person, Plan, PlanFund, Player, SurpriseClear, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
+import type { BonusRecord, PenaltyClearRecord, Bill, Transaction, CustomCard, LootDrop, DayGoals, Memory, Place, Boss, Completion, Contact, ExerciseSet, FocusRun, JournalEntry, Person, Plan, PlanFund, Player, SurpriseClear, PostureScan, Purchase, Quest, Reward, SavingsEntry } from '../engine'
 
 export const LOCAL_USER = 'local'
 
@@ -41,6 +41,7 @@ export const db = new Dexie('livinghud') as Dexie & {
   transactions: EntityTable<Transaction, 'id'>
   bills: EntityTable<Bill, 'id'>
   penaltyClears: EntityTable<PenaltyClearRecord, 'id'>
+  bonuses: EntityTable<BonusRecord, 'id'>
 }
 
 db.version(1).stores({
@@ -127,4 +128,9 @@ db.version(14).stores({
 // Penalty Quests cleared or shielded.
 db.version(15).stores({
   penaltyClears: 'id, userId, day',
+})
+
+// v16: surprise-reward moments (rolls, Red Gate clears, coupons, wildcards, job changes).
+db.version(16).stores({
+  bonuses: 'id, userId, sourceId, kind',
 })

@@ -67,6 +67,9 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'finance', name: 'Finance tracker', description: 'Log spending, income and bills; a monthly limit, weekly check-ins and monthly reports; WLT XP for staying under.' },
   { key: 'incentives', name: 'Combo, chests and shields', description: 'Perfect days in a row multiply quest XP; perfect-day chests, card packs at combo milestones, secret card series, and Shields from perfect weeks.' },
   { key: 'penaltyQuest', name: 'Penalty Quests', description: 'Miss too many dailies and the next day brings a mandatory quest from your own list; the Shop stays locked until it is done.' },
+  { key: 'extras', name: 'Surprise rewards', description: 'Golden Quest, Red Gates, the perfect-day Lucky Roll, treat coupons, wildcards, name plates and hidden achievements.' },
+  { key: 'companion', name: 'Companion', description: 'A little creature on your HUD that evolves with your best combo.' },
+  { key: 'legion', name: 'Job Changes and Shadow Legion', description: 'Class trials at levels 10, 25 and 40, and a shadow army that grows as you clear quests.' },
   { key: 'journal', name: 'Reflection journal', description: 'Three prompts a day, mood and energy, and the patterns over time.' },
 ]
 

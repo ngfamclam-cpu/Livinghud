@@ -63,6 +63,10 @@ export interface Player {
   finance?: FinanceSettings
   /** Combo, chests, shields and the Penalty Quest settings (see src/engine/incentives.ts). */
   incentives?: IncentiveSettings
+  /** Equipped name plate (see PLATES in extras.ts). */
+  plate?: string
+  /** Your companion's name. */
+  companionName?: string
   /** Reward ideas starred in the Shop to work toward. */
   favoriteRewards?: string[]
   /** The title shown under the player's name, chosen from earned badges. */
@@ -114,6 +118,8 @@ export interface Completion {
   stageId?: string
   xp: number
   dollars: number
+  /** Cleared as the day's Golden Quest (triple XP). */
+  golden?: boolean
   createdAt: number
 }
 
@@ -237,7 +243,7 @@ export interface PostureScan {
 }
 
 /** Optional parts of the game the player can switch off in Settings. */
-export type FeatureKey = 'plans' | 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises' | 'memories' | 'cards' | 'finance' | 'incentives' | 'penaltyQuest'
+export type FeatureKey = 'plans' | 'party' | 'focus' | 'bosses' | 'journal' | 'badges' | 'penalties' | 'briefing' | 'report' | 'loot' | 'surprises' | 'memories' | 'cards' | 'finance' | 'incentives' | 'penaltyQuest' | 'extras' | 'companion' | 'legion'
 
 export type Circle = 'friend' | 'family' | 'dating' | 'work'
 
@@ -464,6 +470,8 @@ export interface LootDrop {
   sourceId: string
   /** Game day, YYYY-MM-DD. */
   day: string
+  /** A holographic copy: counts as two toward stars. */
+  foil?: boolean
   createdAt: number
 }
 

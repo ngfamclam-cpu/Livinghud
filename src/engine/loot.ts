@@ -83,10 +83,10 @@ export const CARDS = BUILT_IN
 export const cardById = (id: string) => allCards().find(c => c.id === id)
 
 /** What triggered a roll. Big moments drop better loot. */
-export type DropSource = 'boss' | 'main' | 'strength' | 'quest' | 'focus' | 'surprise' | 'goals' | 'perfect' | 'pack'
+export type DropSource = 'boss' | 'main' | 'strength' | 'quest' | 'focus' | 'surprise' | 'goals' | 'perfect' | 'pack' | 'golden' | 'gate' | 'roll'
 
 /** Chance a source drops anything at all ("generous" setting). */
-export const DROP_CHANCE: Record<DropSource, number> = { boss: 1, main: 1, strength: 1, quest: 0.25, focus: 0.25, surprise: 0.5, goals: 0.5, perfect: 1, pack: 1 }
+export const DROP_CHANCE: Record<DropSource, number> = { boss: 1, main: 1, strength: 1, quest: 0.25, focus: 0.25, surprise: 0.5, goals: 0.5, perfect: 1, pack: 1, golden: 1, gate: 1, roll: 1 }
 
 /** Rarity odds per source, as weights for common/rare/epic/legendary. */
 const RARITY_ODDS: Record<DropSource, [number, number, number, number]> = {
@@ -99,6 +99,9 @@ const RARITY_ODDS: Record<DropSource, [number, number, number, number]> = {
   goals: [40, 40, 16, 4],
   perfect: [0, 60, 30, 10],
   pack: [35, 40, 18, 7],
+  golden: [0, 0, 75, 25],
+  gate: [0, 55, 35, 10],
+  roll: [0, 70, 25, 5],
 }
 
 /** A small, well-mixed hash so a roll is stable for the same source. */
@@ -156,16 +159,20 @@ export interface CollectionEntry {
   copies: number
   stars: number
   firstAt: number
+  /** You own at least one holographic copy. */
+  foil: boolean
 }
 
 /** Your binder: every card you own with its copies and power level. */
-export function collection(drops: { cardId: string; createdAt: number }[]): Map<string, CollectionEntry> {
+export function collection(drops: { cardId: string; createdAt: number; foil?: boolean }[]): Map<string, CollectionEntry> {
   const out = new Map<string, CollectionEntry>()
   for (const d of [...drops].sort((a, b) => a.createdAt - b.createdAt)) {
     const card = cardById(d.cardId)
     if (!card) continue
-    const e = out.get(card.id) ?? { card, copies: 0, stars: 0, firstAt: d.createdAt }
-    e.copies++
+    const e = out.get(card.id) ?? { card, copies: 0, stars: 0, firstAt: d.createdAt, foil: false }
+    // A foil copy counts as two.
+    e.copies += d.foil ? 2 : 1
+    e.foil = e.foil || !!d.foil
     e.stars = stars(e.copies)
     out.set(card.id, e)
   }
@@ -173,7 +180,7 @@ export function collection(drops: { cardId: string; createdAt: number }[]): Map<
 }
 
 /** XP from duplicates powering cards up. */
-export function starUpXp(drops: { cardId: string; createdAt: number }[]): number {
+export function starUpXp(drops: { cardId: string; createdAt: number; foil?: boolean }[]): number {
   let ups = 0
   for (const e of collection(drops).values()) ups += Math.max(0, e.stars - 1)
   return ups * STAR_UP_XP

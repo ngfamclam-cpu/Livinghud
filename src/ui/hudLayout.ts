@@ -5,13 +5,14 @@ import { useEffect, useState } from 'react'
 // The Penalty Zone and alerts (surprise, recovery, bonds...) aren't listed:
 // they only appear when something needs you, and always show on top.
 
-export type PanelId = 'status' | 'dailies' | 'combo' | 'top3' | 'today' | 'money' | 'sides' | 'stats' | 'mains' | 'focus' | 'adventure' | 'journal' | 'collection'
+export type PanelId = 'status' | 'dailies' | 'combo' | 'companion' | 'top3' | 'today' | 'money' | 'sides' | 'stats' | 'mains' | 'focus' | 'adventure' | 'journal' | 'collection' | 'rewards'
 export type Placement = 'top' | 'more' | 'hidden'
 
 export const PANEL_LABELS: Record<PanelId, string> = {
   status: 'Status, level and wallet',
   dailies: 'Daily quests',
   combo: 'Combo meter and chest',
+  companion: 'Companion',
   top3: 'Top 3 goals',
   today: 'Today’s page (photo and journal)',
   money: 'Money tracker',
@@ -22,6 +23,7 @@ export const PANEL_LABELS: Record<PanelId, string> = {
   adventure: 'Next adventure',
   journal: 'Journal',
   collection: 'Card collection',
+  rewards: 'Rewards & Shadow Legion',
 }
 
 export interface HudLayout {
@@ -30,9 +32,9 @@ export interface HudLayout {
 }
 
 export const DEFAULT_LAYOUT: HudLayout = {
-  order: ['status', 'dailies', 'combo', 'top3', 'today', 'money', 'sides', 'stats', 'mains', 'focus', 'adventure', 'journal', 'collection'],
+  order: ['status', 'dailies', 'combo', 'companion', 'top3', 'today', 'money', 'rewards', 'sides', 'stats', 'mains', 'focus', 'adventure', 'journal', 'collection'],
   place: {
-    status: 'top', dailies: 'top', combo: 'top', top3: 'top', today: 'top', money: 'top',
+    status: 'top', dailies: 'top', combo: 'top', companion: 'top', top3: 'top', today: 'top', money: 'top', rewards: 'more',
     sides: 'more', stats: 'more', mains: 'more', focus: 'more', adventure: 'more', journal: 'more', collection: 'more',
   },
 }

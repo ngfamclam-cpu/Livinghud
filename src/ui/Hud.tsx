@@ -11,6 +11,7 @@ import { activeFocus, focusedMinutes } from '../db/focus'
 import { Bar } from './Bar'
 import { PenaltyZone, ComboPanel } from './IncentivePanels'
 import { useHudLayout, type PanelId } from './hudLayout'
+import { CompanionPanel, ExtrasAlerts, RewardsPanel } from './extras/Extras'
 import { money, monthName } from './format'
 
 interface HudProps {
@@ -40,9 +41,11 @@ interface HudProps {
   onFinance: () => void
   /** Opens the Customize HUD screen (phone layout). */
   onCustomize?: () => void
+  /** Opens the Rewards & Shadow Legion screen. */
+  onRewards?: () => void
 }
 
-export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop, memories, onLifeLog, goals, onGoals, loot, onCollection, transactions, bills, onFinance, onCustomize }: HudProps) {
+export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop, memories, onLifeLog, goals, onGoals, loot, onCollection, transactions, bills, onFinance, onCustomize, onRewards }: HudProps) {
   const layout = useHudLayout()
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
@@ -62,7 +65,9 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
       !desktop && <SystemWindow title="Status" className="status">
             <div className="player-line">
               <div>
-                <div className="player-name">{player.name}</div>
+                <div className={`player-name plate-${player.plate && summary.extras.plates.includes(player.plate) ? player.plate : 'plain'}`}>{player.name}</div>
+                {summary.extras.cursedToday && <div className="player-title cursed">Cursed by the Dice (today)</div>}
+                {summary.extras.job && <div className="muted">Class: {summary.extras.job.title}{summary.extras.legion.length ? ` · Shadow Legion ${summary.extras.legion.length}` : ''}</div>}
                 {featureOn(player, 'badges') && player.title && summary.badges.some(b => b.title === player.title) && (
                   <div className="player-title">{player.title}</div>
                 )}
@@ -122,6 +127,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
                     pay={payOf(q)}
                     onPhoto={q.templateId === 'int-photo' ? () => onLifeLog(true) : undefined}
                     onPlan={q.templateId === 'agi-plan' ? () => setPlanning(true) : undefined}
+                    golden={summary.extras.golden === q.id}
                   />
                 ))}
               </ul>
@@ -180,6 +186,8 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
           ),
     collection:
       featureOn(player, 'cards') && <CollectionPanel loot={loot} onOpen={onCollection} />,
+    companion: summary.extras.companion && <CompanionPanel summary={summary} />,
+    rewards: (featureOn(player, 'extras') || featureOn(player, 'legion')) && onRewards && <RewardsPanel summary={summary} onOpen={onRewards} />,
   }
   const shown = layout.order.filter(id => layout.place[id] !== 'hidden' && panels[id])
   const top = desktop ? shown : shown.filter(id => layout.place[id] === 'top')
@@ -188,6 +196,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
   return (
     <main className="hud">
       <PenaltyZone player={player} summary={summary} />
+      <ExtrasAlerts summary={summary} quests={quests} now={now} />
 
       {featureOn(player, 'memories') && <NewAreaBanner onSnap={() => onLifeLog(true)} />}
 
@@ -260,6 +269,8 @@ interface RowProps {
   pay?: { xp: number; dollars: number }
   /** "Plan tomorrow's top 3": cleared by writing the goals. */
   onPlan?: () => void
+  /** Today's Golden Quest: triple XP and an Epic+ card. */
+  golden?: boolean
 }
 
 const PANEL_SHORT: Record<PanelId, string> = {
@@ -276,9 +287,11 @@ const PANEL_SHORT: Record<PanelId, string> = {
   adventure: 'adventure',
   journal: 'journal',
   collection: 'cards',
+  companion: 'companion',
+  rewards: 'rewards',
 }
 
-function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto, pay, onPlan }: RowProps) {
+function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto, pay, onPlan, golden }: RowProps) {
   const [open, setOpen] = useState(false)
   const routineParts = routine
     ? [
@@ -288,10 +301,10 @@ function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto, p
       ]
     : []
   return (
-    <li className={`quest ${done ? 'done' : ''}`}>
+    <li className={`quest ${done ? 'done' : ''} ${golden ? 'golden' : ''}`}>
       <button className="quest-main" onClick={() => setOpen(o => !o)} aria-expanded={open}>
         <span className="stat-key">{statName(quest.stat)}</span>
-        <span className="quest-title">{quest.title}</span>
+        <span className="quest-title">{quest.title}{golden && <span className="golden-tag" title="Golden Quest: triple XP and an Epic-or-better card"> ✦ GOLDEN ×3</span>}</span>
         {pay && !done && <span className="quest-pay" title="Full version pays">{money(pay.dollars)}</span>}
         {streak > 0 && <span className="streak" title={`${streak}-day streak`}>{streak}d</span>}
       </button>
