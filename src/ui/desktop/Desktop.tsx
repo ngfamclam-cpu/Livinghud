@@ -44,6 +44,7 @@ import { GoalsView } from '../goals/GoalsView'
 import { Collection } from '../loot/Loot'
 import { Finance } from '../finance/Finance'
 import { RewardsScreen } from '../extras/Extras'
+import { Search } from '../Search'
 import { MemoriesPanel } from './MemoriesPanel'
 import { MoneyPanel, ProfileCard, ReportWall, StatTrends, StreakCalendar, Timeline, TrainingPanel } from './panels'
 import { setPref, usePrefs, type Look } from './prefs'
@@ -77,10 +78,11 @@ export interface DashData {
   bills: Bill[]
 }
 
-type Page = 'dashboard' | 'lifelog' | 'goals' | 'collection' | 'finance' | 'quests' | 'party' | 'shop' | 'plans' | 'journal' | 'report' | 'settings' | 'workout' | 'scan' | 'focus' | 'rewards'
+type Page = 'dashboard' | 'lifelog' | 'goals' | 'collection' | 'finance' | 'quests' | 'party' | 'shop' | 'plans' | 'journal' | 'report' | 'settings' | 'workout' | 'scan' | 'focus' | 'rewards' | 'search'
 
 const NAV: { key: Page; label: string; icon: string; feature?: Parameters<typeof featureOn>[1] }[] = [
   { key: 'dashboard', label: 'Command centre', icon: '◈' },
+  { key: 'search', label: 'Search', icon: '⌕' },
   { key: 'quests', label: 'Quests', icon: '❖' },
   { key: 'lifelog', label: 'Life log', icon: '❂', feature: 'memories' },
   { key: 'goals', label: 'Top 3 goals', icon: '◎' },
@@ -222,6 +224,12 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
             <LifeLog key={logCamera} data={data} summary={summary} startCamera={logCamera > 0} onJournal={() => setPage('journal')} onClose={() => { setLogCamera(0); home() }} />
           )}
           {page === 'finance' && <Finance summary={summary} finance={player.finance} transactions={data.transactions} bills={data.bills} />}
+          {page === 'search' && (
+            <Search
+              data={data}
+              onOpen={(target, id) => (target === 'plans' ? openPlans(id ?? null) : target === 'focus' ? openFocus() : target === 'lifelog' ? openLog() : setPage(target === 'finance' ? 'finance' : target))}
+            />
+          )}
           {page === 'rewards' && <RewardsScreen player={player} summary={summary} />}
           {page === 'collection' && <Collection player={player} summary={summary} loot={data.loot} custom={data.customCards} />}
           {page === 'goals' && (

@@ -983,3 +983,17 @@ button.photo { cursor: zoom-in; }
 .coupon-list, .hidden-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .coupon { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border: 1px dashed var(--gold); border-radius: var(--radius); }
 .hidden-list li.got b { color: var(--gold); }
+
+/* Search */
+.search-input { width: 100%; font-size: 1.05rem; padding: 10px 12px; }
+.tab-search { flex: 0 0 auto; min-width: 2.6em; }
+.search-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.search-hit { border: 1px solid rgba(47, 143, 255, 0.3); border-radius: var(--radius); padding: 10px 12px; background: var(--panel, rgba(10, 20, 38, 0.6)); display: grid; gap: 6px; }
+.search-hit-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; width: 100%; text-align: left; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; }
+.search-kind { font-weight: 700; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.search-title { font-weight: 600; flex: 1 1 12em; min-width: 0; }
+.search-day { white-space: nowrap; }
+.search-text { margin: 0; color: var(--muted); font-size: 0.92rem; overflow-wrap: anywhere; }
+.search-text.full { white-space: pre-wrap; color: inherit; }
+.search-hit mark { background: rgba(255, 207, 92, 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
+.center-text { text-align: center; }

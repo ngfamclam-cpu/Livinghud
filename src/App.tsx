@@ -26,6 +26,8 @@ import { pushPenaltyStatus } from './db/triggers'
 import { Desktop } from './ui/desktop/Desktop'
 import { CustomizeHud, MoreMenu, type MoreItem } from './ui/More'
 import { RewardsScreen } from './ui/extras/Extras'
+import { Search } from './ui/Search'
+import type { SearchTarget } from './engine'
 import { setPref, usePrefs, useWide } from './ui/desktop/prefs'
 
 type Tab = 'hud' | 'quests' | 'log' | 'shop' | 'more'
@@ -41,7 +43,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
-  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | 'collection' | 'finance' | 'party' | 'settings' | 'customize' | 'rewards' | null>(null)
+  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | 'collection' | 'finance' | 'party' | 'settings' | 'customize' | 'rewards' | 'search' | null>(null)
   const [logCamera, setLogCamera] = useState(0)
   const [planId, setPlanId] = useState<string | null>(null)
   const [briefingDone, setBriefingDone] = useState(false)
@@ -151,10 +153,24 @@ export default function App() {
     setScreen(null)
     setTab('log')
   }
+  // A search result opens the screen it came from.
+  const openFromSearch = (target: SearchTarget, id?: string) => {
+    const tabFor: Partial<Record<SearchTarget, Tab>> = { quests: 'quests', shop: 'shop' }
+    if (target === 'lifelog') return openLog()
+    if (target === 'plans') return openPlans(id ?? null)
+    if (target === 'focus') return openFocus()
+    if (tabFor[target]) {
+      setScreen(null)
+      setTab(tabFor[target]!)
+      return
+    }
+    setScreen(target as 'journal' | 'goals' | 'finance' | 'party' | 'collection' | 'rewards')
+  }
   const tabs = TABS.filter(t => t.key !== 'log' || featureOn(player, 'memories'))
   const current = tabs.some(t => t.key === tab) ? tab : 'hud'
 
   const moreItems: MoreItem[] = [
+    { key: 'search', label: 'Search', hint: 'Everything you’ve written or logged', open: () => setScreen('search') },
     featureOn(player, 'party') && { key: 'party', label: 'Party', hint: 'Friends, family, bonds', open: () => setScreen('party') },
     featureOn(player, 'finance') && { key: 'finance', label: 'Finances', hint: 'Spending, bills, reports', open: () => setScreen('finance') },
     (featureOn(player, 'extras') || featureOn(player, 'legion')) && { key: 'rewards', label: 'Rewards & Legion', hint: 'Coupons, job changes, secrets', open: () => setScreen('rewards') },
@@ -184,6 +200,7 @@ export default function App() {
         )}
         {screen === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setScreen(null)} />}
         {screen === 'customize' && <CustomizeHud onClose={() => setScreen(null)} />}
+        {screen === 'search' && <Search data={data} onOpen={openFromSearch} onClose={() => setScreen(null)} />}
         {screen === 'rewards' && <RewardsScreen player={player} summary={summary} onClose={() => setScreen(null)} />}
         {screen === 'finance' && <Finance summary={summary} finance={player.finance} transactions={data.transactions} bills={data.bills} onClose={() => setScreen(null)} />}
         {screen === 'collection' && <Collection player={player} summary={summary} loot={data.loot} custom={data.customCards} onClose={() => setScreen(null)} />}
@@ -216,6 +233,7 @@ export default function App() {
             {t.label}
           </button>
         ))}
+        <button className="tab-search" aria-label="Search everything" onClick={() => setScreen('search')}>🔍</button>
         {wide && <button onClick={() => setPref('layout', 'auto')}>PC dashboard</button>}
       </nav>
       {current === 'log' && (
