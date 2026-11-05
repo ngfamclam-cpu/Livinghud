@@ -691,9 +691,11 @@ button.photo { cursor: zoom-in; }
 .memory-time { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
 .memory-place { color: var(--muted); font-size: 0.9rem; }
 .memory-note { margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.reflection { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 8px; }
-.reflection dt { color: var(--muted); font-size: 0.85rem; }
-.reflection dd { margin: 0; overflow-wrap: anywhere; }
+/* Each question sits above its answer (long evolving questions used to squeeze answers into a one-letter column). */
+.reflection { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin: 0 0 8px; }
+.reflection dt { color: var(--muted); font-size: 0.85rem; margin-top: 10px; }
+.reflection dt:first-child { margin-top: 0; }
+.reflection dd { margin: 0; padding-left: 10px; border-left: 2px solid rgba(47, 143, 255, 0.35); overflow-wrap: anywhere; white-space: pre-wrap; }
 .composer-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; margin-bottom: 4px; }
 .composer-photo { position: relative; }
 .composer-photo.busy { display: grid; place-items: center; aspect-ratio: 1; border: 1px dashed var(--line); border-radius: var(--radius); font-size: 0.8rem; color: var(--muted); }
