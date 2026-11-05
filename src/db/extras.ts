@@ -147,3 +147,23 @@ export async function nameCompanion(name: string): Promise<void> {
 /** Unused-coupon name, for messages. */
 export const couponName = (id: string) => couponById(id)?.name ?? 'Treat coupon'
 export const jobTitle = (id: string) => jobById(id)?.title ?? id
+
+/** Gives a shadow soldier a name of your own (empty = back to their shade name). */
+export async function renameSoldier(id: string, name: string): Promise<void> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player) return
+  const names = { ...(player.legion?.names ?? {}) }
+  if (name.trim()) names[id] = name.trim().slice(0, 30)
+  else delete names[id]
+  await db.players.update(LOCAL_USER, { legion: { ...player.legion, names }, updatedAt: Date.now() })
+}
+
+/** Posts a soldier to guard a quest (null = stand down). They level up as you clear it. */
+export async function setGuard(id: string, questId: string | null): Promise<void> {
+  const player = await db.players.get(LOCAL_USER)
+  if (!player) return
+  const guards = { ...(player.legion?.guards ?? {}) }
+  if (questId) guards[id] = { questId, at: Date.now() }
+  else delete guards[id]
+  await db.players.update(LOCAL_USER, { legion: { ...player.legion, guards }, updatedAt: Date.now() })
+}

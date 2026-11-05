@@ -230,7 +230,7 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
               onOpen={(target, id) => (target === 'plans' ? openPlans(id ?? null) : target === 'focus' ? openFocus() : target === 'lifelog' ? openLog() : setPage(target === 'finance' ? 'finance' : target))}
             />
           )}
-          {page === 'rewards' && <RewardsScreen player={player} summary={summary} />}
+          {page === 'rewards' && <RewardsScreen player={player} summary={summary} quests={quests} />}
           {page === 'collection' && <Collection player={player} summary={summary} loot={data.loot} custom={data.customCards} />}
           {page === 'goals' && (
             <main className="hud">

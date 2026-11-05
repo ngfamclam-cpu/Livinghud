@@ -229,6 +229,10 @@ export async function announceProgress(before: Summary): Promise<void> {
     const joined = a.legion.filter(s => !b.legion.some(o => o.id === s.id))
     emit({ type: 'extra', title: 'Arise', text: `${joined.map(s => s.name).join(', ')} joined your Shadow Legion (${a.legion.length}).` })
   }
+  for (const s of a.legion) {
+    const was = b.legion.find(o => o.id === s.id)
+    if (was && s.level > was.level) emit({ type: 'extra', title: `${s.displayName} levelled up`, text: `Now level ${s.level} (${s.rank}), power ${s.power}.` })
+  }
   if (a.nextJob?.ready && !b.nextJob?.ready) emit({ type: 'extra', title: 'Job Change available', text: `The ${a.nextJob.job.title} trial is complete. Open the Legion to take it.` })
 }
 

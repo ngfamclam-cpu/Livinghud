@@ -11,7 +11,8 @@ import { activeFocus, focusedMinutes } from '../db/focus'
 import { Bar } from './Bar'
 import { PenaltyZone, ComboPanel } from './IncentivePanels'
 import { useHudLayout, type PanelId } from './hudLayout'
-import { CompanionPanel, ExtrasAlerts, RewardsPanel } from './extras/Extras'
+import { ExtrasAlerts, RewardsPanel } from './extras/Extras'
+import { CompanionPanel } from './extras/CompanionPanel'
 import { money, monthName } from './format'
 
 interface HudProps {
@@ -186,7 +187,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
           ),
     collection:
       featureOn(player, 'cards') && <CollectionPanel loot={loot} onOpen={onCollection} />,
-    companion: summary.extras.companion && <CompanionPanel summary={summary} />,
+    companion: summary.extras.companion && <CompanionPanel summary={summary} dailiesTotal={dailies.length} dailiesDone={doneCount} />,
     rewards: (featureOn(player, 'extras') || featureOn(player, 'legion')) && onRewards && <RewardsPanel summary={summary} onOpen={onRewards} />,
   }
   const shown = layout.order.filter(id => layout.place[id] !== 'hidden' && panels[id])

@@ -283,6 +283,49 @@ export function companionState(bestCombo: number, doneToday: number, dailiesToda
   return { stage, next, mood }
 }
 
+
+// ---- Companion talk and reactions ----
+
+export interface CompanionContext {
+  name: string
+  mood: CompanionMood
+  stage: string
+  /** Local hour, 0-23. */
+  hour: number
+  dailiesLeft: number
+  dailiesTotal: number
+  combo: number
+}
+
+/** Something your companion says, picked from what's going on today. `n` rotates through the options. */
+export function companionLine(c: CompanionContext, n: number): string {
+  const lines: string[] = []
+  if (c.stage === 'egg') lines.push('*the egg wobbles*', '*something taps from inside*', '*warm, faintly glowing*')
+  else {
+    if (c.mood === 'sulky') lines.push(`${c.name} turns away. Yesterday hurt.`, 'Hmph. One daily and I might forgive you.', "I waited all day yesterday, you know.")
+    if (c.dailiesTotal > 0 && c.dailiesLeft === 0) lines.push('PERFECT DAY! You absolute legend.', "We did it! Let's celebrate.", 'I knew you had it in you.')
+    else if (c.dailiesLeft > 0 && c.dailiesLeft < c.dailiesTotal) lines.push(`${c.dailiesLeft} to go. We're so close!`, "Don't stop now, we're on a roll.", `Only ${c.dailiesLeft} left. I believe in you.`)
+    else if (c.dailiesLeft > 0) lines.push("Let's knock out the first one together.", "A new day, a new hunt. Where do we start?", 'Pick the easiest one first. Momentum!')
+    if (c.combo >= 3) lines.push(`${c.combo}-day combo. I'm getting stronger with you.`)
+    if (c.hour < 6) lines.push('*yawns* Why are we awake?')
+    else if (c.hour < 11) lines.push('Morning! Water first, then glory.')
+    else if (c.hour >= 22) lines.push("It's late. Sleep is a daily too, you know.")
+    else if (c.hour >= 18) lines.push('Evening already. How did today go?')
+  }
+  return lines[Math.abs(n) % lines.length]
+}
+
+export type CompanionAction = 'pet' | 'feed' | 'play'
+
+export const COMPANION_REACTIONS: Record<CompanionAction, string[]> = {
+  pet: ['*purrs loudly*', '*leans into your hand*', 'More. MORE.', '*happy wiggle*', "That's the spot!", '*glows a little brighter*'],
+  feed: ['Nom nom nom!', '*crunch* Delicious.', 'Snack acquired. Power up!', '*happy chewing noises*', 'Best. Snack. Ever.'],
+  play: ['*zooms in a circle*', 'Again! Again!', '*does a little flip*', 'Catch me if you can!', '*bounces off the walls*'],
+}
+export const COMPANION_SNACKS = ['🍓', '🍙', '🍡', '🍪', '🍣', '🧁', '🍑']
+/** Snacks a day before your companion is full. */
+export const COMPANION_MEALS = 3
+
 // ---- Job Changes and the Shadow Legion ----
 
 export interface JobInput {
@@ -380,6 +423,90 @@ export function shadowLegion(seed: string, since: number | null, captainSince: n
   soldiers.sort((a, b) => a.at - b.at)
   return { soldiers, nextIn: QUESTS_PER_SOLDIER - (cleared.length % QUESTS_PER_SOLDIER) }
 }
+
+
+// ---- Soldier profiles: levels, power, abilities, guard duty ----
+
+/** Your Legion settings, saved on the player: renamed soldiers and guard posts. */
+export interface LegionPrefs {
+  names?: Record<string, string>
+  /** soldier id -> the daily or side quest they guard, and since when. */
+  guards?: Record<string, { questId: string; at: number }>
+}
+
+const KIND_INFO: Record<SoldierKind, { power: number; ability: string; lore: string[] }> = {
+  Footman: { power: 10, ability: 'Shield Wall: holds the line on hard days', lore: ['Never once stepped back.', 'Marches before the sun is up.', 'Says nothing. Does everything.'] },
+  Archer: { power: 12, ability: 'Far Sight: spots the next quest before you do', lore: ['Has never missed a deadline.', 'Counts arrows like you count reps.', 'Watches from the rooftops.'] },
+  Spearman: { power: 11, ability: 'Pierce: breaks through procrastination', lore: ['Points straight at the hardest task.', 'Always first through the gate.', 'Keeps the spear sharp and the mind sharper.'] },
+  Mage: { power: 14, ability: 'Focus Ward: shields your deep-work time', lore: ['Reads the runes of your to-do list.', 'Hums spells only shadows can hear.', 'Once turned a bad day into a minimum clear.'] },
+  Hound: { power: 9, ability: 'Hunt: sniffs out streaks at risk', lore: ['Loyal to a fault.', 'Howls when you skip leg day.', 'Fetches motivation from the dark.'] },
+  Rider: { power: 13, ability: 'Charge: speeds through errands', lore: ['Rides a horse made of smoke.', 'Arrives before the quest does.', 'Knows every shortcut in the city.'] },
+  Knight: { power: 20, ability: 'Oath: born from a main quest you finished', lore: ['Forged from months of work.', 'Swore to guard your biggest wins.', 'Wears armour etched with your milestones.'] },
+  Elite: { power: 25, ability: 'Dread Aura: a defeated boss, now on your side', lore: ['Once your enemy. Now your blade.', 'Remembers every hit you landed.', 'The task you dreaded, kneeling.'] },
+}
+
+export const SOLDIER_RANKS = ['Recruit', 'Soldier', 'Veteran', 'Champion', 'Commander'] as const
+export const MAX_SOLDIER_LEVEL = 20
+/** Guarded quest clears needed per soldier level. */
+export const CLEARS_PER_LEVEL = 3
+
+export interface SoldierProfile extends Soldier {
+  /** The name you gave them, or their shade name. */
+  displayName: string
+  level: number
+  /** Guarded clears toward the next level (0..CLEARS_PER_LEVEL-1). */
+  progress: number
+  power: number
+  rank: (typeof SOLDIER_RANKS)[number]
+  ability: string
+  lore: string
+  guardQuestId: string | null
+  /** Quests they've guarded to a clear. */
+  guardClears: number
+}
+
+const rankFor = (level: number) => SOLDIER_RANKS[level >= 15 ? 4 : level >= 10 ? 3 : level >= 6 ? 2 : level >= 3 ? 1 : 0]
+
+/**
+ * Levels come from guard duty: every 3 clears of the quest a soldier guards is a
+ * level (veterans, knights and elites start 2 levels up). Power grows 15% a level.
+ */
+export function soldierProfiles(seed: string, soldiers: Soldier[], prefs: LegionPrefs | undefined, completions: Completion[]): SoldierProfile[] {
+  return soldiers.map(s => {
+    const guard = prefs?.guards?.[s.id] ?? null
+    const guardClears = guard ? completions.filter(c => c.questId === guard.questId && c.createdAt >= guard.at).length : 0
+    const head = s.veteran ? 2 : 0
+    const level = Math.min(MAX_SOLDIER_LEVEL, 1 + head + Math.floor(guardClears / CLEARS_PER_LEVEL))
+    const info = KIND_INFO[s.kind]
+    return {
+      ...s,
+      displayName: prefs?.names?.[s.id]?.trim() || s.name,
+      level,
+      progress: level >= MAX_SOLDIER_LEVEL ? 0 : guardClears % CLEARS_PER_LEVEL,
+      power: Math.round(info.power * (1 + 0.15 * (level - 1))),
+      rank: rankFor(level),
+      ability: info.ability,
+      lore: info.lore[hash(`${seed}:lore:${s.id}`) % info.lore.length],
+      guardQuestId: guard?.questId ?? null,
+      guardClears,
+    }
+  })
+}
+
+/** What your army is called as it grows. */
+export function legionTitle(size: number): string {
+  return size >= 60 ? 'Legion' : size >= 25 ? 'Battalion' : size >= 10 ? 'Company' : size >= 1 ? 'Warband' : 'Empty ranks'
+}
+
+export const BATTLE_CRIES = [
+  'ARISE!',
+  'For the Shadowcaller!',
+  'No quest left standing!',
+  'We march at dawn!',
+  'From the dark, we rise!',
+  'Streaks unbroken, blades unsheathed!',
+  'The gate will fall!',
+]
 
 // ---- Hidden achievements ----
 

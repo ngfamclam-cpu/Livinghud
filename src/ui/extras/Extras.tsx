@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { COMPANION_STAGES, EXTRA_PAY, HIDDEN, JOBS, scalePay, PLATES, QUESTS_PER_SOLDIER, featureOn, type Player, type Quest, type Soldier, type Summary } from '../../engine'
-import { nameCompanion, redeemCoupon, rollTheDice, setPlate, takeJobChange, playWildcard } from '../../db/extras'
+import { COMPANION_STAGES, EXTRA_PAY, HIDDEN, JOBS, scalePay, PLATES, featureOn, type Player, type Quest, type Summary } from '../../engine'
+import { redeemCoupon, rollTheDice, setPlate, takeJobChange, playWildcard } from '../../db/extras'
 import { SystemWindow } from '../SystemWindow'
-import { CompanionArt } from './Companion'
+import { LegionView } from './Legion'
 
 const minutesLeft = (until: number, now: number) => Math.max(0, Math.ceil((until - now) / 60_000))
 
@@ -56,34 +56,6 @@ export function ExtrasAlerts({ summary, quests, now }: { summary: Summary; quest
   )
 }
 
-/** Your companion on the HUD. Tap the name to rename it. */
-export function CompanionPanel({ summary }: { summary: Summary }) {
-  const c = summary.extras.companion
-  const [editing, setEditing] = useState(false)
-  const [name, setName] = useState(c?.name ?? 'Pip')
-  if (!c) return null
-  const line = c.mood === 'happy' ? `${c.name} is thrilled with you today.` : c.mood === 'sulky' ? `${c.name} is sulking about yesterday. Clear a daily to cheer them up.` : `${c.name} is waiting to see what you do today.`
-  return (
-    <SystemWindow title="Companion" className="companion-panel">
-      <div className="row">
-        <CompanionArt stage={c.stage.id} mood={c.mood} />
-        <div className="grow">
-          {editing ? (
-            <form className="inline-form" onSubmit={e => { e.preventDefault(); void nameCompanion(name); setEditing(false) }}>
-              <input value={name} maxLength={20} onChange={e => setName(e.target.value)} aria-label="Companion name" autoFocus />
-              <button className="small">Save</button>
-            </form>
-          ) : (
-            <button className="link-button" onClick={() => setEditing(true)}><b>{c.name}</b> · {c.stage.name}</button>
-          )}
-          <p className="muted">{line}</p>
-          <p className="muted">{c.next ? `Evolves into a ${c.next.name} at a ${c.next.combo}-day best combo.` : 'Fully evolved.'}</p>
-        </div>
-      </div>
-    </SystemWindow>
-  )
-}
-
 /** A small HUD panel: coupons, wildcards, the Legion and the next Job Change. */
 export function RewardsPanel({ summary, onOpen }: { summary: Summary; onOpen: () => void }) {
   const x = summary.extras
@@ -100,10 +72,9 @@ export function RewardsPanel({ summary, onOpen }: { summary: Summary; onOpen: ()
   )
 }
 
-const SOLDIER_ICON: Record<Soldier['kind'], string> = { Footman: '🗡️', Archer: '🏹', Spearman: '🔱', Mage: '🔮', Hound: '🐺', Rider: '🐎', Knight: '🛡️', Elite: '👑' }
 
 /** The Rewards screen: Job Changes and the Shadow Legion, coupons, hidden achievements, name plates. */
-export function RewardsScreen({ player, summary, onClose }: { player: Player; summary: Summary; onClose?: () => void }) {
+export function RewardsScreen({ player, summary, quests = [], onClose }: { player: Player; summary: Summary; quests?: Quest[]; onClose?: () => void }) {
   const x = summary.extras
   const legionOn = featureOn(player, 'legion')
   const [confirming, setConfirming] = useState<string | null>(null)
@@ -132,29 +103,7 @@ export function RewardsScreen({ player, summary, onClose }: { player: Player; su
         </SystemWindow>
       )}
 
-      {legionOn && (
-        <SystemWindow title={`Shadow Legion · ${x.legion.length}`} className="legion-panel">
-          {x.job ? (
-            <>
-              <p className="muted">A new soldier rises every {QUESTS_PER_SOLDIER} quests you clear ({x.legionNextIn} to go). Every boss you defeat becomes an Elite, every main quest a Knight.</p>
-              {x.legion.length === 0 ? (
-                <p className="muted">No shadows yet. Clear quests to raise your first.</p>
-              ) : (
-                <ul className="legion-grid">
-                  {[...x.legion].reverse().map(s => (
-                    <li key={s.id} className={`shade kind-${s.kind.toLowerCase()} ${s.veteran ? 'veteran' : ''}`} title={s.name}>
-                      <span className="shade-icon" aria-hidden="true">{SOLDIER_ICON[s.kind]}</span>
-                      <small>{s.name}</small>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          ) : (
-            <p className="muted">Locked. Complete the Shadowcaller Job Change to raise your first shadows. Every quest you clear after that feeds the Legion.</p>
-          )}
-        </SystemWindow>
-      )}
+      {legionOn && <LegionView summary={summary} quests={quests} />}
 
       {x.on && (
         <SystemWindow title={`Treat coupons · ${x.coupons.length}`} className="coupon-panel">
