@@ -19,6 +19,10 @@ import {
   dailyWeight,
   GOALS_PER_DAY,
   rollRarity,
+  foilFor,
+  GOLDEN_XP_MULT,
+  HIDDEN_XP,
+  PLATES,
   shopLock,
   PACK_MILESTONES,
   PACK_SIZE,
@@ -162,7 +166,7 @@ export async function snapshot() {
     db.savings.where('userId').equals(LOCAL_USER).toArray(),
     db.sets.where('userId').equals(LOCAL_USER).toArray(),
   ])
-  const [people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot, transactions, penaltyClears] = await Promise.all([
+  const [people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot, transactions, penaltyClears, bonuses] = await Promise.all([
     db.people.where('userId').equals(LOCAL_USER).toArray(),
     db.contacts.where('userId').equals(LOCAL_USER).toArray(),
     db.focusRuns.where('userId').equals(LOCAL_USER).toArray(),
@@ -176,9 +180,10 @@ export async function snapshot() {
     db.loot.where('userId').equals(LOCAL_USER).toArray(),
     db.transactions.where('userId').equals(LOCAL_USER).toArray(),
     db.penaltyClears.where('userId').equals(LOCAL_USER).toArray(),
+    db.bonuses.where('userId').equals(LOCAL_USER).toArray(),
   ])
   const summary = summarize(player, quests, completions, new Date(), {
-    purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot, transactions, penaltyClears,
+    purchases, savings, sets, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, loot, transactions, penaltyClears, bonuses,
   })
   return { player, quests, completions, purchases, savings, sets, people, contacts, focusRuns, bosses, summary }
 }
@@ -204,6 +209,18 @@ export async function announceProgress(before: Summary): Promise<void> {
       if (!before.themes.includes(id)) emit({ type: 'loot.dropped', name: THEMES.find(t => t.id === id)?.name ?? id })
     }
   }
+  // Surprise rewards (src/engine/extras.ts).
+  const a = after.extras
+  const b = before.extras
+  const hadHidden = new Set(b.hidden.map(h => h.id))
+  for (const h of a.hidden) if (!hadHidden.has(h.id)) emit({ type: 'extra', title: `Hidden achievement: ${h.title}`, text: `${h.description}. +${HIDDEN_XP} XP.` })
+  for (const id of a.plates) if (!b.plates.includes(id)) emit({ type: 'extra', title: 'New name plate', text: `${PLATES.find(p => p.id === id)?.name ?? id} unlocked. Equip it in Settings.` })
+  if (a.companion && b.companion && a.companion.stage.id !== b.companion.stage.id) emit({ type: 'extra', title: `${a.companion.name} evolved!`, text: `Now a ${a.companion.stage.name}.` })
+  if (a.legion.length > b.legion.length) {
+    const joined = a.legion.filter(s => !b.legion.some(o => o.id === s.id))
+    emit({ type: 'extra', title: 'Arise', text: `${joined.map(s => s.name).join(', ')} joined your Shadow Legion (${a.legion.length}).` })
+  }
+  if (a.nextJob?.ready && !b.nextJob?.ready) emit({ type: 'extra', title: 'Job Change available', text: `The ${a.nextJob.job.title} trial is complete. Open the Legion to take it.` })
 }
 
 // ---- Quests ----
@@ -238,7 +255,10 @@ export async function completeQuest(
   const bonus = featureOn(player, 'badges') && summary.streakBonus.has(quest.stat) ? 1 + STREAK_BONUS : 1
   // Perfect days in a row multiply quest XP (never dollars).
   const comboBoost = featureOn(player, 'incentives') ? (summary.incentives?.multiplier ?? 1) : 1
-  const reward = { ...base, xp: Math.round(base.xp * bonus * comboBoost) }
+  // Today's Golden Quest pays triple XP (src/engine/extras.ts).
+  const extras = await import('./extras')
+  const golden = extras.goldenFor(summary, quest, day)
+  const reward = { ...base, xp: Math.round(base.xp * bonus * comboBoost * (golden ? GOLDEN_XP_MULT : 1)) }
   const completion: Completion = {
     id: newId(),
     userId: LOCAL_USER,
@@ -249,12 +269,16 @@ export async function completeQuest(
     ...(stage ? { stageId: stage.id } : {}),
     xp: reward.xp,
     dollars: reward.dollars,
+    ...(golden ? { golden: true } : {}),
     createdAt: Date.now(),
   }
   await db.completions.add(completion)
   emit({ type: 'quest.completed', completion, questTitle: stage ? `${quest.title}: ${stage.title}` : quest.title, via })
   await dropLoot(quest.kind === 'main' ? 'main' : quest.templateId === 'str-routine' && version === 'full' ? 'strength' : 'quest', completion.id)
-  if (quest.kind === 'daily') await rewardPerfectDay(summary, day)
+  if (quest.kind === 'daily') {
+    await rewardPerfectDay(summary, day)
+    await extras.afterDailyCleared(completion)
+  }
   if (stage && quest.stages?.[quest.stages.length - 1].id === stage.id) {
     emit({ type: 'mainQuest.cleared', questId: quest.id, questTitle: quest.title })
   }
@@ -285,6 +309,7 @@ export async function undoQuest(quest: Quest): Promise<void> {
     forge.cancelDrops(chestIds)
     await db.loot.where('sourceId').anyOf(chestIds).delete()
     await forge.pruneOrphanForged()
+    await (await import('./extras')).afterDailyUndone(done)
   }
   emit({ type: 'quest.undone', questId: quest.id, questTitle: quest.title })
 }
@@ -1047,19 +1072,19 @@ export async function setFeature(key: FeatureKey, on: boolean): Promise<void> {
 // ---- Save file: a full copy of the game, used for backups and cloud sync ----
 
 const SAVE_FORMAT = 'livinghud-save'
-const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places, db.goals, db.loot, db.customCards, db.transactions, db.bills, db.penaltyClears]
+const tables = () => [db.players, db.quests, db.completions, db.rewards, db.purchases, db.savings, db.sets, db.scans, db.people, db.contacts, db.focusRuns, db.bosses, db.journal, db.surprises, db.plans, db.planFunds, db.memories, db.places, db.goals, db.loot, db.customCards, db.transactions, db.bills, db.penaltyClears, db.bonuses]
 /** The record lists a save file holds, in order. */
-export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places', 'goals', 'loot', 'customCards', 'transactions', 'bills', 'penaltyClears'] as const
+export const SAVE_TABLES = ['players', 'quests', 'completions', 'rewards', 'purchases', 'savings', 'sets', 'scans', 'people', 'contacts', 'focusRuns', 'bosses', 'journal', 'surprises', 'plans', 'planFunds', 'memories', 'places', 'goals', 'loot', 'customCards', 'transactions', 'bills', 'penaltyClears', 'bonuses'] as const
 
 /** Every record, in a stable order, so two copies of the same game serialize identically. */
 export async function saveData() {
-  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears] = await Promise.all(
+  const [players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears, bonuses] = await Promise.all(
     tables().map(t => t.toArray()),
   )
   return {
     format: SAVE_FORMAT,
-    version: 15,
-    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears,
+    version: 16,
+    players, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears, bonuses,
   }
 }
 
@@ -1099,6 +1124,7 @@ export async function importSave(json: string): Promise<void> {
     await db.transactions.bulkPut(data.transactions ?? [])
     await db.bills.bulkPut(data.bills ?? [])
     await db.penaltyClears.bulkPut(data.penaltyClears ?? [])
+    await db.bonuses.bulkPut(data.bonuses ?? [])
   })
   // An older save (or another device not yet updated) may still have the combined daily.
   await splitVitTrio()
@@ -1204,9 +1230,13 @@ export async function grantCard(cardId: string, source: string, sourceId: string
   const player = await db.players.get(LOCAL_USER)
   if (!player) return
   setCustomCards((await db.customCards.where('userId').equals(LOCAL_USER).toArray()).map(customCard))
-  const before = await db.loot.where('userId').equals(LOCAL_USER).filter(d => d.cardId === cardId).count()
-  await db.loot.add({ id: newId(), userId: LOCAL_USER, cardId, source, sourceId, day: dayKey(new Date(), player.settings.resetHour), createdAt: Date.now() })
-  emit({ type: 'loot.card', cardId, copies: before + 1, starUp: stars(before + 1) > stars(before) && before > 0 })
+  const mine = await db.loot.where('userId').equals(LOCAL_USER).filter(d => d.cardId === cardId).toArray()
+  const before = mine.reduce((n, d) => n + (d.foil ? 2 : 1), 0)
+  // About 1 in 15 drops comes out holographic and counts as two copies.
+  const foil = featureOn(player, 'extras') && foilFor(surpriseSeed(player), sourceId)
+  await db.loot.add({ id: newId(), userId: LOCAL_USER, cardId, source, sourceId, day: dayKey(new Date(), player.settings.resetHour), ...(foil ? { foil: true } : {}), createdAt: Date.now() })
+  const after = before + (foil ? 2 : 1)
+  emit({ type: 'loot.card', cardId, copies: after, starUp: stars(after) > stars(before) && before > 0, foil })
 }
 
 export async function dropLoot(source: DropSource, sourceId: string, opts: { minRarity?: Rarity; secrets?: Set<string> } = {}): Promise<void> {
@@ -1336,6 +1366,7 @@ async function rewardPerfectDay(before: Summary, day: string): Promise<void> {
   const secrets = summary.incentives.secrets
   emit({ type: 'perfect.day', combo: summary.incentives.combo, multiplier: summary.incentives.multiplier })
   await dropLoot('perfect', `perfect-${day}`, { minRarity: 'rare', secrets })
+  await (await import('./extras')).perfectDayExtras(day)
   const milestone = packMilestone(before.incentives?.combo ?? 0, summary.incentives.combo)
   if (milestone) {
     emit({ type: 'combo.pack', combo: milestone })

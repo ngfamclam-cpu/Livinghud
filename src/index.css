@@ -912,3 +912,74 @@ button.photo { cursor: zoom-in; }
 /* Card view actions (your own cards). */
 .card-actions { display: grid; gap: 6px; justify-items: center; }
 .danger-text { color: var(--danger); border-color: rgba(255, 95, 109, 0.5); }
+
+/* ---- Surprise rewards ---- */
+/* Golden Quest */
+.quest.golden { border-color: var(--gold); box-shadow: 0 0 14px rgba(255, 207, 92, 0.35); background: linear-gradient(135deg, rgba(255, 207, 92, 0.1), transparent 60%); }
+.golden-tag { color: var(--gold); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.06em; white-space: nowrap; }
+/* Red Gate */
+.red-gate { border-color: var(--danger) !important; box-shadow: 0 0 22px rgba(255, 77, 109, 0.4); }
+.gate-pips { display: flex; gap: 8px; }
+.gate-pips span { width: 26px; height: 10px; border-radius: 3px; border: 1px solid var(--danger); }
+.gate-pips span.on { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+.gate-closed { text-align: center; }
+/* Lucky Roll */
+.lucky-roll { border-color: var(--gold) !important; }
+.d20 { display: grid; place-items: center; width: 54px; height: 54px; flex: none; font-weight: 800; font-size: 1.2rem; color: #0a1426; background: var(--gold); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.d20.rolling { animation: d20-spin 0.3s linear infinite; }
+@keyframes d20-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .d20.rolling { animation: none; } }
+/* Name plates (also on the PC profile card) */
+.player-name.plate-glow { text-shadow: 0 0 10px var(--accent), 0 0 22px rgba(63, 162, 255, 0.5); }
+.player-name.plate-neon { color: #ff7ad9; text-shadow: 0 0 6px #ff7ad9, 0 0 18px #7a5cff; animation: plate-flicker 4s infinite; }
+.player-name.plate-gold { background: linear-gradient(90deg, #ffe39a, #ffb347, #fff1c4, #ffb347); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.player-name.plate-glitch { text-shadow: 2px 0 #ff3d6e, -2px 0 #3dfcff; animation: plate-glitch 2.5s infinite steps(2); }
+.player-name.plate-shadow { color: #d7c8ff; text-shadow: 0 0 12px #7a3cff, 0 0 26px #2a0b5e; }
+.player-name.plate-aurora { background: linear-gradient(90deg, #6cf7c5, #6ab8ff, #c08bff, #6cf7c5); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: plate-aurora 6s linear infinite; }
+.player-name.plate-sovereign { color: #ffd9a1; text-shadow: 0 0 8px #ff8a3d, 0 0 20px #ff3d3d, 0 -2px 14px #7a3cff; }
+@keyframes plate-flicker { 0%, 92%, 100% { opacity: 1; } 94% { opacity: 0.5; } 96% { opacity: 0.9; } }
+@keyframes plate-glitch { 0%, 100% { transform: none; } 50% { transform: translateX(1px); } }
+@keyframes plate-aurora { to { background-position: 300% 0; } }
+@media (prefers-reduced-motion: reduce) { .player-name[class*='plate-'] { animation: none !important; } }
+.player-title.cursed { color: #c08bff; }
+.plate-preview { font-size: 1.6rem; text-align: center; }
+.plate-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Foil cards */
+.loot-card.foil { position: relative; overflow: hidden; }
+.loot-card.foil::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; mix-blend-mode: color-dodge; opacity: 0.55;
+  background: linear-gradient(115deg, transparent 20%, rgba(255, 120, 220, 0.6) 35%, rgba(120, 220, 255, 0.6) 50%, rgba(255, 240, 120, 0.6) 65%, transparent 80%);
+  background-size: 250% 250%; animation: foil-shine 3.5s ease-in-out infinite;
+}
+@keyframes foil-shine { 0% { background-position: 100% 100%; } 50% { background-position: 0 0; } 100% { background-position: 100% 100%; } }
+@media (prefers-reduced-motion: reduce) { .loot-card.foil::after { animation: none; } }
+/* Companion */
+.companion-art { flex: none; }
+.companion-art .c-body { fill: var(--accent); opacity: 0.9; }
+.companion-art.egg .c-body { fill: #e9e2ff; }
+.companion-art .c-line { fill: none; stroke: #0a1426; stroke-width: 2.5; stroke-linecap: round; }
+.companion-art.egg .c-line { stroke: #7a5cff; }
+.companion-art .c-eye { fill: #0a1426; }
+.companion-art .c-shine { fill: #fff; opacity: 0.8; }
+.companion-art .c-blush { fill: #ff8ac9; opacity: 0.7; }
+.companion-art .c-ear path, .companion-art .c-horn path { fill: var(--accent); }
+.companion-art .c-horn path { fill: var(--gold); }
+.companion-art .c-wing path { fill: rgba(150, 200, 255, 0.55); }
+.companion-art .c-crown { fill: var(--gold); }
+.companion-art.mood-happy { animation: companion-bob 2.4s ease-in-out infinite; }
+.companion-art.mood-sulky .c-body { opacity: 0.6; }
+@keyframes companion-bob { 50% { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .companion-art { animation: none !important; } }
+.link-button { background: none; border: 0; padding: 0; color: inherit; text-align: left; cursor: pointer; }
+/* Rewards screen */
+.trial-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.trial-list li.done { color: var(--good); }
+.legion-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+.shade { display: grid; justify-items: center; gap: 2px; text-align: center; padding: 6px 2px; border-radius: var(--radius); background: rgba(70, 30, 140, 0.18); }
+.shade-icon { font-size: 1.8rem; filter: brightness(0) drop-shadow(0 0 4px #9b6bff) drop-shadow(0 0 10px #5a2bd6); }
+.shade.veteran .shade-icon { filter: brightness(0) drop-shadow(0 0 4px #ffcf5c) drop-shadow(0 0 12px #9b6bff); }
+.shade.kind-elite { background: rgba(255, 207, 92, 0.12); }
+.shade small { font-size: 0.68rem; color: var(--muted); line-height: 1.2; }
+.coupon-list, .hidden-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.coupon { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border: 1px dashed var(--gold); border-radius: var(--radius); }
+.hidden-list li.got b { color: var(--gold); }

@@ -48,6 +48,8 @@ describe('penalties in the summary', () => {
     id: 'p', userId: 'local', name: 'T', stats: ['STR'], fitness: null, createdAt: new Date(2026, 9, 1, 12).getTime(), updatedAt: 0,
     settings: { monthlyBudget: 150, savingsGoal: { type: 'off', amount: 0 }, difficulty: 'casual', resetHour: 4, wakeTime: '07:00', bedTime: '23:00' },
     penaltiesSince: '2026-10-01',
+    // Hidden achievements (a comeback day here) would add XP; this tests penalties only.
+    features: { extras: false },
   }
   const quest: Quest = { id: 'a', userId: 'local', kind: 'daily', stat: 'STR', title: 'a', description: '', minVersion: '', active: true, templateId: null, createdAt: player.createdAt, updatedAt: 0 }
   const done = (day: string): Completion => ({ id: day, userId: 'local', questId: 'a', stat: 'STR', day, version: 'full', xp: 20, dollars: 1, createdAt: 0 })
@@ -66,7 +68,7 @@ describe('penalties in the summary', () => {
   })
 
   it('does nothing when penalties are switched off', () => {
-    const off = { ...player, settings: { ...player.settings, difficulty: 'normal' as const }, features: { penalties: false } }
+    const off = { ...player, settings: { ...player.settings, difficulty: 'normal' as const }, features: { penalties: false, extras: false } }
     expect(summarize(off, [quest], log, now)).toMatchObject({ totalXp: 60, penalty: null })
   })
 })

@@ -32,7 +32,9 @@ export type GameEvent =
   | { type: 'combo.pack'; combo: number }
   | { type: 'penalty.cleared'; task: string; shield: boolean }
   | { type: 'finance.logged'; kind: 'expense' | 'income'; amount: number; category: string }
-  | { type: 'loot.card'; cardId: string; copies: number; starUp: boolean }
+  | { type: 'loot.card'; cardId: string; copies: number; starUp: boolean; foil?: boolean }
+  /** Surprise rewards: Golden Quest, Red Gate, Lucky Roll, coupons, wildcards, job changes, hidden achievements, the Legion. */
+  | { type: 'extra'; title: string; text: string }
   | { type: 'tracking.added'; kind: 'daily' | 'side' | 'goal'; title: string }
   | { type: 'plan.funded'; name: string; amount: number }
   | { type: 'plan.booked'; name: string; label: string; cost: number }

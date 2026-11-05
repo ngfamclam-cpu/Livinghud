@@ -14,7 +14,11 @@ import { TRAVEL_IDS, TRAVEL_XP, earnedBadges, longestStreak, streakBonuses, unlo
 import { travelCounts } from './memories'
 import { starUpXp } from './loot'
 import { financeXp } from './finance'
-import { incentiveState, type IncentiveState, type PenaltyClear } from './incentives'
+import { incentiveState, perfectDays, type IncentiveState, type PenaltyClear } from './incentives'
+import {
+  GATE_NEEDED, GATE_XP, HIDDEN_XP, JOBS, PLATES, couponById, companionState, earnedHidden, gateCount, goldenQuestId, jobById, luckyRoll, redGate, rollReward, shadowLegion, wildcardOffers,
+  type BonusRecord, type CompanionMood, type CompanionStage, type Coupon, type Hidden, type Job, type RedGate, type Soldier, type WildcardOffer,
+} from './extras'
 import type { Transaction, LootDrop, Memory, Place, Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, Plan, PlanFund, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
 export const STAT_WINDOW_DAYS = 30
@@ -101,10 +105,34 @@ export interface Summary {
   plans: PlanStatus[]
   /** Combo meter, perfect days, shields and any open Penalty Quest; null before the rules start. */
   incentives: IncentiveState | null
+  extras: ExtrasState
   /** Distinct places, cities and countries in the Life log. */
   travel: { places: number; cities: number; countries: number }
   /** The plan with raised targets the System offers after 3 clean weeks; null when not due. */
   routineOffer: TrainingPlan | null
+}
+
+export interface ExtrasState {
+  on: boolean
+  /** Today's Golden Quest id. */
+  golden: string | null
+  gate: (RedGate & { count: number; needed: number; cleared: boolean }) | null
+  /** A perfect day (today or yesterday) still waiting for its Lucky Roll, and what it will roll. */
+  rollDay: string | null
+  roll: number | null
+  rolledToday: number | null
+  cursedToday: boolean
+  coupons: { record: BonusRecord; coupon: Coupon }[]
+  couponsUsed: number
+  wildcards: number
+  wildcardOffers: WildcardOffer[]
+  plates: string[]
+  hidden: Hidden[]
+  job: Job | null
+  nextJob: { job: Job; checks: { label: string; done: boolean }[]; ready: boolean } | null
+  legion: Soldier[]
+  legionNextIn: number
+  companion: { stage: CompanionStage; next: CompanionStage | null; mood: CompanionMood; name: string } | null
 }
 
 export interface Logs {
@@ -124,6 +152,7 @@ export interface Logs {
   loot?: LootDrop[]
   transactions?: Transaction[]
   penaltyClears?: PenaltyClear[]
+  bonuses?: BonusRecord[]
 }
 
 const weight = (c: Completion) => (c.version === 'full' ? 1 : 0.5)
@@ -133,7 +162,7 @@ export function summarize(
   quests: Quest[],
   completions: Completion[],
   now: Date,
-  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [], surprises = [], plans = [], planFunds = [], memories = [], places = [], loot = [], transactions = [], penaltyClears = [] }: Logs = {},
+  { purchases = [], savings = [], sets = [], people = [], contacts = [], focusRuns = [], bosses = [], journal = [], surprises = [], plans = [], planFunds = [], memories = [], places = [], loot = [], transactions = [], penaltyClears = [], bonuses = [] }: Logs = {},
 ): Summary {
   const today = dayKey(now, player.settings.resetHour)
   const week = weekOf(today)
@@ -142,6 +171,12 @@ export function summarize(
   const month = monthOf(today)
   // A big night out grants a Recovery Day token for the next day.
   const recoveryDays = new Set(purchases.filter(p => p.special === 'bigNight').map(p => addDays(p.forDay ?? p.day, 1)))
+  // A redeemed lazy-day coupon makes that day a Recovery Day too.
+  const extrasOn = player.features?.extras !== false
+  const couponRecords = new Map(bonuses.filter(b => b.kind === 'coupon').map(b => [b.id, b]))
+  if (extrasOn) {
+    for (const use of bonuses.filter(b => b.kind === 'coupon-use')) if (couponById(couponRecords.get(use.value)?.value ?? '')?.recovery) recoveryDays.add(use.day)
+  }
 
   // Travel titles pay XP once each; they don't depend on level, so they're counted first.
   const travel = player.features?.memories !== false ? travelCounts(memories, places) : { places: 0, cities: 0, countries: 0 }
@@ -154,6 +189,38 @@ export function summarize(
     travelXp +
     (player.features?.cards !== false ? starUpXp(loot) : 0) +
     (player.features?.finance !== false ? financeXp(transactions, player.finance, dayKey(now, player.settings.resetHour)) : 0)
+  // Surprise rewards that pay XP (src/engine/extras.ts): rolls, Red Gates, job changes, hidden achievements.
+  const seed = `${player.id}:${player.createdAt}`
+  const rolls = bonuses.filter(b => b.kind === 'roll')
+  const gateClears = bonuses.filter(b => b.kind === 'gate')
+  const jobsTaken = bonuses.filter(b => b.kind === 'job').sort((a, b) => a.createdAt - b.createdAt)
+  const jobAt = (id: string) => jobsTaken.find(j => j.value === id)?.createdAt ?? null
+  const legionOn = player.features?.legion !== false
+  const mainsClearedAt = quests.filter(q => q.kind === 'main' && (q.stages?.length ?? 0) > 0).flatMap(q => {
+    const done = completions.filter(c => c.questId === q.id)
+    return done.length >= (q.stages?.length ?? 0) ? [Math.max(...done.map(c => c.createdAt))] : []
+  })
+  const legion = legionOn ? shadowLegion(seed, jobAt('shadowcaller'), jobAt('legion-captain'), completions, bosses, mainsClearedAt) : { soldiers: [] as Soldier[], nextIn: 0 }
+  const allDailyIds = new Set(quests.filter(q => q.kind === 'daily').map(q => q.id))
+  const extrasDoneOn = new Map<string, Set<string>>()
+  for (const c of completions) if (allDailyIds.has(c.questId)) (extrasDoneOn.get(c.day) ?? extrasDoneOn.set(c.day, new Set()).get(c.day)!).add(c.questId)
+  const perfectList = perfectDays(
+    { dailies: quests.filter(q => q.kind === 'daily' && q.active).map(q => ({ id: q.id, since: dayKey(new Date(q.createdAt), player.settings.resetHour) })), doneOn: extrasDoneOn, restDays: recoveryDays },
+    startDay,
+    today,
+  )
+  const couponsUsed = bonuses.filter(b => b.kind === 'coupon-use').length
+  const hidden = extrasOn
+    ? earnedHidden({
+        completions, dailyIds: allDailyIds, perfectDays: perfectList, activeDays: new Set(extrasDoneOn.keys()), startDay,
+        gatesCleared: gateClears.length, goldenCleared: completions.filter(c => c.golden).length,
+        rolls: rolls.map(r => Number(r.value)), loot, soldiers: legion.soldiers.length, couponsUsed,
+      })
+    : []
+  const extrasXp = extrasOn
+    ? rolls.reduce((sum, r) => sum + rollReward(Number(r.value)).xp, 0) + gateClears.length * GATE_XP + hidden.length * HIDDEN_XP
+    : 0
+  const jobXp = legionOn ? jobsTaken.reduce((sum, j) => sum + (jobById(j.value)?.xp ?? 0), 0) : 0
 
   // Wallet: each month caps at the budget and the overflow goes to the Vault.
   // When a month ends, whatever the wallet didn't spend rolls into the Vault too.
@@ -197,7 +264,7 @@ export function summarize(
           penaltyQuestOn,
         )
       : null
-  const totalXp = Math.max(0, rawXp + (incentivesOn ? (incentives?.perfectXp ?? 0) : 0) - (penalty?.xpLost ?? 0))
+  const totalXp = Math.max(0, rawXp + extrasXp + jobXp + (incentivesOn ? (incentives?.perfectXp ?? 0) : 0) - (penalty?.xpLost ?? 0))
 
   const spentBy = new Map<string, number>()
   let vaultSpent = 0
@@ -262,6 +329,7 @@ export function summarize(
   // Streaks count back from today (or yesterday if today isn't done yet).
   // A Recovery Day neither breaks a streak nor adds to it.
   const streaks = new Map<string, number>()
+  const saved = new Set(bonuses.filter(b => b.kind === 'wildcard-use' && b.questId).map(b => `${b.questId}:${b.day}`))
   const casualPause = !!penalty && player.settings.difficulty === 'casual'
   for (const q of dailies) {
     const days = new Set(completions.filter(c => c.questId === q.id).map(c => c.day))
@@ -272,7 +340,7 @@ export function summarize(
       if (days.has(day)) {
         streak++
         gap = 0
-      } else if (!recoveryDays.has(day)) {
+      } else if (!recoveryDays.has(day) && !saved.has(`${q.id}:${day}`)) {
         // Casual mode pauses a streak over a couple of missed days instead of breaking it.
         if (!casualPause || day < (player.penaltiesSince ?? today) || ++gap > CASUAL_PAUSE_DAYS) break
       }
@@ -299,6 +367,50 @@ export function summarize(
     journalEntries: journal.length,
     hangouts: contacts.filter(c => c.kind === 'hangout').length,
     ...travel,
+  }
+
+  // Surprise rewards state for the screens.
+  const todayDailies = dailies.filter(q => dayKey(new Date(q.createdAt), player.settings.resetHour) <= today)
+  const gate = extrasOn ? redGate(seed, today, player.settings.wakeTime, player.settings.bedTime) : null
+  const rollFor = (day: string) => (perfectList.includes(day) && !rolls.some(r => r.day === day) ? day : null)
+  const rollDay = extrasOn ? (rollFor(today) ?? rollFor(addDays(today, -1))) : null
+  const usedCoupons = new Set(bonuses.filter(b => b.kind === 'coupon-use').map(b => b.value))
+  const jobInput = {
+    level: level.level,
+    perfectDays: perfectList.length,
+    sideClears: completions.filter(c => quests.find(q => q.id === c.questId)?.kind === 'side').length,
+    bestCombo: incentives?.bestCombo ?? 0,
+    soldiers: legion.soldiers.length,
+    bossesDefeated: bosses.filter(b => b.defeatedAt).length,
+    mainsCleared: mainsClearedAt.length,
+  }
+  const taken = new Set(jobsTaken.map(j => j.value))
+  const nextJob = JOBS.find(j => !taken.has(j.id)) ?? null
+  const missedYesterday = todayDailies.filter(q => dayKey(new Date(q.createdAt), player.settings.resetHour) <= addDays(today, -1) && !completions.some(c => c.questId === q.id && c.day === addDays(today, -1))).length
+  const extras: ExtrasState = {
+    on: extrasOn,
+    golden: extrasOn ? goldenQuestId(seed, today, todayDailies) : null,
+    gate: gate && { ...gate, count: gateCount(gate, completions, allDailyIds), needed: GATE_NEEDED, cleared: gateClears.some(g => g.day === today) },
+    rollDay,
+    roll: rollDay ? luckyRoll(seed, rollDay) : null,
+    rolledToday: rolls.find(r => r.day === today) ? Number(rolls.find(r => r.day === today)!.value) : null,
+    cursedToday: rolls.some(r => r.day === today && r.value === '1'),
+    coupons: extrasOn ? [...couponRecords.values()].filter(c => !usedCoupons.has(c.id)).flatMap(c => {
+      const coupon = couponById(c.value)
+      return coupon ? [{ record: c, coupon }] : []
+    }) : [],
+    couponsUsed,
+    wildcards: extrasOn ? Math.max(0, bonuses.filter(b => b.kind === 'wildcard').length - bonuses.filter(b => b.kind === 'wildcard-use').length) : 0,
+    wildcardOffers: extrasOn ? wildcardOffers(todayDailies, completions, today, recoveryDays, saved, startDay) : [],
+    plates: PLATES.filter(p => p.earned({ level: level.level, bestCombo: incentives?.bestCombo ?? 0, gatesCleared: gateClears.length, jobs: taken })).map(p => p.id),
+    hidden,
+    job: legionOn ? (jobById(jobsTaken[jobsTaken.length - 1]?.value ?? '') ?? null) : null,
+    nextJob: legionOn && nextJob ? { job: nextJob, checks: nextJob.trial.map(t => ({ label: t.label, done: t.done(jobInput) })), ready: nextJob.trial.every(t => t.done(jobInput)) } : null,
+    legion: legion.soldiers,
+    legionNextIn: legion.nextIn,
+    companion: player.features?.companion !== false
+      ? { ...companionState(incentives?.bestCombo ?? 0, todayDailies.filter(q => todayDone.has(q.id)).length, todayDailies.length, missedYesterday), name: player.companionName || 'Pip' }
+      : null,
   }
 
   const plan = playerPlan(player, startDay)
@@ -340,6 +452,7 @@ export function summarize(
     party: partyBonds(people, contacts, today, at => dayKey(new Date(at), player.settings.resetHour)),
     travel,
     incentives,
+    extras,
     routineOffer: progressionDue(routineFullDays, recoveryDays, today, player.routineReviewedOn) ? raisePlan(plan) : null,
   }
 }

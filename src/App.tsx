@@ -25,6 +25,7 @@ import { customCard, dayKey, featureOn, setCustomCards, shopLock } from './engin
 import { pushPenaltyStatus } from './db/triggers'
 import { Desktop } from './ui/desktop/Desktop'
 import { CustomizeHud, MoreMenu, type MoreItem } from './ui/More'
+import { RewardsScreen } from './ui/extras/Extras'
 import { setPref, usePrefs, useWide } from './ui/desktop/prefs'
 
 type Tab = 'hud' | 'quests' | 'log' | 'shop' | 'more'
@@ -40,7 +41,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
-  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | 'collection' | 'finance' | 'party' | 'settings' | 'customize' | null>(null)
+  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | 'collection' | 'finance' | 'party' | 'settings' | 'customize' | 'rewards' | null>(null)
   const [logCamera, setLogCamera] = useState(0)
   const [planId, setPlanId] = useState<string | null>(null)
   const [briefingDone, setBriefingDone] = useState(false)
@@ -51,7 +52,7 @@ export default function App() {
     document.documentElement.dataset.look = prefs.look
   }, [prefs.look])
   const data = useLiveQuery(async () => {
-    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears] = await Promise.all([
+    const [player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears, bonuses] = await Promise.all([
       db.players.get(LOCAL_USER),
       db.quests.where('userId').equals(LOCAL_USER).toArray(),
       db.completions.where('userId').equals(LOCAL_USER).toArray(),
@@ -76,10 +77,11 @@ export default function App() {
       db.transactions.where('userId').equals(LOCAL_USER).toArray(),
       db.bills.where('userId').equals(LOCAL_USER).toArray(),
       db.penaltyClears.where('userId').equals(LOCAL_USER).toArray(),
+      db.bonuses.where('userId').equals(LOCAL_USER).toArray(),
     ])
     // Your own cards join the card set before anything reads it.
     setCustomCards(customCards.map(customCard))
-    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears }
+    return { player, quests, completions, rewards, purchases, savings, sets, scans, people, contacts, focusRuns, bosses, journal, surprises, plans, planFunds, memories, places, goals, loot, customCards, transactions, bills, penaltyClears, bonuses }
   })
 
   if (!data) return null
@@ -93,7 +95,7 @@ export default function App() {
   }
 
   const { player, quests, rewards, purchases, savings, sets, people, contacts, focusRuns, bosses } = data
-  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises, plans: data.plans, planFunds: data.planFunds, memories: data.memories, places: data.places, loot: data.loot, transactions: data.transactions, penaltyClears: data.penaltyClears })
+  const summary = summarize(player, quests, data.completions, now, { purchases, savings, sets, people, contacts, focusRuns, bosses, journal: data.journal, surprises: data.surprises, plans: data.plans, planFunds: data.planFunds, memories: data.memories, places: data.places, loot: data.loot, transactions: data.transactions, penaltyClears: data.penaltyClears, bonuses: data.bonuses })
   const reportInput = {
     stats: player.stats,
     quests,
@@ -155,6 +157,7 @@ export default function App() {
   const moreItems: MoreItem[] = [
     featureOn(player, 'party') && { key: 'party', label: 'Party', hint: 'Friends, family, bonds', open: () => setScreen('party') },
     featureOn(player, 'finance') && { key: 'finance', label: 'Finances', hint: 'Spending, bills, reports', open: () => setScreen('finance') },
+    (featureOn(player, 'extras') || featureOn(player, 'legion')) && { key: 'rewards', label: 'Rewards & Legion', hint: 'Coupons, job changes, secrets', open: () => setScreen('rewards') },
     featureOn(player, 'cards') && { key: 'collection', label: 'Card collection', hint: 'Your binder', open: () => setScreen('collection') },
     featureOn(player, 'plans') && { key: 'plans', label: 'Plans', hint: 'Raves, festivals, trips', open: () => openPlans() },
     featureOn(player, 'journal') && { key: 'journal', label: 'Journal', hint: 'Today’s reflection', open: () => setScreen('journal') },
@@ -181,6 +184,7 @@ export default function App() {
         )}
         {screen === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setScreen(null)} />}
         {screen === 'customize' && <CustomizeHud onClose={() => setScreen(null)} />}
+        {screen === 'rewards' && <RewardsScreen player={player} summary={summary} onClose={() => setScreen(null)} />}
         {screen === 'finance' && <Finance summary={summary} finance={player.finance} transactions={data.transactions} bills={data.bills} onClose={() => setScreen(null)} />}
         {screen === 'collection' && <Collection player={player} summary={summary} loot={data.loot} custom={data.customCards} onClose={() => setScreen(null)} />}
         {screen === 'goals' && (
@@ -217,7 +221,7 @@ export default function App() {
       {current === 'log' && (
         <LifeLog key={logCamera} data={{ ...data, player }} summary={summary} startCamera={logCamera > 0} onJournal={() => setScreen('journal')} onClose={() => { setLogCamera(0); setTab('hud') }} />
       )}
-      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} memories={data.memories} onLifeLog={openLog} goals={data.goals} onGoals={() => setScreen('goals')} loot={data.loot} onCollection={() => setScreen('collection')} transactions={data.transactions} bills={data.bills} onFinance={() => setScreen('finance')} onCustomize={() => setScreen('customize')} />}
+      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} memories={data.memories} onLifeLog={openLog} goals={data.goals} onGoals={() => setScreen('goals')} loot={data.loot} onCollection={() => setScreen('collection')} transactions={data.transactions} bills={data.bills} onFinance={() => setScreen('finance')} onCustomize={() => setScreen('customize')} onRewards={() => setScreen('rewards')} />}
       {current === 'quests' && <QuestBoard player={player} quests={quests} completions={data.completions} summary={summary} onFight={bossId => openFocus({ bossId })} />}
       {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} onPlans={() => openPlans()} />}
       {current === 'more' && <MoreMenu items={moreItems} />}
