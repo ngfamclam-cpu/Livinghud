@@ -67,6 +67,8 @@ export interface Player {
   plate?: string
   /** Your companion's name. */
   companionName?: string
+  /** Names you gave your other pets (pet id -> name). */
+  petNames?: Record<string, string>
   /** Shadow Legion: renamed soldiers and guard posts (see LegionPrefs). */
   legion?: import('./extras').LegionPrefs
   /** Reward ideas starred in the Shop to work toward. */

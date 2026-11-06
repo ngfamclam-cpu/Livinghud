@@ -30,7 +30,7 @@ const startOfDay = (day: string) => {
 }
 
 /** Saved moments: rolls, Red Gate clears, coupons (earned and used), wildcards (earned and used), job changes. */
-export type BonusKind = 'roll' | 'gate' | 'coupon' | 'coupon-use' | 'wildcard' | 'wildcard-use' | 'job' | 'hidden'
+export type BonusKind = 'roll' | 'gate' | 'coupon' | 'coupon-use' | 'wildcard' | 'wildcard-use' | 'job' | 'hidden' | 'egg' | 'pet'
 
 export interface BonusRecord {
   id: string

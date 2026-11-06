@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { COMPANION_STAGES, EXTRA_PAY, HIDDEN, JOBS, scalePay, PLATES, featureOn, type Player, type Quest, type Summary } from '../../engine'
+import { EXTRA_PAY, HIDDEN, JOBS, scalePay, PLATES, featureOn, type Player, type Quest, type Summary } from '../../engine'
 import { redeemCoupon, rollTheDice, setPlate, takeJobChange, playWildcard } from '../../db/extras'
 import { SystemWindow } from '../SystemWindow'
 import { LegionView } from './Legion'
+import { PetSanctuary } from './PetSanctuary'
 
 const minutesLeft = (until: number, now: number) => Math.max(0, Math.ceil((until - now) / 60_000))
 
@@ -158,11 +159,7 @@ export function RewardsScreen({ player, summary, quests = [], onClose }: { playe
         </SystemWindow>
       )}
 
-      {x.companion && (
-        <SystemWindow title="Companion stages">
-          <p className="muted">{COMPANION_STAGES.map(s => `${s.name}${s.combo ? ` (${s.combo}-day combo)` : ''}`).join(' → ')}</p>
-        </SystemWindow>
-      )}
+      {x.pets && <PetSanctuary pets={x.pets} />}
     </main>
   )
 }
