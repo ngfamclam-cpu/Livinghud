@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EGG_CHANCE, HATCH_CLEARS, PETS, petsState, rollEgg, type BonusRecord, type Completion } from './index'
+import { AFFECTION_NAMES, COMPANION_DATE_XP, EGG_CHANCE, HATCH_CLEARS, HUMAN_COMPANIONS, PETS, companionPrompt, dateOffer, humanLine, petsState, rollEgg, unlockedOutfits, type BonusRecord, type Completion } from './index'
 
 const clear = (n: number, at: number, day = '2026-11-01'): Completion => ({ id: `c${n}`, userId: 'local', questId: `q${n % 3}`, stat: 'STR', day, version: 'full', xp: 20, dollars: 1, createdAt: at })
 const bonus = (kind: BonusRecord['kind'], value: string, createdAt: number, sourceId = `${kind}-${createdAt}`): BonusRecord => ({ id: `${kind}-${value}-${createdAt}`, userId: 'local', kind, day: '2026-11-01', sourceId, value, createdAt })
@@ -8,7 +8,7 @@ const base = { completions: [] as Completion[], perfectDays: [] as string[], bon
 describe('pets', () => {
   it('has unique ids, Mythic and Elemental families, and Pip as the starter', () => {
     expect(new Set(PETS.map(p => p.id)).size).toBe(PETS.length)
-    expect(new Set(PETS.map(p => p.family))).toEqual(new Set(['Starter', 'Elemental', 'Mythic']))
+    expect(new Set(PETS.map(p => p.family))).toEqual(new Set(['Starter', 'Elemental', 'Mythic', 'Companion']))
     const s = petsState(base)
     expect(s.owned.map(p => p.def.id)).toEqual(['pip'])
     expect(s.active.def.id).toBe('pip')
@@ -55,5 +55,47 @@ describe('pets', () => {
     expect(fox.xp).toBe(12 + 5)
     expect(fox.level).toBe(2)
     expect(s.active.def.id).toBe('ember-fox')
+  })
+})
+
+describe('human companions', () => {
+  it('join when bought, level up with quests and dates, and unlock outfits', () => {
+    const s0 = petsState(base)
+    expect(s0.missing.some(p => p.id === 'mina' && p.source === 'shop')).toBe(true)
+    const bought = bonus('companion', 'mina', 10)
+    const active = bonus('pet', 'mina', 11)
+    const clears = Array.from({ length: 6 }, (_, i) => clear(i, 100 + i))
+    const s = petsState({ ...base, bonuses: [bought, active], completions: clears, dateClears: new Map([['mina', 2]]) })
+    const mina = s.owned.find(p => p.def.id === 'mina')!
+    expect(s.active.def.id).toBe('mina')
+    expect(mina.xp).toBe(6 + 2 * COMPANION_DATE_XP)
+    expect(mina.level).toBe(3)
+    expect(mina.stage).toBe(AFFECTION_NAMES[2])
+    expect(unlockedOutfits(mina.def.human!, mina.level).map(o => o.level)).toEqual([1, 2, 3])
+  })
+
+  it('offers one date idea per 4-day window and talks in character', () => {
+    const a = dateOffer('s', 'rei', '2026-11-04')
+    expect(dateOffer('s', 'rei', '2026-11-04')).toEqual(a)
+    const windows = new Set(['2026-11-01', '2026-11-05', '2026-11-09', '2026-11-13', '2026-11-17'].map(d => dateOffer('s', 'rei', d).templateId))
+    expect(windows.size).toBe(5)
+    const rei = HUMAN_COMPANIONS.find(h => h.id === 'rei')!
+    expect(humanLine(rei, { dailiesLeft: 2, dailiesTotal: 5, hour: 14 }, 0)).toBeTruthy()
+    expect(humanLine(rei, { dailiesLeft: 0, dailiesTotal: 5, hour: 14 }, 1)).toMatch(/perfect|clear|impressive|co-op/i)
+  })
+
+  it('keeps every outfit prompt adult, non-explicit and under the model limit', () => {
+    for (const h of HUMAN_COMPANIONS) {
+      for (const o of h.outfits) {
+        for (const level of [0, 1] as const) {
+          const p = companionPrompt(h, o.id, 42, level)!
+          expect(p).toMatch(/early 20s/)
+          expect(p).toMatch(/fictional adult/)
+          expect(p).not.toMatch(/\bgirl\b|teen|pasties|topless|nud(e|ity)|nipple|genital|sexual|sexy|seductive|sultry|pin-up/i)
+          expect(p.length).toBeLessThan(2048)
+        }
+      }
+    }
+    expect(companionPrompt(HUMAN_COMPANIONS[0], 'nope')).toBeNull()
   })
 })

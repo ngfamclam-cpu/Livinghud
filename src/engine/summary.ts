@@ -139,6 +139,10 @@ export interface ExtrasState {
   companion: { pet: OwnedPet; mood: CompanionMood; name: string } | null
   /** Every pet: owned, hatching eggs, still to find. */
   pets: PetsState | null
+  /** Human companion portraits: "companionId:outfitId" -> photo id. */
+  portraits: Record<string, string>
+  /** The outfit each human companion is wearing. */
+  outfits: Record<string, string>
 }
 
 export interface Logs {
@@ -406,6 +410,15 @@ export function summarize(
         pipName: player.companionName,
         // Pip keeps the growth it had from your best combo before pets could be swapped.
         pipHeadStart: (incentives?.bestCombo ?? 0) * 3,
+        dateClears: (() => {
+          const byQuest = new Map(quests.filter(q => q.templateId?.startsWith('date:')).map(q => [q.id, q.templateId!.split(':')[1]]))
+          const out = new Map<string, number>()
+          for (const c of completions) {
+            const who = byQuest.get(c.questId)
+            if (who) out.set(who, (out.get(who) ?? 0) + 1)
+          }
+          return out
+        })(),
       })
     : null
   const profiles = soldierProfiles(seed, legion.soldiers, player.legion, completions)
@@ -434,6 +447,8 @@ export function summarize(
     legionNextIn: legion.nextIn,
     companion: pets ? { pet: pets.active, mood: companionState(incentives?.bestCombo ?? 0, todayDailies.filter(q => todayDone.has(q.id)).length, todayDailies.length, missedYesterday).mood, name: pets.active.name } : null,
     pets,
+    outfits: player.companionOutfits ?? {},
+    portraits: Object.fromEntries(bonuses.filter(b => b.kind === 'portrait' && b.photoId).sort((a, b) => a.createdAt - b.createdAt).map(b => [b.value, b.photoId!])),
   }
 
   const plan = playerPlan(player, startDay)

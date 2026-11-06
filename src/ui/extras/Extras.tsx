@@ -58,7 +58,7 @@ export function ExtrasAlerts({ summary, quests, now }: { summary: Summary; quest
 }
 
 /** A small HUD panel: coupons, wildcards, the Legion and the next Job Change. */
-export function RewardsPanel({ summary, onOpen }: { summary: Summary; onOpen: () => void }) {
+export function RewardsPanel({ summary, onOpen, onCards }: { summary: Summary; onOpen: () => void; onCards?: () => void }) {
   const x = summary.extras
   return (
     <SystemWindow title="Rewards & Legion">
@@ -68,7 +68,10 @@ export function RewardsPanel({ summary, onOpen }: { summary: Summary; onOpen: ()
         {` · 🎟 ${x.coupons.length} coupon${x.coupons.length === 1 ? '' : 's'} · 🃏 ${x.wildcards} wildcard${x.wildcards === 1 ? '' : 's'} · ${x.hidden.length}/${HIDDEN.length} secrets`}
       </p>
       {x.nextJob?.ready && <p className="system-line">Job Change ready: {x.nextJob.job.title}!</p>}
-      <div className="row end"><button className="small" onClick={onOpen}>Open</button></div>
+      <div className="row end">
+        {onCards && <button className="ghost small" onClick={onCards}>🂠 Card binder</button>}
+        <button className="small" onClick={onOpen}>Open</button>
+      </div>
     </SystemWindow>
   )
 }
@@ -159,7 +162,7 @@ export function RewardsScreen({ player, summary, quests = [], onClose }: { playe
         </SystemWindow>
       )}
 
-      {x.pets && <PetSanctuary pets={x.pets} />}
+      {x.pets && <PetSanctuary summary={summary} />}
     </main>
   )
 }

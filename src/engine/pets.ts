@@ -6,15 +6,16 @@
 // it's the active one. Pip is the starter. Cosmetic: pets pay nothing.
 // The Shadow Legion may adopt shadow beasts later; not yet.
 
-import type { Completion } from './types'
+import type { Completion, StatKey } from './types'
 import type { BonusRecord } from './extras'
+import { HUMAN_COMPANIONS, type HumanCompanion } from './forge'
 
 export type PetRarity = 'common' | 'rare' | 'epic' | 'legendary'
-export type PetFamily = 'Elemental' | 'Mythic' | 'Starter'
+export type PetFamily = 'Elemental' | 'Mythic' | 'Starter' | 'Companion'
 export type PetElement = 'fire' | 'water' | 'nature' | 'storm' | 'ice' | 'crystal' | 'moon' | 'light' | 'void' | 'spirit'
 /** The body plan the art draws. */
-export type PetBody = 'pip' | 'fox' | 'otter' | 'stag' | 'wolf' | 'lynx' | 'tortoise' | 'kitsune' | 'griffin' | 'serpent' | 'owl' | 'dragon' | 'qilin' | 'phoenix' | 'moth' | 'wyrm' | 'thunderbird'
-export type PetSource = 'starter' | 'egg' | 'milestone' | 'secret'
+export type PetBody = 'human' | 'pip' | 'fox' | 'otter' | 'stag' | 'wolf' | 'lynx' | 'tortoise' | 'kitsune' | 'griffin' | 'serpent' | 'owl' | 'dragon' | 'qilin' | 'phoenix' | 'moth' | 'wyrm' | 'thunderbird'
+export type PetSource = 'starter' | 'egg' | 'milestone' | 'secret' | 'shop'
 
 export interface PetDef {
   id: string
@@ -29,7 +30,33 @@ export interface PetDef {
   /** How it's unlocked (milestones and secrets; secrets show ??? until found). */
   unlock: string
   blurb: string
+  /** Human companions: their catalog entry (look, outfits, price). */
+  human?: HumanCompanion
 }
+
+const HUMAN_COLORS: Record<HumanCompanion['personality'], [string, string, string]> = {
+  sunny: ['#ffe0ef', '#ff8ac9', '#ffd34d'],
+  cool: ['#d6d9ff', '#5b4bd9', '#7af3ff'],
+  sweet: ['#fff1e0', '#e8a07a', '#ff8ac9'],
+  elegant: ['#f3e8ff', '#3a1f5e', '#ff3d6e'],
+  sporty: ['#e0fff4', '#1f9e74', '#ffb347'],
+  regal: ['#f4ecff', '#6a2bd9', '#d7c8ff'],
+}
+
+/** Human companions, bought in the Shop (see HUMAN_COMPANIONS in forge.ts). */
+export const HUMAN_PETS: PetDef[] = HUMAN_COMPANIONS.map(h => ({
+  id: h.id,
+  name: h.name,
+  family: 'Companion',
+  element: 'spirit',
+  rarity: h.price >= 250 ? 'legendary' : h.price >= 100 ? 'epic' : 'rare',
+  body: 'human',
+  colors: HUMAN_COLORS[h.personality],
+  source: 'shop',
+  unlock: `Shop · $${h.price}`,
+  blurb: h.tagline,
+  human: h,
+}))
 
 export const PETS: PetDef[] = [
   { id: 'pip', name: 'Pip', family: 'Starter', element: 'spirit', rarity: 'common', body: 'pip', colors: ['#9ce8ff', '#3c7bff', '#d6a6ff'], source: 'starter', unlock: 'Your first companion', blurb: 'Hatched the day you awakened. Loyal to the end.' },
@@ -52,6 +79,7 @@ export const PETS: PetDef[] = [
   { id: 'lunar-moth', name: 'Lunar Moth', family: 'Elemental', element: 'moon', rarity: 'rare', body: 'moth', colors: ['#f4ecff', '#8b6bff', '#bff6ff'], source: 'secret', unlock: 'Clear a quest between midnight and 3 a.m.', blurb: 'Only flies for night owls.' },
   { id: 'chaos-wyrm', name: 'Chaos Wyrm', family: 'Mythic', element: 'void', rarity: 'epic', body: 'wyrm', colors: ['#d79bff', '#3a0b6e', '#ff3d6e'], source: 'secret', unlock: 'Roll a 1 on the Lucky Roll', blurb: 'Born from bad luck. Brings good luck. Probably.' },
   { id: 'thunderbird', name: 'Thunderbird', family: 'Mythic', element: 'storm', rarity: 'legendary', body: 'thunderbird', colors: ['#fff36b', '#ff9f1a', '#7af3ff'], source: 'secret', unlock: 'Close 5 Red Gates', blurb: 'Its wingbeat is the thunder you hear before a gate opens.' },
+  ...HUMAN_PETS,
 ]
 
 export const petById = (id: string) => PETS.find(p => p.id === id)
@@ -98,6 +126,10 @@ export function rollEgg(seed: string, source: EggSource, sourceId: string, taken
 /** Pet XP for each level (index = level - 1). Pip has a sixth level (its old Elder form). */
 export const PET_LEVEL_XP = [0, 10, 30, 70, 140, 250]
 export const PET_STAGE_NAMES = ['Hatchling', 'Young', 'Adult', 'Elder', 'Ascended', 'Mythic']
+/** Affection levels for human companions. */
+export const AFFECTION_NAMES = ['Stranger', 'Friend', 'Close', 'Sweetheart', 'Soulmate']
+/** Affection XP for each date-night quest you clear with her. */
+export const COMPANION_DATE_XP = 15
 /** Pip's art keeps its own stage names. */
 export const PIP_STAGES = ['egg', 'hatchling', 'sprite', 'wisp', 'drake', 'elder']
 /** XP while active: per quest cleared, per perfect day. */
@@ -149,6 +181,8 @@ export interface PetsInput {
   pipName?: string
   /** Pip keeps the progress it made before pets could be swapped. */
   pipHeadStart: number
+  /** Date-night quests cleared, per companion id. */
+  dateClears?: Map<string, number>
 }
 
 export interface PetsState {
@@ -176,6 +210,8 @@ export function petsState(i: PetsInput): PetsState {
     else eggs.push({ record: r, pet, clears, needed })
   }
   for (const [id, met] of Object.entries(MILESTONE)) if (met(i.milestones)) owned.add(id)
+  // Human companions you bought (a refund removes the record).
+  for (const r of i.bonuses) if (r.kind === 'companion' && HUMAN_PETS.some(h => h.id === r.value)) owned.add(r.value)
 
   // Who was active when: the latest switch to a pet you owned at that point wins.
   const switches = i.bonuses.filter(b => b.kind === 'pet' && owned.has(b.value)).sort((a, b) => a.createdAt - b.createdAt)
@@ -192,6 +228,7 @@ export function petsState(i: PetsInput): PetsState {
     const id = activeAt(c.createdAt)
     xp.set(id, (xp.get(id) ?? 0) + PET_XP.clear)
   }
+  for (const [id, n] of i.dateClears ?? []) xp.set(id, (xp.get(id) ?? 0) + n * COMPANION_DATE_XP)
   const lastClear = new Map<string, number>()
   for (const c of i.completions) lastClear.set(c.day, Math.max(lastClear.get(c.day) ?? 0, c.createdAt))
   for (const d of i.perfectDays) {
@@ -209,7 +246,7 @@ export function petsState(i: PetsInput): PetsState {
       name: (def.id === 'pip' ? i.pipName : i.names?.[def.id])?.trim() || def.name,
       xp: x,
       level,
-      stage: def.id === 'pip' ? PIP_STAGES[level - 1] : PET_STAGE_NAMES[level - 1],
+      stage: def.id === 'pip' ? PIP_STAGES[level - 1] : def.human ? AFFECTION_NAMES[level - 1] : PET_STAGE_NAMES[level - 1],
       nextXp: level < maxLevel ? PET_LEVEL_XP[level] : null,
     }
   }
@@ -218,4 +255,87 @@ export function petsState(i: PetsInput): PetsState {
   const active = list.find(p => p.def.id === current) ?? list[0]
   const pending = new Set(eggs.map(e => e.pet.id))
   return { owned: list, active, eggs, missing: PETS.filter(p => !owned.has(p.id) && !pending.has(p.id)) }
+}
+
+// ---- Human companions: outfits, talk, date nights ----
+
+/** Outfits she has unlocked at your affection level. */
+export const unlockedOutfits = (h: HumanCompanion, level: number) => h.outfits.filter(o => o.level <= level)
+
+export type HumanAction = 'compliment' | 'gift' | 'hangout'
+
+const LINES: Record<HumanCompanion['personality'], { idle: string[]; done: string[]; left: string[]; late: string[] }> = {
+  sunny: {
+    idle: ['Hiii! I saved you a seat. What are we conquering today?', "You look cute when you're focused, you know.", 'Okay but your streak? Kind of hot.'],
+    done: ['Perfect day! Come here, you deserve a hug. A long one.', "You did EVERYTHING. I'm telling everyone. Mostly myself."],
+    left: ['{n} left! Finish them and I owe you a date~', "Just {n} more. I'll be right here cheering."],
+    late: ["It's late... sleep is a daily too. Want me to stay till you drift off?"],
+  },
+  cool: {
+    idle: ["Took you long enough. ...I wasn't waiting. Much.", "Fine, I'll watch you grind. Don't make it boring.", 'You clear your quests, I clear my schedule for you. Deal?'],
+    done: ["Perfect day. Not bad. ...Okay, kind of impressive.", "All clear. You've earned some co-op time with me."],
+    left: ['{n} to go. Lose and you owe me a rematch.', "Still {n} left. I'll pretend I'm not checking."],
+    late: ["Go to bed. I'll still be cute tomorrow."],
+  },
+  sweet: {
+    idle: ['Good to see you. I made you a latte. Extra foam, like you like it.', "How are you, really? I've got time.", 'You have no idea how much I like seeing you show up.'],
+    done: ["A perfect day. I'm so proud of you, honestly.", 'Everything done? Then tonight is just for us.'],
+    left: ["{n} more and you're free. I'll keep the coffee warm.", "Only {n} left, love. One at a time."],
+    late: ['Hey. Phone down soon, okay? I want you rested.'],
+  },
+  elegant: {
+    idle: ['Discipline looks good on you.', 'Shall we begin? I do so enjoy watching you work.', "Mm. You're early. I like that."],
+    done: ['Flawless. Dinner is on me tonight.', 'A perfect day. You may take my arm.'],
+    left: ['{n} remaining. Finish them, and you have my full attention.', "{n} left. I don't date men who quit halfway."],
+    late: ['It is late, darling. Rest is part of excellence.'],
+  },
+  sporty: {
+    idle: ["Let's go! Warm-up first, then you can flirt with me.", "Hydrate, champ. I'm watching.", 'You, me, a workout, and then smoothies. Non-negotiable.'],
+    done: ["PERFECT DAY! High five! ...No, a hug. You've earned it.", "That's my training partner. So proud."],
+    left: ['{n} reps... I mean quests left. Push!', "Only {n} left, don't you dare tap out."],
+    late: ['Recovery is gains too. Bed. Now. Smile for me first.'],
+  },
+  regal: {
+    idle: ['My hunter returns. Kneel... or better, get to work.', 'The gate trembles when you act. So do I, a little.', 'You may speak, hunter. Briefly. Then go conquer.'],
+    done: ['A perfect hunt. You may sit beside my throne tonight.', 'Flawless. I chose well.'],
+    left: ['{n} trials remain. Clear them and claim your reward.', "{n} left. My favour isn't given to the idle."],
+    late: ['Even queens sleep. Rest, my hunter.'],
+  },
+}
+
+const REACTIONS: Record<HumanAction, string[]> = {
+  compliment: ['*blushes* Say that again. Slower.', "Stop it... no, don't stop.", 'Flattery will get you everywhere with me.', '*hides a smile* You\'re dangerous, you know that?'],
+  gift: ['For me? You remembered! *happy gasp*', 'This is perfect. You\'re perfect. Okay, almost.', '*hugs it* I\'m keeping this forever.'],
+  hangout: ['*leans on your shoulder* This is nice.', "Let's just stay like this a bit.", '*laughs at your joke* You\'re ridiculous. Again!'],
+}
+
+/** What she says right now. */
+export function humanLine(h: HumanCompanion, ctx: { dailiesLeft: number; dailiesTotal: number; hour: number }, n: number): string {
+  const l = LINES[h.personality]
+  const pool = ctx.hour >= 23 || ctx.hour < 4 ? [...l.late, ...l.idle] : ctx.dailiesTotal > 0 && ctx.dailiesLeft === 0 ? l.done : ctx.dailiesLeft > 0 && ctx.dailiesLeft < ctx.dailiesTotal ? [...l.left, ...l.idle] : l.idle
+  return pool[Math.abs(n) % pool.length].replace('{n}', String(ctx.dailiesLeft))
+}
+
+export const humanReaction = (action: HumanAction, n: number) => REACTIONS[action][Math.abs(n) % REACTIONS[action].length]
+
+/** Real-life date ideas: self-care and getting out, done "with" her. */
+export const DATE_IDEAS: { title: string; description: string; stat: StatKey }[] = [
+  { title: 'Cook a proper dinner', description: 'Cook something real, plate it nicely, eat without your phone.', stat: 'VIT' },
+  { title: 'Sunset walk', description: 'A 30-minute walk at sunset, no phone, just music or quiet.', stat: 'STR' },
+  { title: 'Try a new café', description: 'Go somewhere new and order something you have never had.', stat: 'CHA' },
+  { title: 'Dress up and go out', description: 'Put on your best fit and go somewhere: a bar, a gallery, a show.', stat: 'CHA' },
+  { title: 'Dance session', description: '20 minutes dancing to your favourite set. Yes, at home counts.', stat: 'STR' },
+  { title: 'Grooming day', description: 'Haircut, skincare, a proper shave or a new fragrance.', stat: 'VIT' },
+  { title: 'Plan a weekend trip', description: 'Pick a place, a date and a budget for a short trip.', stat: 'WLT' },
+  { title: 'Learn something together', description: 'An hour on a course, a language or a skill you have been putting off.', stat: 'INT' },
+]
+
+/** Days between date-night ideas. */
+export const DATE_EVERY = 4
+
+/** This window's date idea from a companion (the same all window, a new one every 4 days). */
+export function dateOffer(seed: string, companionId: string, today: string): { templateId: string; idea: (typeof DATE_IDEAS)[number] } {
+  const [y, m, d] = today.split('-').map(Number)
+  const window = Math.floor(Date.UTC(y, m - 1, d) / 86_400_000 / DATE_EVERY)
+  return { templateId: `date:${companionId}:${window}`, idea: DATE_IDEAS[hash(`${seed}:date:${companionId}:${window}`) % DATE_IDEAS.length] }
 }

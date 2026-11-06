@@ -13,7 +13,7 @@ export type ForgeOutcome =
   | { ok: false; reason: 'no-sync' | 'not-configured' | 'limit' | 'failed'; made: number; series: string; skipped: number; message?: string }
 
 type FatalError = { error: 'not-configured' | 'limit' | 'failed'; message?: string }
-type ImageError = FatalError | { error: 'declined'; message?: string }
+export type ImageError = FatalError | { error: 'declined'; message?: string }
 
 /** The last pack's cards and looks (this device), for "Forge again with the same prompts". */
 const LAST_KEY = 'livinghud-forge-last'
@@ -42,11 +42,14 @@ function rememberPack(picks: PackPick[]) {
 /** Two images at a time: quick, and gentle on the free allowance's rate limit. */
 const PARALLEL = 2
 
-async function makeImage(key: string, { card, variant }: PackPick): Promise<Blob | ImageError> {
+const makeImage = (key: string, { card, variant }: PackPick) => forgeImage(key, { cardId: card.id, variant })
+
+/** Asks api/forge.ts for one image (a catalog card or a companion portrait). */
+export async function forgeImage(key: string, body: Record<string, string | number>): Promise<Blob | ImageError> {
   const res = await fetch('/api/forge', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-sync-key': key },
-    body: JSON.stringify({ cardId: card.id, variant }),
+    body: JSON.stringify(body),
   }).catch(() => null)
   if (!res) return { error: 'failed', message: 'No connection.' }
   if (!res.headers.get('content-type')?.includes('application/json')) return { error: 'not-configured', message: 'The forge is not on this server yet.' }
@@ -138,7 +141,7 @@ export async function forgePack(onProgress: (done: number, total: number) => voi
 }
 
 /** Crops a forged image to card shape and stores it; returns the photo id. */
-async function cardPhoto(image: Blob, name: string): Promise<string> {
+export async function cardPhoto(image: Blob, name: string): Promise<string> {
   const draft = await analyse(new File([image], `${name}.jpg`, { type: 'image/jpeg' }), 0)
   const photo = await addPhoto(await renderCard(draft))
   URL.revokeObjectURL(draft.url)
