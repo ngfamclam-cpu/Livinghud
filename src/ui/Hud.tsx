@@ -187,7 +187,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
           ),
     collection:
       featureOn(player, 'cards') && <CollectionPanel loot={loot} onOpen={onCollection} />,
-    companion: summary.extras.companion && <CompanionPanel summary={summary} dailiesTotal={dailies.length} dailiesDone={doneCount} />,
+    companion: summary.extras.companion && <CompanionPanel summary={summary} dailiesTotal={dailies.length} dailiesDone={doneCount} onPets={onRewards} />,
     rewards: (featureOn(player, 'extras') || featureOn(player, 'legion')) && onRewards && <RewardsPanel summary={summary} onOpen={onRewards} />,
   }
   const shown = layout.order.filter(id => layout.place[id] !== 'hidden' && panels[id])

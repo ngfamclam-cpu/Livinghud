@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { COMPANION_MEALS, COMPANION_REACTIONS, COMPANION_SNACKS, companionLine, type CompanionAction, type Summary } from '../../engine'
-import { nameCompanion } from '../../db/extras'
+import { renamePet, setActivePet } from '../../db/extras'
 import { SystemWindow } from '../SystemWindow'
-import { CompanionArt } from './Companion'
+import { PetPortrait } from './PetPortrait'
 
 interface Care {
   pets: number
@@ -34,7 +34,7 @@ interface Particle {
 let particleId = 1
 
 /** Your companion: tap to pet, feed it a snack, play with it. It talks about your day. */
-export function CompanionPanel({ summary, dailiesTotal, dailiesDone }: { summary: Summary; dailiesTotal: number; dailiesDone: number }) {
+export function CompanionPanel({ summary, dailiesTotal, dailiesDone, onPets }: { summary: Summary; dailiesTotal: number; dailiesDone: number; onPets?: () => void }) {
   const c = summary.extras.companion
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(c?.name ?? 'Pip')
@@ -53,10 +53,13 @@ export function CompanionPanel({ summary, dailiesTotal, dailiesDone }: { summary
   useEffect(() => () => timers.current.forEach(t => window.clearTimeout(t)), [])
   useEffect(() => setCare(loadCare(summary.today)), [summary.today])
 
+  useEffect(() => setName(c?.name ?? 'Pip'), [c?.name])
   if (!c) return null
-  const egg = c.stage.id === 'egg'
+  const pet = c.pet
+  const egg = pet.stage === 'egg'
+  const pets = summary.extras.pets
   const line = say ?? companionLine(
-    { name: c.name, mood: c.mood, stage: c.stage.id, hour: new Date().getHours(), dailiesLeft: Math.max(0, dailiesTotal - dailiesDone), dailiesTotal, combo: summary.incentives?.combo ?? 0 },
+    { name: c.name, mood: c.mood, stage: egg ? 'egg' : 'grown', hour: new Date().getHours(), dailiesLeft: Math.max(0, dailiesTotal - dailiesDone), dailiesTotal, combo: summary.incentives?.combo ?? 0 },
     tick,
   )
   const full = care.meals >= COMPANION_MEALS
@@ -86,22 +89,22 @@ export function CompanionPanel({ summary, dailiesTotal, dailiesDone }: { summary
   }
 
   return (
-    <SystemWindow title="Companion" className={`companion-panel stage-${c.stage.id}`}>
+    <SystemWindow title="Companion" className={`companion-panel pet-${pet.def.id}`}>
       <div className="companion-stage">
         <div className="companion-speech" aria-live="polite">{line}</div>
         <button className="companion-touch" onClick={() => act('pet')} aria-label={`Pet ${c.name}`}>
-          <CompanionArt stage={c.stage.id} mood={c.mood} action={action} size={132} />
+          <PetPortrait pet={pet} mood={c.mood} action={action} size={132} />
           {particles.map(p => <span key={p.id} className="companion-particle" style={{ left: `${p.x}%` }} aria-hidden="true">{p.text}</span>)}
         </button>
       </div>
       <div className="companion-meta">
         {editing ? (
-          <form className="inline-form" onSubmit={e => { e.preventDefault(); void nameCompanion(name); setEditing(false) }}>
+          <form className="inline-form" onSubmit={e => { e.preventDefault(); void renamePet(pet.def.id, name); setEditing(false) }}>
             <input value={name} maxLength={20} onChange={e => setName(e.target.value)} aria-label="Companion name" autoFocus />
             <button className="small">Save</button>
           </form>
         ) : (
-          <button className="link-button" onClick={() => setEditing(true)} title="Rename"><b>{c.name}</b> · {c.stage.name} ✎</button>
+          <button className="link-button" onClick={() => setEditing(true)} title="Rename"><b>{c.name}</b> · Lv {pet.level} {pet.def.id === 'pip' ? pet.stage : pet.stage} ✎</button>
         )}
         <span className="companion-hearts" aria-label={`Affection today: ${hearts} of 5`}>{'♥'.repeat(hearts)}<span className="muted">{'♥'.repeat(5 - hearts)}</span></span>
       </div>
@@ -110,7 +113,27 @@ export function CompanionPanel({ summary, dailiesTotal, dailiesDone }: { summary
         <button className="small" onClick={() => act('feed')} disabled={full} title={full ? 'Full for today' : 'Give a snack'}>🍙 Feed {care.meals}/{COMPANION_MEALS}</button>
         <button className="small" onClick={() => act('play')}>🎾 Play</button>
       </div>
-      <p className="muted">{c.next ? `Evolves into a ${c.next.name} at a ${c.next.combo}-day best combo. Perfect days in a row help it grow.` : 'Fully evolved. Legendary companion.'}</p>
+      {pet.nextXp !== null ? (
+        <div className="pet-xp" aria-label={`${pet.xp} of ${pet.nextXp} pet XP to the next level`}>
+          <span style={{ width: `${Math.min(100, (pet.xp / pet.nextXp) * 100)}%` }} />
+          <small>{pet.xp}/{pet.nextXp} XP · grows 1 per quest cleared, 5 per perfect day, only while active</small>
+        </div>
+      ) : (
+        <p className="muted">Fully grown. A true {pet.def.rarity} companion.</p>
+      )}
+      {pets && (pets.owned.length > 1 || pets.eggs.length > 0) && (
+        <div className="pet-switcher" role="group" aria-label="Switch pet">
+          {pets.owned.map(p => (
+            <button key={p.def.id} className={`pet-chip r-${p.def.rarity} ${p.def.id === pet.def.id ? 'on' : ''}`} aria-pressed={p.def.id === pet.def.id} onClick={() => void setActivePet(p.def.id)} title={`${p.name} · Lv ${p.level}`}>
+              <PetPortrait pet={p} mood="calm" size={44} />
+            </button>
+          ))}
+          {pets.eggs.map(e => (
+            <span key={e.record.id} className="pet-chip egg-chip" title={`Egg: hatches in ${e.needed - e.clears} quest clears`}>🥚<small>{e.needed - e.clears}</small></span>
+          ))}
+          {onPets && <button className="ghost small" onClick={onPets}>All pets</button>}
+        </div>
+      )}
     </SystemWindow>
   )
 }

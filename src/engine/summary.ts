@@ -14,10 +14,11 @@ import { TRAVEL_IDS, TRAVEL_XP, earnedBadges, longestStreak, streakBonuses, unlo
 import { travelCounts } from './memories'
 import { starUpXp } from './loot'
 import { financeXp } from './finance'
+import { petsState, type OwnedPet, type PetsState } from './pets'
 import { incentiveState, perfectDays, type IncentiveState, type PenaltyClear } from './incentives'
 import {
   GATE_NEEDED, GATE_XP, HIDDEN_XP, extraDollarsByDay, JOBS, PLATES, couponById, companionState, earnedHidden, gateCount, goldenQuestId, jobById, luckyRoll, redGate, rollReward, shadowLegion, soldierProfiles, legionTitle, wildcardOffers,
-  type BonusRecord, type CompanionMood, type SoldierProfile, type CompanionStage, type Coupon, type Hidden, type Job, type RedGate, type Soldier, type WildcardOffer,
+  type BonusRecord, type CompanionMood, type SoldierProfile, type Coupon, type Hidden, type Job, type RedGate, type Soldier, type WildcardOffer,
 } from './extras'
 import type { Transaction, LootDrop, Memory, Place, Boss, Completion, Contact, DayKind, FocusRun, JournalEntry, Person, Plan, PlanFund, SurpriseClear, ExerciseSet, Player, Purchase, Quest, RewardRank, RoutineExercise, SavingsEntry, StatKey, TrainingPlan } from './types'
 
@@ -134,7 +135,10 @@ export interface ExtrasState {
   legionPower: number
   legionTitle: string
   legionNextIn: number
-  companion: { stage: CompanionStage; next: CompanionStage | null; mood: CompanionMood; name: string } | null
+  /** Your active pet (Pip by default) and its mood today. */
+  companion: { pet: OwnedPet; mood: CompanionMood; name: string } | null
+  /** Every pet: owned, hatching eggs, still to find. */
+  pets: PetsState | null
 }
 
 export interface Logs {
@@ -392,6 +396,18 @@ export function summarize(
   const taken = new Set(jobsTaken.map(j => j.value))
   const nextJob = JOBS.find(j => !taken.has(j.id)) ?? null
   const missedYesterday = todayDailies.filter(q => dayKey(new Date(q.createdAt), player.settings.resetHour) <= addDays(today, -1) && !completions.some(c => c.questId === q.id && c.day === addDays(today, -1))).length
+  const pets = player.features?.companion !== false
+    ? petsState({
+        completions,
+        perfectDays: perfectList,
+        bonuses,
+        milestones: { bestCombo: incentives?.bestCombo ?? 0, level: level.level, bossesDefeated: bosses.filter(b => b.defeatedAt).length, gatesCleared: gateClears.length, hiddenIds: new Set(hidden.map(h => h.id)) },
+        names: player.petNames,
+        pipName: player.companionName,
+        // Pip keeps the growth it had from your best combo before pets could be swapped.
+        pipHeadStart: (incentives?.bestCombo ?? 0) * 3,
+      })
+    : null
   const profiles = soldierProfiles(seed, legion.soldiers, player.legion, completions)
   const extras: ExtrasState = {
     on: extrasOn,
@@ -416,9 +432,8 @@ export function summarize(
     legionPower: profiles.reduce((n, p) => n + p.power, 0),
     legionTitle: legionTitle(legion.soldiers.length),
     legionNextIn: legion.nextIn,
-    companion: player.features?.companion !== false
-      ? { ...companionState(incentives?.bestCombo ?? 0, todayDailies.filter(q => todayDone.has(q.id)).length, todayDailies.length, missedYesterday), name: player.companionName || 'Pip' }
-      : null,
+    companion: pets ? { pet: pets.active, mood: companionState(incentives?.bestCombo ?? 0, todayDailies.filter(q => todayDone.has(q.id)).length, todayDailies.length, missedYesterday).mood, name: pets.active.name } : null,
+    pets,
   }
 
   const plan = playerPlan(player, startDay)

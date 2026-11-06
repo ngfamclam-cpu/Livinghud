@@ -8,6 +8,7 @@ import {
   type BonusKind, type BonusRecord, type Completion, type Quest, type Summary,
 } from '../engine'
 import { announceProgress, dropLoot, snapshot, surpriseSeed } from './actions'
+import { HATCH_CLEARS, petById, rollEgg, type EggSource } from '../engine'
 import { db, LOCAL_USER, newId } from './db'
 
 async function addBonus(kind: BonusKind, day: string, sourceId: string, value: string, questId?: string): Promise<BonusRecord> {
@@ -51,6 +52,7 @@ export async function afterDailyCleared(completion: Completion): Promise<void> {
   if (completion.golden) {
     emit({ type: 'extra', title: 'Golden Quest cleared', text: `Triple XP: +${completion.xp} XP and +$${completion.dollars.toFixed(2)}. An Epic-or-better card is on its way.` })
     await dropLoot('golden', `golden-${day}`, { minRarity: 'epic' })
+    await maybeEgg('golden', `golden-${day}`)
     if (rollsCoupon(seed, 'golden', `golden-${day}`)) await giveCoupon(seed, day, `golden-${day}`)
   }
   if (day !== summary.today) return
@@ -62,6 +64,7 @@ export async function afterDailyCleared(completion: Completion): Promise<void> {
   await addBonus('gate', day, `gate-${day}`, '')
   emit({ type: 'extra', title: 'Red Gate closed', text: `+40 XP, +$${scalePay(EXTRA_PAY.gate, player.settings.monthlyBudget).toFixed(2)} and a card from the other side.` })
   await dropLoot('gate', `gate-${day}`, { minRarity: 'rare' })
+  await maybeEgg('gate', `gate-${day}`)
   if (rollsCoupon(seed, 'gate', `gate-${day}`)) await giveCoupon(seed, day, `gate-${day}`)
   if (gateWildcard(seed, day)) await giveWildcard(day, `gate-${day}`)
   await announceProgress(before)
@@ -87,6 +90,7 @@ export async function perfectDayExtras(day: string): Promise<void> {
   if (!featureOn(player, 'extras')) return
   const seed = surpriseSeed(player)
   if (rollsCoupon(seed, 'perfect', `perfect-${day}`)) await giveCoupon(seed, day, `perfect-${day}`)
+  await maybeEgg('perfect', `perfect-${day}`)
 }
 
 /** Rolls the d20 for a perfect day (once). Returns the number. */
@@ -102,6 +106,7 @@ export async function rollTheDice(): Promise<number | null> {
   const pay = scalePay(rollPay(n), player.settings.monthlyBudget)
   emit({ type: 'extra', title: `You rolled ${n}`, text: pay > 0 ? `${reward.text} Plus $${pay.toFixed(2)}.` : reward.text })
   if (reward.card) await dropLoot('roll', `roll-${day}`, { minRarity: reward.card })
+  if (n >= 18) await maybeEgg(n === 20 ? 'roll20' : 'roll18', `roll-${day}`)
   if (reward.coupon) await giveCoupon(seed, day, `roll-${day}`)
   if (reward.wildcard) await giveWildcard(day, `roll-${day}`)
   await announceProgress(summary)
@@ -166,4 +171,41 @@ export async function setGuard(id: string, questId: string | null): Promise<void
   if (questId) guards[id] = { questId, at: Date.now() }
   else delete guards[id]
   await db.players.update(LOCAL_USER, { legion: { ...player.legion, guards }, updatedAt: Date.now() })
+}
+
+// ---- Pets ----
+
+/** Maybe drops a pet egg (a pet you don't have yet). It hatches after a few quest clears. */
+export async function maybeEgg(source: EggSource, sourceId: string): Promise<void> {
+  const { summary, player } = await snapshot()
+  const pets = summary.extras.pets
+  if (!pets || !featureOn(player, 'companion')) return
+  if (await db.bonuses.where('sourceId').equals(sourceId).filter(b => b.kind === 'egg').count()) return
+  const taken = new Set([...pets.owned.map(p => p.def.id), ...pets.eggs.map(e => e.pet.id)])
+  const petId = rollEgg(surpriseSeed(player), source, sourceId, taken)
+  const pet = petId ? petById(petId) : undefined
+  if (!pet) return
+  await addBonus('egg', summary.today, sourceId, pet.id)
+  emit({ type: 'extra', title: `${pet.family} pet egg`, text: `A ${pet.rarity} egg dropped! It hatches after ${HATCH_CLEARS[pet.rarity]} more quest clears.` })
+}
+
+/** Makes a pet you own your active companion. It grows only while active. */
+export async function setActivePet(petId: string): Promise<void> {
+  const { summary } = await snapshot()
+  if (!summary.extras.pets?.owned.some(p => p.def.id === petId) || summary.extras.pets.active.def.id === petId) return
+  const now = Date.now()
+  await addBonus('pet', summary.today, `pet-${now}`, petId)
+  const pet = summary.extras.pets.owned.find(p => p.def.id === petId)!
+  emit({ type: 'extra', title: `${pet.name} is by your side`, text: 'Your active pet grows as you clear quests.' })
+}
+
+/** Names a pet (Pip's name lives in companionName). Empty = back to its species name. */
+export async function renamePet(petId: string, name: string): Promise<void> {
+  if (petId === 'pip') return nameCompanion(name)
+  const player = await db.players.get(LOCAL_USER)
+  if (!player) return
+  const petNames = { ...(player.petNames ?? {}) }
+  if (name.trim()) petNames[petId] = name.trim().slice(0, 20)
+  else delete petNames[petId]
+  await db.players.update(LOCAL_USER, { petNames, updatedAt: Date.now() })
 }

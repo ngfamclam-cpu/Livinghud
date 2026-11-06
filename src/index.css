@@ -1096,3 +1096,30 @@ button.photo { cursor: zoom-in; }
 @media (prefers-reduced-motion: reduce) {
   .legion-slot, .shadow-figure *, .battle-cry { animation: none !important; }
 }
+
+/* ---- Pets ---- */
+.pet-xp { position: relative; height: 18px; border-radius: 9px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.pet-xp > span { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #ff8ac9, #b48cff, #7af3ff); opacity: 0.55; }
+.pet-xp > small { position: relative; display: block; text-align: center; font-size: 0.68rem; line-height: 18px; }
+.pet-xp.small { height: 6px; }
+.pet-switcher { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; }
+.pet-chip { display: grid; place-items: center; width: 52px; height: 52px; padding: 0; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.15); background: rgba(10, 20, 38, 0.6) !important; box-shadow: none !important; }
+.pet-chip.on { border-color: var(--gold); box-shadow: 0 0 10px rgba(255, 207, 92, 0.5) !important; }
+.pet-chip.egg-chip { font-size: 1.3rem; position: relative; }
+.pet-chip.egg-chip small { position: absolute; right: -2px; bottom: -2px; font-size: 0.62rem; background: var(--accent); color: #04101f; border-radius: 8px; padding: 0 4px; }
+.r-common { --r: #9fb3d1; } .r-rare { --r: #5fd0ff; } .r-epic { --r: #c48bff; } .r-legendary { --r: #ffb347; }
+.pet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.pet-card { position: relative; display: grid; justify-items: center; gap: 2px; padding: 8px 4px; border-radius: var(--radius); border: 1px solid var(--r, rgba(255,255,255,0.2)); background: rgba(10, 20, 38, 0.55); color: inherit; text-align: center; }
+button.pet-card { cursor: pointer; }
+.pet-card b { font-size: 0.82rem; }
+.pet-card small { font-size: 0.68rem; color: var(--muted); }
+.pet-card.active { box-shadow: 0 0 14px color-mix(in srgb, var(--r) 60%, transparent); }
+.pet-card.open { background: rgba(122, 60, 255, 0.18); }
+.pet-card.missing { opacity: 0.55; }
+.pet-card.egg .pet-xp { width: 80%; }
+.pet-egg { font-size: 2.6rem; animation: c-wobble 2.6s ease-in-out infinite; display: inline-block; }
+.pet-unknown { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; font-size: 1.8rem; font-weight: 800; color: var(--r); border: 2px dashed var(--r); }
+.pet-badge { position: absolute; top: 4px; right: 4px; font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: 6px; background: var(--gold); color: #04101f; }
+.pet-detail { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px; border-radius: var(--radius); border: 1px solid rgba(180, 140, 255, 0.45); background: rgba(40, 18, 90, 0.3); }
+.pet-detail p { margin: 0 0 4px; }
+@media (prefers-reduced-motion: reduce) { .pet-egg { animation: none; } }

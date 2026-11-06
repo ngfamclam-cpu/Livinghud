@@ -224,7 +224,16 @@ export async function announceProgress(before: Summary): Promise<void> {
     }
   }
   for (const id of a.plates) if (!b.plates.includes(id)) emit({ type: 'extra', title: 'New name plate', text: `${PLATES.find(p => p.id === id)?.name ?? id} unlocked. Equip it in Settings.` })
-  if (a.companion && b.companion && a.companion.stage.id !== b.companion.stage.id) emit({ type: 'extra', title: `${a.companion.name} evolved!`, text: `Now a ${a.companion.stage.name}.` })
+  if (a.companion && b.companion && a.companion.pet.def.id === b.companion.pet.def.id && a.companion.pet.level > b.companion.pet.level) {
+    emit({ type: 'extra', title: `${a.companion.name} grew!`, text: `Now level ${a.companion.pet.level}: ${a.companion.pet.def.id === 'pip' ? a.companion.pet.stage : a.companion.pet.stage}.` })
+  }
+  if (a.pets && b.pets) {
+    for (const p of a.pets.owned) {
+      if (b.pets.owned.some(o => o.def.id === p.def.id)) continue
+      const hatched = b.pets.eggs.some(e => e.pet.id === p.def.id)
+      emit({ type: 'extra', title: hatched ? `${p.def.name} hatched!` : `New pet: ${p.def.name}`, text: `${p.def.blurb} Make it your companion in Rewards & Legion → Pets.` })
+    }
+  }
   if (a.legion.length > b.legion.length) {
     const joined = a.legion.filter(s => !b.legion.some(o => o.id === s.id))
     emit({ type: 'extra', title: 'Arise', text: `${joined.map(s => s.name).join(', ')} joined your Shadow Legion (${a.legion.length}).` })
@@ -295,6 +304,7 @@ export async function completeQuest(
   }
   if (stage && quest.stages?.[quest.stages.length - 1].id === stage.id) {
     emit({ type: 'mainQuest.cleared', questId: quest.id, questTitle: quest.title })
+    await extras.maybeEgg('main', completion.id)
   }
   await announceProgress(summary)
   // Clearing an Expedition stage by hand can make the next saving milestones due.
@@ -843,6 +853,7 @@ async function damageBoss(bossId: string): Promise<void> {
     await db.bosses.update(bossId, { defeatedAt: Date.now(), updatedAt: Date.now() })
     emit({ type: 'boss.defeated', name: status.boss.name, xp: BOSS_XP })
     await dropLoot('boss', bossId)
+    await (await import('./extras')).maybeEgg('boss', `egg-boss-${bossId}`)
     const done = dread && summary.weekDone.get(dread.id)
     if (dread && done?.version === 'min') await db.completions.delete(done.id)
     if (dread && done?.version !== 'full') await completeQuest(dread, 'full')
@@ -1271,6 +1282,7 @@ async function removeLootFrom(sourceId: string): Promise<void> {
   const forge = await import('./forge')
   forge.cancelDrops([sourceId])
   await db.loot.where('sourceId').equals(sourceId).delete()
+  await db.bonuses.where('sourceId').equals(sourceId).delete()
   await forge.pruneOrphanForged()
 }
 
