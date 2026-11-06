@@ -22,6 +22,7 @@ import { addReward, addSuggestedRewards, buyReward, deleteSavings, logSavings, r
 import { SystemWindow } from './SystemWindow'
 import { EditReward, OneOffPurchase, RewardIdeas } from './ShopExtras'
 import { money, monthName, SPECIAL_LABEL } from './format'
+import { CompanionShop } from './extras/CompanionShop'
 
 interface Props {
   player: Player
@@ -138,6 +139,8 @@ export function Shop({ player, rewards, purchases, savings, summary, onPlans }: 
       <OneOffPurchase />
 
       <RewardIdeas player={player} summary={summary} rewards={rewards} />
+
+      {featureOn(player, 'companion') && <CompanionShop summary={summary} />}
 
       <SystemWindow title="Add a reward">
         {active.length === 0 && <p>Your shop is empty. Start with the suggested list, or add your own rewards below.</p>}

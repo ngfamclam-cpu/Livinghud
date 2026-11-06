@@ -30,7 +30,7 @@ const startOfDay = (day: string) => {
 }
 
 /** Saved moments: rolls, Red Gate clears, coupons (earned and used), wildcards (earned and used), job changes. */
-export type BonusKind = 'roll' | 'gate' | 'coupon' | 'coupon-use' | 'wildcard' | 'wildcard-use' | 'job' | 'hidden' | 'egg' | 'pet'
+export type BonusKind = 'roll' | 'gate' | 'coupon' | 'coupon-use' | 'wildcard' | 'wildcard-use' | 'job' | 'hidden' | 'egg' | 'pet' | 'companion' | 'portrait'
 
 export interface BonusRecord {
   id: string
@@ -44,6 +44,8 @@ export interface BonusRecord {
   value: string
   /** wildcard-use: the daily it saved. */
   questId?: string
+  /** portrait: the stored image (value = "companionId:outfitId"). */
+  photoId?: string
   createdAt: number
 }
 

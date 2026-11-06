@@ -4,13 +4,14 @@
 // generate arbitrary images. The app calls it once per card.
 //
 // POST /api/forge   header x-sync-key, body { cardId: "rave-3", variant: 0-9999 }
+//                   or { companionId: "mina", outfitId: "knit", variant } for a companion portrait
 //   -> { image: <base64 JPEG> }
 //   -> 503 { error: 'not-configured' } without CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN
 //   -> 429 { error: 'limit' } when today's free allowance is used up
 //   -> 422 { error: 'declined' } when the NSFW filter refuses it even with softer wording
 
 import { blobStore, jsonResponse, normalizeKey, sha256, type Store } from '../server/blob.js'
-import { FORGE_STEPS, MAX_VARIANT, forgeCard, forgePrompt } from '../src/engine/forge.js'
+import { FORGE_STEPS, MAX_VARIANT, companionPrompt, forgeCard, forgePrompt, humanCompanion, type ForgeLevel } from '../src/engine/forge.js'
 
 const MODEL = '@cf/black-forest-labs/flux-1-schnell'
 const env = () => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}
@@ -23,11 +24,20 @@ export async function handle(request: Request, store: Store = blobStore, fetcher
   const token = env().CLOUDFLARE_API_TOKEN?.trim()
   if (!account || !token) return jsonResponse({ error: 'not-configured' }, 503)
 
-  const body = (await request.json().catch(() => ({}))) as { cardId?: unknown; variant?: unknown }
-  const card = typeof body.cardId === 'string' ? forgeCard(body.cardId) : undefined
-  if (!card) return jsonResponse({ error: 'unknown-card' }, 400)
+  const body = (await request.json().catch(() => ({}))) as { cardId?: unknown; variant?: unknown; companionId?: unknown; outfitId?: unknown }
   const variant = body.variant === undefined ? 0 : Number(body.variant)
   if (!Number.isInteger(variant) || variant < 0 || variant > MAX_VARIANT) return jsonResponse({ error: 'bad-variant' }, 400)
+  // A card from the catalog, or a companion's outfit portrait. Nothing else can be made.
+  let promptFor: ((level: ForgeLevel) => string) | null = null
+  if (typeof body.companionId === 'string') {
+    const companion = humanCompanion(body.companionId)
+    const outfitId = typeof body.outfitId === 'string' ? body.outfitId : ''
+    if (companion && companionPrompt(companion, outfitId, variant)) promptFor = level => companionPrompt(companion, outfitId, variant, level)!
+  } else {
+    const card = typeof body.cardId === 'string' ? forgeCard(body.cardId) : undefined
+    if (card) promptFor = level => forgePrompt(card, variant, level)
+  }
+  if (!promptFor) return jsonResponse({ error: 'unknown-card' }, 400)
 
   try {
     if (!(await store.read(`saves/${await sha256(key)}.json`))) return jsonResponse({ error: 'unknown-save' }, 403)
@@ -42,7 +52,7 @@ export async function handle(request: Request, store: Store = blobStore, fetcher
       res = await fetcher(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/ai/run/${MODEL}`, {
         method: 'POST',
         headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt: forgePrompt(card, variant, level), steps: FORGE_STEPS }),
+        body: JSON.stringify({ prompt: promptFor(level), steps: FORGE_STEPS }),
       })
     } catch {
       return jsonResponse({ error: 'ai-error' }, 502)

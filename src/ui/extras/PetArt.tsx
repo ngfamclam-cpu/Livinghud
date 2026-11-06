@@ -20,28 +20,55 @@ export function PetArt({ pet, level, mood, action = null, size = 120 }: { pet: P
   return (
     <svg className={`companion-art pet-art body-${pet.body} el-${pet.element} mood-${mood} ${action ? `act-${action}` : ''}`} viewBox="0 0 120 120" width={size} height={size} role="img" aria-label={`${pet.name}, level ${level}, feeling ${mood}`}>
       <defs>
-        <radialGradient id={`pb-${uid}`} cx="38%" cy="28%" r="80%"><stop offset="0%" stopColor={top} /><stop offset="100%" stopColor={bottom} /></radialGradient>
-        <radialGradient id={`pg-${uid}`}><stop offset="0%" stopColor={accent} stopOpacity={level >= 4 ? 0.7 : 0.45} /><stop offset="100%" stopColor={accent} stopOpacity="0" /></radialGradient>
+        {/* Three-tone body: highlight, colour, deep shade. */}
+        <radialGradient id={`pb-${uid}`} cx="36%" cy="26%" r="85%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+          <stop offset="18%" stopColor={top} />
+          <stop offset="70%" stopColor={bottom} />
+          <stop offset="100%" stopColor={bottom} stopOpacity="0.85" />
+        </radialGradient>
+        <radialGradient id={`pg-${uid}`}><stop offset="0%" stopColor={accent} stopOpacity={level >= 4 ? 0.75 : 0.5} /><stop offset="100%" stopColor={accent} stopOpacity="0" /></radialGradient>
+        {/* Shade on the underside, rim light on the edge, glossy irises. */}
+        <linearGradient id={`ps-${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="55%" stopColor="#000" stopOpacity="0" /><stop offset="100%" stopColor="#120624" stopOpacity="0.45" /></linearGradient>
+        <linearGradient id={`pr-${uid}`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#ffffff" stopOpacity="0.7" /><stop offset="35%" stopColor="#ffffff" stopOpacity="0" /></linearGradient>
+        <radialGradient id={`pi-${uid}`} cx="50%" cy="35%" r="70%"><stop offset="0%" stopColor={accent} /><stop offset="60%" stopColor={bottom} /><stop offset="100%" stopColor="#120624" /></radialGradient>
+        <filter id={`pf-${uid}`} x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3" /></filter>
+        <filter id={`pd-${uid}`} x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#05010f" floodOpacity="0.55" /></filter>
       </defs>
-      <circle cx="60" cy="66" r={level >= 4 ? 58 : 52} fill={glow} className="c-aura" />
+      <circle cx="60" cy="66" r={level >= 4 ? 58 : 52} fill={glow} className="c-aura" filter={`url(#pf-${uid})`} />
+      <ellipse cx="60" cy="108" rx="26" ry="5" fill="#05010f" opacity="0.45" filter={`url(#pf-${uid})`} className="c-ground" />
       {level >= 3 && <Sparkles color={accent} element={pet.element} />}
       <g transform={`translate(60 70) scale(${scale}) translate(-60 -70)`}>
-        <g className="c-body-group">
-          {parts.back}
+        <g className="c-body-group c-float">
+          <g filter={`url(#pd-${uid})`}>{parts.back}</g>
           {pet.body === 'serpent' || pet.body === 'wyrm' ? (
-            <path d="M24 88 C 10 70, 30 56, 46 66 C 58 74, 62 60, 60 50 C 74 52, 88 62, 84 80 C 80 96, 50 100, 24 88 Z" fill={fill} />
+            <path d={SERPENT} fill={fill} stroke={bottom} strokeOpacity="0.7" strokeWidth="1.2" filter={`url(#pd-${uid})`} />
           ) : (
-            <ellipse cx="60" cy="70" rx="30" ry="27" fill={fill} />
+            <ellipse cx="60" cy="70" rx="30" ry="27" fill={fill} stroke={bottom} strokeOpacity="0.7" strokeWidth="1.2" filter={`url(#pd-${uid})`} />
           )}
-          <ellipse cx="60" cy="80" rx="17" ry="13" fill="#ffffff" opacity="0.28" />
+          {/* Underside shade, rim light, belly sheen, fur tufts. */}
+          {pet.body === 'serpent' || pet.body === 'wyrm' ? <path d={SERPENT} fill={`url(#ps-${uid})`} /> : <ellipse cx="60" cy="70" rx="30" ry="27" fill={`url(#ps-${uid})`} />}
+          {pet.body === 'serpent' || pet.body === 'wyrm' ? <path d={SERPENT} fill={`url(#pr-${uid})`} /> : <ellipse cx="60" cy="70" rx="30" ry="27" fill={`url(#pr-${uid})`} />}
+          <ellipse cx="60" cy="81" rx="17" ry="12" fill="#ffffff" opacity="0.3" />
+          <ellipse cx="46" cy="54" rx="9" ry="5" fill="#ffffff" opacity="0.35" filter={`url(#pf-${uid})`} />
+          {!beak && pet.body !== 'tortoise' && (
+            <g fill="none" stroke={top} strokeWidth="1.4" strokeLinecap="round" opacity="0.8">
+              <path d="M32 72 l-4 2 M33 77 l-4 3 M88 72 l4 2 M87 77 l4 3" />
+              <path d="M56 44 q2 -4 4 0 q2 -4 4 0" />
+            </g>
+          )}
           {parts.front}
           <g className="c-eyes">
-            <ellipse cx="49" cy="62" rx={beak ? 7 : 6} ry={beak ? 7 : 7.5} fill="#1b1033" />
-            <ellipse cx="71" cy="62" rx={beak ? 7 : 6} ry={beak ? 7 : 7.5} fill="#1b1033" />
-            <circle cx="51" cy="59" r="2.4" fill="#fff" />
-            <circle cx="73" cy="59" r="2.4" fill="#fff" />
-            <circle cx="47.5" cy="64" r="1" fill={accent} />
-            <circle cx="69.5" cy="64" r="1" fill={accent} />
+            <ellipse cx="49" cy="62" rx={beak ? 7.5 : 6.5} ry={beak ? 7.5 : 8} fill="#120624" />
+            <ellipse cx="71" cy="62" rx={beak ? 7.5 : 6.5} ry={beak ? 7.5 : 8} fill="#120624" />
+            <ellipse cx="49" cy="63" rx={beak ? 6 : 5} ry={beak ? 6 : 6.5} fill={`url(#pi-${uid})`} />
+            <ellipse cx="71" cy="63" rx={beak ? 6 : 5} ry={beak ? 6 : 6.5} fill={`url(#pi-${uid})`} />
+            <ellipse cx="49" cy="64" rx="2.6" ry="3.4" fill="#0b0418" />
+            <ellipse cx="71" cy="64" rx="2.6" ry="3.4" fill="#0b0418" />
+            <circle cx="51.2" cy="59.5" r="2.6" fill="#fff" />
+            <circle cx="73.2" cy="59.5" r="2.6" fill="#fff" />
+            <circle cx="47" cy="66.5" r="1.2" fill="#fff" opacity="0.85" />
+            <circle cx="69" cy="66.5" r="1.2" fill="#fff" opacity="0.85" />
           </g>
           {mood === 'sulky' && !action && <path d="M41 52 L53 55 M79 52 L67 55" className="c-mouth" />}
           {happy && <ellipse cx="40" cy="72" rx="5" ry="3" fill="#ff7ab8" opacity="0.55" />}
@@ -63,6 +90,8 @@ export function PetArt({ pet, level, mood, action = null, size = 120 }: { pet: P
     </svg>
   )
 }
+
+const SERPENT = 'M24 88 C 10 70, 30 56, 46 66 C 58 74, 62 60, 60 50 C 74 52, 88 62, 84 80 C 80 96, 50 100, 24 88 Z'
 
 function Sparkles({ color, element }: { color: string; element: PetDef['element'] }) {
   const star = (x: number, y: number, r: number) => `M${x} ${y - r} L${x + r * 0.3} ${y - r * 0.3} L${x + r} ${y} L${x + r * 0.3} ${y + r * 0.3} L${x} ${y + r} L${x - r * 0.3} ${y + r * 0.3} L${x - r} ${y} L${x - r * 0.3} ${y - r * 0.3} Z`
@@ -128,6 +157,7 @@ const fluffyTail = (fill: string, tip: string, angle = 0) => (
 
 const PARTS: Record<PetDef['body'], Parts> = {
   pip: () => ({}),
+  human: () => ({}),
   fox: ({ fill, accent }) => ({ back: fluffyTail(fill, accent), front: pointyEars(fill, accent) }),
   otter: ({ fill, accent }) => ({
     back: <path className="c-tail" d="M84 86 C 104 92, 112 84, 106 76 C 100 82, 92 82, 84 80 Z" fill={fill} />,

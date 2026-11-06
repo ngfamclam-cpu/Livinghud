@@ -1123,3 +1123,42 @@ button.pet-card { cursor: pointer; }
 .pet-detail { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px; border-radius: var(--radius); border: 1px solid rgba(180, 140, 255, 0.45); background: rgba(40, 18, 90, 0.3); }
 .pet-detail p { margin: 0 0 4px; }
 @media (prefers-reduced-motion: reduce) { .pet-egg { animation: none; } }
+
+/* HD pets: a gentle float on top of breathing, ears that twitch, a pulsing ground shadow. */
+.pet-art .c-float { animation: pet-float 4s ease-in-out infinite; }
+.pet-art .c-ears { transform-origin: 60px 46px; transform-box: view-box; animation: pet-twitch 6s ease-in-out infinite; }
+.pet-art .c-ground { transform-origin: 60px 108px; transform-box: view-box; animation: pet-ground 4s ease-in-out infinite; }
+@keyframes pet-float { 50% { transform: translateY(-3px); } }
+@keyframes pet-twitch { 0%, 88%, 100% { transform: rotate(0); } 91% { transform: rotate(-4deg); } 94% { transform: rotate(3deg); } }
+@keyframes pet-ground { 50% { transform: scaleX(0.9); opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .pet-art .c-float, .pet-art .c-ears, .pet-art .c-ground { animation: none; } }
+
+/* ---- Human companions ---- */
+.p-sunny { --c1: #ff8ac9; --c2: #ffd34d; } .p-cool { --c1: #5b4bd9; --c2: #7af3ff; } .p-sweet { --c1: #e8a07a; --c2: #ff8ac9; }
+.p-elegant { --c1: #ff3d6e; --c2: #3a1f5e; } .p-sporty { --c1: #1f9e74; --c2: #ffb347; } .p-regal { --c1: #6a2bd9; --c2: #d7c8ff; }
+.human-portrait {
+  position: relative; display: inline-grid; place-items: center; overflow: hidden; border-radius: 14px; flex: none;
+  padding: 3px; background: linear-gradient(135deg, var(--c1, #ff8ac9), var(--c2, #7af3ff));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--c1, #ff8ac9) 55%, transparent);
+}
+.human-portrait.round { border-radius: 50%; padding: 2px; }
+.human-portrait .human-photo, .human-portrait .human-placeholder { display: block; width: 100%; height: 100%; border-radius: inherit; overflow: hidden; background: #0b0418; }
+.human-portrait .human-photo img { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; animation: human-breathe 6s ease-in-out infinite; transform-origin: 50% 35%; }
+.human-portrait.round .human-photo img { object-position: center 18%; transform: scale(1.4); animation: none; }
+.human-placeholder { display: grid !important; place-items: center; color: var(--c1, #ff8ac9); }
+.human-placeholder svg { width: 70%; fill: currentColor; opacity: 0.45; }
+.human-placeholder small { position: absolute; bottom: 8px; color: #fff; font-weight: 700; }
+.human-sheen { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%); background-size: 250% 250%; animation: human-sheen 7s ease-in-out infinite; }
+.human-portrait.act-compliment, .human-portrait.act-hangout { animation: human-lean 0.6s ease-in-out; }
+.human-portrait.act-gift { animation: human-hop 0.5s ease-in-out 2; }
+@keyframes human-breathe { 50% { transform: scale(1.035) translateY(-1%); } }
+@keyframes human-sheen { 0%, 60% { background-position: 120% 120%; } 100% { background-position: -20% -20%; } }
+@keyframes human-lean { 50% { transform: rotate(-2deg) scale(1.03); } }
+@keyframes human-hop { 50% { transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .human-portrait, .human-portrait *, .human-sheen { animation: none !important; } }
+.outfit-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.date-card { display: grid; gap: 4px; padding: 10px; border-radius: var(--radius); border: 1px dashed rgba(255, 138, 201, 0.6); background: rgba(255, 138, 201, 0.08); }
+.date-card p { margin: 0; }
+.companion-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.companion-offer { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--c1) 50%, transparent); }
+.companion-offer p { margin: 2px 0; }

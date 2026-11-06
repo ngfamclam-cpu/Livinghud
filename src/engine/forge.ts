@@ -289,3 +289,112 @@ export function replacementPick(rarity: ForgeRarity, exclude: Iterable<string>, 
   if (!ranked.length) return null
   return { card: ranked[hash(seed) % ranked.length], variant: hash(`${seed}:look`) % (MAX_VARIANT + 1) }
 }
+
+// ---- Human companions (bought in the Shop; owner's picks Nov 2026) ----
+// Fictional adult women in their early 20s, flirty but never explicit. Each has
+// a fixed look (so every outfit portrait looks like the same person) and four
+// outfits that unlock as your affection grows. Portraits are made on demand by
+// api/forge.ts from these prompts only.
+
+export interface CompanionOutfit {
+  id: string
+  name: string
+  /** Affection level that unlocks it (1 = from the start). */
+  level: number
+  scene: string
+}
+
+export interface HumanCompanion {
+  id: string
+  name: string
+  style: ForgeStyle
+  /** Her fixed look, the same in every portrait. */
+  look: string
+  personality: 'sunny' | 'cool' | 'sweet' | 'elegant' | 'sporty' | 'regal'
+  price: number
+  tagline: string
+  outfits: CompanionOutfit[]
+}
+
+export const HUMAN_COMPANIONS: HumanCompanion[] = [
+  {
+    id: 'hana', name: 'Hana', style: 'anime', personality: 'sunny', price: 60,
+    look: 'long honey-blonde hair with a pink ribbon, bright amber eyes, a big warm smile',
+    tagline: 'Your biggest cheerleader. Will absolutely brag about your streaks.',
+    outfits: [
+      { id: 'casual', name: 'Weekend casual', level: 1, scene: 'She wears an oversized pastel hoodie and denim shorts, sitting on a sunny windowsill with a coffee, waving at the viewer.' },
+      { id: 'beach', name: 'Beach day', level: 2, scene: 'She wears a frilly white two-piece swimsuit and a sun hat on a bright beach, winking and holding a shaved ice.' },
+      { id: 'stage', name: 'Idol stage', level: 3, scene: 'She wears a sparkly pink idol stage outfit with a short pleated skirt, holding a microphone under stage lights with confetti.' },
+      { id: 'gown', name: 'Starlit gown', level: 5, scene: 'She wears an off-shoulder rose-gold evening gown with a thigh slit on a balcony at night, city lights behind her, a soft flirty smile.' },
+    ],
+  },
+  {
+    id: 'rei', name: 'Rei', style: 'anime', personality: 'cool', price: 60,
+    look: 'a sleek black bob with blue streaks, sharp violet eyes, a small confident smirk, a choker necklace',
+    tagline: 'Cool, teasing, secretly soft. Plays games with you after your dailies.',
+    outfits: [
+      { id: 'gamer', name: 'Night-in gamer', level: 1, scene: 'She wears an oversized black gaming hoodie slipping off one shoulder and thigh-high socks, headphones around her neck, lit by an RGB monitor glow.' },
+      { id: 'arcade', name: 'Arcade date', level: 2, scene: 'She wears a cropped leather jacket over a black crop top and a mini skirt in a neon arcade, leaning on a claw machine.' },
+      { id: 'rave', name: 'Rave night', level: 3, scene: 'She wears a black mesh crop top over a bralette, holographic shorts and LED accessories under green lasers, mid-dance.' },
+      { id: 'satin', name: 'After hours', level: 5, scene: 'She wears a black satin pajama set with the top loosely buttoned, sitting on a bed by a rainy window at night, giving a sly look.' },
+    ],
+  },
+  {
+    id: 'mina', name: 'Mina', style: 'real', personality: 'sweet', price: 120,
+    look: 'a Korean woman with long soft dark-brown waves and curtain bangs, gentle eyes and a sweet smile',
+    tagline: 'Warm café-girl energy. Remembers how your day went.',
+    outfits: [
+      { id: 'knit', name: 'Café morning', level: 1, scene: 'She wears a cropped cream knit sweater and a pleated mini skirt in a cosy café, holding a latte with both hands.' },
+      { id: 'tennis', name: 'Tennis club', level: 2, scene: 'She wears a white tennis dress with a sporty headband on a sunny court, holding a racket over her shoulder.' },
+      { id: 'cocktail', name: 'Cocktail hour', level: 3, scene: 'She wears a fitted red cocktail dress with a low back at a rooftop bar at golden hour, holding a glass of champagne.' },
+      { id: 'slip', name: 'Just us', level: 5, scene: 'She wears a champagne satin slip dress, sitting on the edge of a bed in soft candlelight, smiling shyly at the viewer.' },
+    ],
+  },
+  {
+    id: 'yuki', name: 'Yuki', style: 'real', personality: 'elegant', price: 120,
+    look: 'a Japanese woman with long straight glossy black hair, elegant features, red lips and a calm knowing gaze',
+    tagline: 'Composed, classy, quietly impressed by discipline.',
+    outfits: [
+      { id: 'office', name: 'After work', level: 1, scene: 'She wears a fitted blazer over a silk camisole and a pencil skirt, leaning against a desk in a glass office at dusk.' },
+      { id: 'yukata', name: 'Summer festival', level: 2, scene: 'She wears a deep-blue floral yukata at a lantern-lit summer festival, holding a paper fan, fireworks behind her.' },
+      { id: 'evening', name: 'Black tie', level: 3, scene: 'She wears a black backless evening gown with a high slit in a luxurious hotel lobby, glancing back over her shoulder.' },
+      { id: 'robe', name: 'Hotel night', level: 5, scene: 'She wears a silk kimono-style robe tied loosely over lace loungewear, standing at a hotel window with a city skyline at night.' },
+    ],
+  },
+  {
+    id: 'lin', name: 'Lin', style: 'real', personality: 'sporty', price: 120,
+    look: 'a Chinese woman with a high glossy black ponytail, an athletic toned figure, bright eyes and a confident grin',
+    tagline: 'Your training partner. Will not let you skip leg day.',
+    outfits: [
+      { id: 'gym', name: 'Gym session', level: 1, scene: 'She wears a matching sports bra and high-waisted leggings in a bright gym, resting on a bench with a water bottle, glowing after a workout.' },
+      { id: 'run', name: 'Morning run', level: 2, scene: 'She wears a cropped running top and short running shorts on a riverside path at sunrise, mid-stretch, smiling at the viewer.' },
+      { id: 'pool', name: 'Poolside', level: 3, scene: 'She wears a sporty black two-piece swimsuit at a rooftop pool, sitting on the edge with her feet in the water.' },
+      { id: 'qipao', name: 'Red qipao', level: 5, scene: 'She wears a fitted red silk qipao-inspired dress with a high slit at a lantern-lit evening banquet, a playful confident look.' },
+    ],
+  },
+  {
+    id: 'seraphine', name: 'Seraphine', style: 'anime', personality: 'regal', price: 300,
+    look: 'long silver-white hair, glowing violet eyes, a delicate silver circlet, an elegant regal bearing',
+    tagline: 'A hunter queen from beyond the gate. Only serves the worthy.',
+    outfits: [
+      { id: 'hunter', name: 'Gate hunter', level: 1, scene: 'She wears fitted black leather hunter armour with a low neckline and a long coat before a glowing violet portal, holding a slender sword.' },
+      { id: 'witch', name: 'Night witch', level: 2, scene: 'She wears a black witch corset dress with a high slit and a wide-brimmed hat, violet flames dancing around her hands.' },
+      { id: 'queen', name: 'Throne room', level: 3, scene: 'She wears a flowing dark-violet gown with a plunging neckline and a jewelled crown, seated on an obsidian throne.' },
+      { id: 'starlight', name: 'Starlight', level: 5, scene: 'She wears an ethereal sheer starlight dress over a silver bodysuit, floating among stars and moonlight, reaching toward the viewer.' },
+    ],
+  },
+]
+
+export const humanCompanion = (id: string) => HUMAN_COMPANIONS.find(c => c.id === id)
+
+/** The prompt for one companion's outfit portrait (same SAFE wording and softer retry as cards). */
+export function companionPrompt(c: HumanCompanion, outfitId: string, variant = 0, level: ForgeLevel = 0): string | null {
+  const outfit = c.outfits.find(o => o.id === outfitId)
+  if (!outfit) return null
+  const v = Math.max(0, Math.floor(variant))
+  const lead = c.style === 'real'
+    ? `Photo of ${c.look}. ${FEMME_REAL}.`
+    : `Anime illustration of a woman with ${c.look}. ${FEMME_ANIME}.`
+  const prompt = `${lead} ${outfit.scene} She looks at the viewer with an affectionate, flirtatious expression. ${pick(LIGHT, v)} ${MOOD} ${STYLE[c.style]} ${FRAME}`
+  return level === 0 ? prompt : SOFTER.reduce((p, [from, to]) => p.replace(from, to), prompt)
+}

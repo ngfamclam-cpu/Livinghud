@@ -545,6 +545,8 @@ export async function refundPurchase(purchase: Purchase): Promise<void> {
   const { summary } = await snapshot()
   if (purchase.day !== summary.today) return
   await db.purchases.delete(purchase.id)
+  // A refunded companion leaves again.
+  await db.bonuses.where('sourceId').equals(`buy-${purchase.id}`).delete()
   emit({ type: 'reward.refunded', purchase })
 }
 

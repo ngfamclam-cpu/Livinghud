@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { COMPANION_MEALS, COMPANION_REACTIONS, COMPANION_SNACKS, companionLine, type CompanionAction, type Summary } from '../../engine'
-import { renamePet, setActivePet } from '../../db/extras'
+import { renamePet } from '../../db/extras'
+import { HumanPanel } from './HumanPanel'
+import { PetSwitcher } from './PetSwitcher'
 import { SystemWindow } from '../SystemWindow'
 import { PetPortrait } from './PetPortrait'
 
@@ -33,8 +35,24 @@ interface Particle {
 }
 let particleId = 1
 
-/** Your companion: tap to pet, feed it a snack, play with it. It talks about your day. */
-export function CompanionPanel({ summary, dailiesTotal, dailiesDone, onPets }: { summary: Summary; dailiesTotal: number; dailiesDone: number; onPets?: () => void }) {
+interface PanelProps {
+  summary: Summary
+  dailiesTotal: number
+  dailiesDone: number
+  onPets?: () => void
+  seed: string
+  questTemplates: Set<string>
+}
+
+/** Your companion: a pet (pet, feed, play) or a human companion (talk, gifts, outfits, dates). */
+export function CompanionPanel(props: PanelProps) {
+  const pet = props.summary.extras.companion?.pet
+  if (pet?.def.human) return <HumanPanel key={pet.def.id} pet={pet} {...props} />
+  return <PetPanel {...props} />
+}
+
+/** A pet: tap to pet, feed it a snack, play with it. It talks about your day. */
+function PetPanel({ summary, dailiesTotal, dailiesDone, onPets }: PanelProps) {
   const c = summary.extras.companion
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(c?.name ?? 'Pip')
@@ -57,7 +75,6 @@ export function CompanionPanel({ summary, dailiesTotal, dailiesDone, onPets }: {
   if (!c) return null
   const pet = c.pet
   const egg = pet.stage === 'egg'
-  const pets = summary.extras.pets
   const line = say ?? companionLine(
     { name: c.name, mood: c.mood, stage: egg ? 'egg' : 'grown', hour: new Date().getHours(), dailiesLeft: Math.max(0, dailiesTotal - dailiesDone), dailiesTotal, combo: summary.incentives?.combo ?? 0 },
     tick,
@@ -121,19 +138,7 @@ export function CompanionPanel({ summary, dailiesTotal, dailiesDone, onPets }: {
       ) : (
         <p className="muted">Fully grown. A true {pet.def.rarity} companion.</p>
       )}
-      {pets && (pets.owned.length > 1 || pets.eggs.length > 0) && (
-        <div className="pet-switcher" role="group" aria-label="Switch pet">
-          {pets.owned.map(p => (
-            <button key={p.def.id} className={`pet-chip r-${p.def.rarity} ${p.def.id === pet.def.id ? 'on' : ''}`} aria-pressed={p.def.id === pet.def.id} onClick={() => void setActivePet(p.def.id)} title={`${p.name} · Lv ${p.level}`}>
-              <PetPortrait pet={p} mood="calm" size={44} />
-            </button>
-          ))}
-          {pets.eggs.map(e => (
-            <span key={e.record.id} className="pet-chip egg-chip" title={`Egg: hatches in ${e.needed - e.clears} quest clears`}>🥚<small>{e.needed - e.clears}</small></span>
-          ))}
-          {onPets && <button className="ghost small" onClick={onPets}>All pets</button>}
-        </div>
-      )}
+      <PetSwitcher summary={summary} onPets={onPets} />
     </SystemWindow>
   )
 }
