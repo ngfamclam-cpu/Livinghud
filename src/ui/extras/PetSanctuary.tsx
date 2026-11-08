@@ -25,6 +25,7 @@ export function PetSanctuary({ summary }: { summary: Summary }) {
             <CompanionAvatar summary={summary} pet={p} size={78} />
             <b>{p.name}</b>
             <small>{p.def.human ? AFFECTION_NAMES[p.level - 1] : `Lv ${p.level}`} · {RARITY_LABEL[p.def.rarity]}</small>
+            {p.health !== null && <small className={`cond-text c-${p.condition}`}>{p.condition === 'dead' ? `💀 ghost · ${p.reviveLeft} to revive` : `❤ ${p.health}`}</small>}
             {p.def.id === pets.active.def.id && <span className="pet-badge">Active</span>}
           </button>
         ))}

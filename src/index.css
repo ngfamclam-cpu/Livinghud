@@ -1162,3 +1162,30 @@ button.pet-card { cursor: pointer; }
 .companion-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .companion-offer { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--c1) 50%, transparent); }
 .companion-offer p { margin: 2px 0; }
+
+/* ---- Pet health: pale, sick, critical, ghost ---- */
+.pet-cond { position: relative; display: inline-grid; place-items: center; }
+.pet-cond-weak { filter: saturate(0.75) brightness(0.95); }
+.pet-cond-sick { filter: saturate(0.45) hue-rotate(40deg) brightness(0.9); }
+.pet-cond-sick .companion-art, .pet-cond-critical .companion-art { animation: pet-droop 5s ease-in-out infinite; }
+.pet-cond-critical { filter: grayscale(0.7) brightness(0.8); }
+.pet-cond-critical .c-body-group { animation-duration: 7s !important; }
+.pet-cond-dead { filter: grayscale(1) brightness(1.3); opacity: 0.55; }
+.pet-cond-dead .companion-art { animation: pet-ghost 4s ease-in-out infinite; }
+.pet-cond-dead .companion-art * { animation-play-state: paused; }
+.pet-halo { position: absolute; top: 2%; left: 50%; width: 36%; height: 8%; transform: translateX(-50%); border: 3px solid #fff7c4; border-radius: 50%; box-shadow: 0 0 10px #fff7c4; }
+@keyframes pet-droop { 50% { transform: translateY(3px) rotate(-2deg); } }
+@keyframes pet-ghost { 50% { transform: translateY(-8px); opacity: 0.8; } }
+@media (prefers-reduced-motion: reduce) { .pet-cond .companion-art { animation: none !important; } }
+.pet-health { position: relative; height: 18px; border-radius: 9px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.pet-health > span { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #ff4d6d, #ff9f1a, #4dffa6); opacity: 0.6; }
+.pet-health.h-healthy > span { background: #4dffa6; } .pet-health.h-weak > span { background: #ffd34d; }
+.pet-health.h-sick > span { background: #ff9f1a; } .pet-health.h-critical > span { background: #ff4d6d; animation: pet-pulse 1s ease-in-out infinite; }
+.pet-health.h-dead > span { background: #d7c8ff; }
+.pet-health > small { position: relative; display: block; text-align: center; font-size: 0.68rem; line-height: 18px; }
+@keyframes pet-pulse { 50% { opacity: 0.25; } }
+.pet-chip { position: relative; }
+.cond-dot { position: absolute; right: -4px; bottom: -4px; font-size: 0.75rem; }
+.cond-dot.c-weak { color: var(--gold); font-size: 1.4rem; line-height: 0.6; }
+.cond-text.c-critical, .cond-text.c-sick { color: var(--danger); }
+.cond-text.c-dead { color: #d7c8ff; }

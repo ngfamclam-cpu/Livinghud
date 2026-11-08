@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AFFECTION_NAMES, COMPANION_DATE_XP, EGG_CHANCE, HATCH_CLEARS, HUMAN_COMPANIONS, PETS, companionPrompt, dateOffer, humanLine, petsState, rollEgg, unlockedOutfits, type BonusRecord, type Completion } from './index'
+import { AFFECTION_NAMES, COMPANION_DATE_XP, conditionOf, type NeglectDay, EGG_CHANCE, HATCH_CLEARS, HUMAN_COMPANIONS, PETS, companionPrompt, dateOffer, humanLine, petsState, rollEgg, unlockedOutfits, type BonusRecord, type Completion } from './index'
 
 const clear = (n: number, at: number, day = '2026-11-01'): Completion => ({ id: `c${n}`, userId: 'local', questId: `q${n % 3}`, stat: 'STR', day, version: 'full', xp: 20, dollars: 1, createdAt: at })
 const bonus = (kind: BonusRecord['kind'], value: string, createdAt: number, sourceId = `${kind}-${createdAt}`): BonusRecord => ({ id: `${kind}-${value}-${createdAt}`, userId: 'local', kind, day: '2026-11-01', sourceId, value, createdAt })
@@ -97,5 +97,41 @@ describe('human companions', () => {
       }
     }
     expect(companionPrompt(HUMAN_COMPANIONS[0], 'nope')).toBeNull()
+  })
+})
+
+describe('pet health', () => {
+  const day = (n: number, missed: number, extra: Partial<NeglectDay> = {}): NeglectDay => ({ day: `2026-11-${String(n).padStart(2, '0')}`, end: n * 1000, missed, perfect: missed === 0, rest: false, ...extra })
+
+  it('drops with missed dailies, heals with perfect days, and pauses on Recovery Days', () => {
+    const s = petsState({ ...base, days: [day(1, 2), day(2, 3), day(3, 0), day(4, 5, { rest: true })] })
+    const pip = s.owned[0]
+    expect(pip.health).toBe(100 - 16 - 24 + 15)
+    expect(pip.condition).toBe('healthy')
+    expect(conditionOf(50)).toBe('weak')
+    expect(conditionOf(20)).toBe('sick')
+    expect(conditionOf(5)).toBe('critical')
+  })
+
+  it('dies at 0, loses its growth, and revives after 10 clears at 50 health', () => {
+    const early = Array.from({ length: 20 }, (_, i) => clear(i, 100 + i))
+    const days = [day(1, 5), day(2, 5), day(3, 5)]
+    const dead = petsState({ ...base, completions: early, days, pipHeadStart: 9 })
+    expect(dead.owned[0]).toMatchObject({ condition: 'dead', health: 0, xp: 0, level: 1, reviveLeft: 10 })
+    const later = Array.from({ length: 12 }, (_, i) => clear(50 + i, 5000 + i))
+    const back = petsState({ ...base, completions: [...early, ...later], days, pipHeadStart: 9 })
+    expect(back.owned[0].condition).toBe('weak')
+    expect(back.owned[0].health).toBe(50)
+    // Only the 12 clears after dying count, not the 20 before or the head start.
+    expect(back.owned[0].xp).toBe(12)
+  })
+
+  it('hurts resting pets at half rate, only once they have been by your side, and never human companions', () => {
+    const bonuses = [bonus('egg', 'ember-fox', 0), bonus('pet', 'ember-fox', 1), bonus('pet', 'pip', 2), bonus('companion', 'mina', 3)]
+    const hatch = Array.from({ length: 6 }, (_, i) => clear(i, 0.5 + i * 0.01))
+    const s = petsState({ ...base, bonuses, completions: hatch, days: [day(1, 2)] })
+    expect(s.owned.find(p => p.def.id === 'pip')!.health).toBe(84)
+    expect(s.owned.find(p => p.def.id === 'ember-fox')!.health).toBe(92)
+    expect(s.owned.find(p => p.def.id === 'mina')!.health).toBeNull()
   })
 })

@@ -75,7 +75,13 @@ function PetPanel({ summary, dailiesTotal, dailiesDone, onPets }: PanelProps) {
   if (!c) return null
   const pet = c.pet
   const egg = pet.stage === 'egg'
-  const line = say ?? companionLine(
+  const cond = pet.condition
+  const sickLine =
+    cond === 'dead' ? `*a faint glow* ${c.name} has passed into the spirit realm. Clear ${pet.reviveLeft} more quest${pet.reviveLeft === 1 ? '' : 's'} to bring them back.`
+      : cond === 'critical' ? `*barely breathing* ${c.name} needs you. Clear your dailies today or they won't make it.`
+        : cond === 'sick' ? `*coughs* ${c.name} doesn't feel well. A perfect day would help.`
+          : null
+  const line = say ?? sickLine ?? companionLine(
     { name: c.name, mood: c.mood, stage: egg ? 'egg' : 'grown', hour: new Date().getHours(), dailiesLeft: Math.max(0, dailiesTotal - dailiesDone), dailiesTotal, combo: summary.incentives?.combo ?? 0 },
     tick,
   )
@@ -92,7 +98,7 @@ function PetPanel({ summary, dailiesTotal, dailiesDone, onPets }: PanelProps) {
       setSay(`${c.name} is full. Maybe tomorrow!`)
       return
     }
-    const options = egg ? ['*the egg wiggles happily*', '*warm glow*', '*tap tap from inside*'] : COMPANION_REACTIONS[kind]
+    const options = cond === 'dead' ? ['*your hand passes through the ghost*', '*a cold, faint shimmer*'] : egg ? ['*the egg wiggles happily*', '*warm glow*', '*tap tap from inside*'] : cond === 'critical' || cond === 'sick' ? ['*weak little smile*', '*tries to wag, too tired*'] : COMPANION_REACTIONS[kind]
     setSay(options[Math.floor(Math.random() * options.length)])
     setAction(kind)
     if (kind === 'pet') burst('💗', 3)
@@ -127,9 +133,15 @@ function PetPanel({ summary, dailiesTotal, dailiesDone, onPets }: PanelProps) {
       </div>
       <div className="row companion-actions">
         <button className="small" onClick={() => act('pet')}>🤲 Pet</button>
-        <button className="small" onClick={() => act('feed')} disabled={full} title={full ? 'Full for today' : 'Give a snack'}>🍙 Feed {care.meals}/{COMPANION_MEALS}</button>
+        <button className="small" onClick={() => act('feed')} disabled={full || cond === 'dead'} title={full ? 'Full for today' : 'Give a snack'}>🍙 Feed {care.meals}/{COMPANION_MEALS}</button>
         <button className="small" onClick={() => act('play')}>🎾 Play</button>
       </div>
+      {pet.health !== null && (
+        <div className={`pet-health h-${cond}`} aria-label={cond === 'dead' ? `Dead. ${pet.reviveLeft} quest clears to revive.` : `Health ${pet.health} of 100`}>
+          <span style={{ width: `${cond === 'dead' ? ((10 - pet.reviveLeft) / 10) * 100 : pet.health}%` }} />
+          <small>{cond === 'dead' ? `💀 Ghost · revives in ${pet.reviveLeft} quest clear${pet.reviveLeft === 1 ? '' : 's'}` : `❤ Health ${pet.health}/100 · ${cond === 'healthy' ? 'healthy' : cond} · each missed daily hurts it, perfect days heal`}</small>
+        </div>
+      )}
       {pet.nextXp !== null ? (
         <div className="pet-xp" aria-label={`${pet.xp} of ${pet.nextXp} pet XP to the next level`}>
           <span style={{ width: `${Math.min(100, (pet.xp / pet.nextXp) * 100)}%` }} />

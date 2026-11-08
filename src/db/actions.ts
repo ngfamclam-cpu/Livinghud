@@ -229,6 +229,14 @@ export async function announceProgress(before: Summary): Promise<void> {
   }
   if (a.pets && b.pets) {
     for (const p of a.pets.owned) {
+      const was = b.pets.owned.find(o => o.def.id === p.def.id)
+      if (!was || !p.condition || p.condition === was.condition) continue
+      if (was.condition === 'dead') emit({ type: 'extra', title: `${p.name} is back!`, text: 'Revived from the spirit realm at half health. Keep your dailies up this time.' })
+      else if (p.condition === 'dead') emit({ type: 'extra', title: `${p.name} died`, text: `Too many missed dailies. Their growth is lost; clear ${p.reviveLeft} quests to revive them.` })
+      else if (p.condition === 'critical') emit({ type: 'extra', title: `${p.name} is critical`, text: 'One more bad day could kill them. Clear your dailies.' })
+      else if (p.condition === 'sick' && was.condition !== 'critical') emit({ type: 'extra', title: `${p.name} is sick`, text: 'Missed dailies are hurting them. A perfect day heals.' })
+    }
+    for (const p of a.pets.owned) {
       if (b.pets.owned.some(o => o.def.id === p.def.id)) continue
       const hatched = b.pets.eggs.some(e => e.pet.id === p.def.id)
       emit({ type: 'extra', title: hatched ? `${p.def.name} hatched!` : `New pet: ${p.def.name}`, text: `${p.def.blurb} Make it your companion in Rewards & Legion → Pets.` })
