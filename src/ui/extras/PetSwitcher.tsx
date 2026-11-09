@@ -22,6 +22,7 @@ export function PetSwitcher({ summary, onPets }: { summary: Summary; onPets?: ()
       {pets.owned.map(p => (
         <button key={p.def.id} className={`pet-chip r-${p.def.rarity} ${p.def.id === active ? 'on' : ''}`} aria-pressed={p.def.id === active} onClick={() => void setActivePet(p.def.id)} title={`${p.name} · Lv ${p.level}`}>
           <CompanionAvatar summary={summary} pet={p} />
+          {p.condition && p.condition !== 'healthy' && <small className={`cond-dot c-${p.condition}`} title={p.condition}>{p.condition === 'dead' ? '💀' : p.condition === 'weak' ? '·' : '🤒'}</small>}
         </button>
       ))}
       {pets.eggs.map(e => (

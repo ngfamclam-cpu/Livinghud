@@ -14,7 +14,7 @@ import { TRAVEL_IDS, TRAVEL_XP, earnedBadges, longestStreak, streakBonuses, unlo
 import { travelCounts } from './memories'
 import { starUpXp } from './loot'
 import { financeXp } from './finance'
-import { petsState, type OwnedPet, type PetsState } from './pets'
+import { petsState, type NeglectDay, type OwnedPet, type PetsState } from './pets'
 import { incentiveState, perfectDays, type IncentiveState, type PenaltyClear } from './incentives'
 import {
   GATE_NEEDED, GATE_XP, HIDDEN_XP, extraDollarsByDay, JOBS, PLATES, couponById, companionState, earnedHidden, gateCount, goldenQuestId, jobById, luckyRoll, redGate, rollReward, shadowLegion, soldierProfiles, legionTitle, wildcardOffers,
@@ -410,6 +410,18 @@ export function summarize(
         pipName: player.companionName,
         // Pip keeps the growth it had from your best combo before pets could be swapped.
         pipHeadStart: (incentives?.bestCombo ?? 0) * 3,
+        days: (() => {
+          // Finished game days since you started: dailies missed, perfect or not, Recovery Days.
+          const out: NeglectDay[] = []
+          for (let d = startDay; d < today; d = addDays(d, 1)) {
+            const due = quests.filter(q => q.kind === 'daily' && q.active && dayKey(new Date(q.createdAt), player.settings.resetHour) <= d)
+            const done = extrasDoneOn.get(d) ?? new Set<string>()
+            const missed = due.filter(q => !done.has(q.id)).length
+            const [y, m, dd] = d.split('-').map(Number)
+            out.push({ day: d, end: new Date(y, m - 1, dd + 1, player.settings.resetHour).getTime(), missed, perfect: due.length > 0 && missed === 0, rest: recoveryDays.has(d) })
+          }
+          return out
+        })(),
         dateClears: (() => {
           const byQuest = new Map(quests.filter(q => q.templateId?.startsWith('date:')).map(q => [q.id, q.templateId!.split(':')[1]]))
           const out = new Map<string, number>()

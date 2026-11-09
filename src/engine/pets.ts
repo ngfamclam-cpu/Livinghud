@@ -162,7 +162,14 @@ export interface OwnedPet {
   stage: string
   /** XP for the next level, or null at max. */
   nextXp: number | null
+  /** Pets only (human companions don't get sick): 0-100, and how it's doing. */
+  health: number | null
+  condition: PetCondition | null
+  /** Dead pets: quest clears still needed to revive it. */
+  reviveLeft: number
 }
+
+export type PetCondition = 'healthy' | 'weak' | 'sick' | 'critical' | 'dead'
 
 export interface PetEgg {
   record: BonusRecord
@@ -183,6 +190,74 @@ export interface PetsInput {
   pipHeadStart: number
   /** Date-night quests cleared, per companion id. */
   dateClears?: Map<string, number>
+  /** Finished game days, oldest first: how many dailies were missed (neglect hurts pets). */
+  days?: NeglectDay[]
+}
+
+export interface NeglectDay {
+  day: string
+  /** When the game day ended (ms). */
+  end: number
+  missed: number
+  perfect: boolean
+  /** Recovery Days don't count. */
+  rest: boolean
+}
+
+/**
+ * Neglect (owner, Nov 2026: "make the pets die slowly if I don't do my dailies").
+ * The pet by your side loses 8 health per missed daily (at most 40 a day); pets
+ * resting in the sanctuary lose half, once they've been by your side at least
+ * once. A perfect day heals 15. At 0 a pet dies: it becomes a ghost, loses all
+ * its growth, and comes back after 10 more quest clears at 50 health, level 1.
+ * Human companions are exempt.
+ */
+export const PET_HEALTH = { max: 100, missDamage: 8, maxDailyDamage: 40, perfectHeal: 15, restingShare: 0.5, reviveClears: 10, reviveHealth: 50 }
+
+export const conditionOf = (health: number): PetCondition => (health <= 0 ? 'dead' : health < 15 ? 'critical' : health < 40 ? 'sick' : health < 70 ? 'weak' : 'healthy')
+
+interface HealthResult {
+  health: number
+  dead: boolean
+  /** Growth before this moment is lost (its latest death), or 0. */
+  lostBefore: number
+  reviveLeft: number
+}
+
+function simulateHealth(id: string, days: NeglectDay[], completions: Completion[], activeAt: (t: number) => string, firstActive: number | null): HealthResult {
+  if (firstActive === null) return { health: PET_HEALTH.max, dead: false, lostBefore: 0, reviveLeft: 0 }
+  const clears = [...completions].sort((a, b) => a.createdAt - b.createdAt)
+  let health = PET_HEALTH.max
+  let diedAt: number | null = null
+  let lostBefore = 0
+  const reviveTime = (since: number) => clears.filter(c => c.createdAt > since)[PET_HEALTH.reviveClears - 1]?.createdAt ?? null
+  for (const d of days) {
+    if (d.end <= firstActive) continue
+    if (diedAt !== null) {
+      const back = reviveTime(diedAt)
+      if (back === null || back >= d.end) continue
+      diedAt = null
+      health = PET_HEALTH.reviveHealth
+    }
+    if (d.rest) continue
+    const share = activeAt(d.end - 1) === id ? 1 : PET_HEALTH.restingShare
+    if (d.perfect) health = Math.min(PET_HEALTH.max, health + PET_HEALTH.perfectHeal * share)
+    else health -= Math.min(PET_HEALTH.maxDailyDamage, d.missed * PET_HEALTH.missDamage) * share
+    if (health <= 0) {
+      health = 0
+      diedAt = d.end
+      lostBefore = d.end
+    }
+  }
+  if (diedAt !== null) {
+    const back = reviveTime(diedAt)
+    if (back !== null) {
+      health = PET_HEALTH.reviveHealth
+      diedAt = null
+    }
+  }
+  const done = diedAt === null ? 0 : clears.filter(c => c.createdAt > diedAt!).length
+  return { health: Math.round(health), dead: diedAt !== null, lostBefore, reviveLeft: diedAt === null ? 0 : PET_HEALTH.reviveClears - done }
 }
 
 export interface PetsState {
@@ -223,21 +298,33 @@ export function petsState(i: PetsInput): PetsState {
     }
     return id
   }
-  const xp = new Map<string, number>([['pip', i.pipHeadStart]])
+  // Health first: a pet that died loses the growth it had before.
+  const health = new Map<string, HealthResult>()
+  for (const id of owned) {
+    if (HUMAN_PETS.some(h => h.id === id)) continue
+    const first = id === 'pip' ? 0 : switches.find(s => s.value === id)?.createdAt ?? null
+    health.set(id, simulateHealth(id, i.days ?? [], i.completions, activeAt, first))
+  }
+  const lost = (id: string) => health.get(id)?.lostBefore ?? 0
+  const xp = new Map<string, number>([['pip', lost('pip') ? 0 : i.pipHeadStart]])
   for (const c of i.completions) {
     const id = activeAt(c.createdAt)
+    if (c.createdAt <= lost(id)) continue
     xp.set(id, (xp.get(id) ?? 0) + PET_XP.clear)
   }
   for (const [id, n] of i.dateClears ?? []) xp.set(id, (xp.get(id) ?? 0) + n * COMPANION_DATE_XP)
   const lastClear = new Map<string, number>()
   for (const c of i.completions) lastClear.set(c.day, Math.max(lastClear.get(c.day) ?? 0, c.createdAt))
   for (const d of i.perfectDays) {
-    const id = activeAt(lastClear.get(d) ?? 0)
+    const at = lastClear.get(d) ?? 0
+    const id = activeAt(at)
+    if (at <= lost(id)) continue
     xp.set(id, (xp.get(id) ?? 0) + PET_XP.perfect)
   }
 
   const make = (def: PetDef): OwnedPet => {
-    const x = xp.get(def.id) ?? 0
+    const h = health.get(def.id)
+    const x = h?.dead ? 0 : xp.get(def.id) ?? 0
     const maxLevel = def.id === 'pip' ? 6 : 5
     let level = 1
     while (level < maxLevel && x >= PET_LEVEL_XP[level]) level++
@@ -248,6 +335,9 @@ export function petsState(i: PetsInput): PetsState {
       level,
       stage: def.id === 'pip' ? PIP_STAGES[level - 1] : def.human ? AFFECTION_NAMES[level - 1] : PET_STAGE_NAMES[level - 1],
       nextXp: level < maxLevel ? PET_LEVEL_XP[level] : null,
+      health: h ? h.health : null,
+      condition: h ? (h.dead ? 'dead' : conditionOf(h.health)) : null,
+      reviveLeft: h?.reviveLeft ?? 0,
     }
   }
   const list = PETS.filter(p => owned.has(p.id)).map(make)
