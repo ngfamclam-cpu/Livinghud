@@ -13,7 +13,7 @@ import {
   type Summary,
   type WeekendPlan,
 } from '../engine'
-import { buyWeekend, saveWeekendPrefs, updateSettings } from '../db/actions'
+import { buyWeekend, resetMoney, saveWeekendPrefs, updateSettings } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { money } from './format'
 
@@ -138,7 +138,7 @@ const PLAN_FIELDS: { key: keyof WeekendPlan; label: string; per: string; step: n
  * the monthly budget. Saving it recalibrates what every quest pays, including
  * what you've already earned this month.
  */
-export function BudgetHelper({ player, summary }: { player: Player; summary: Summary }) {
+export function BudgetHelper({ player }: { player: Player }) {
   const [plan, setPlan] = useState<WeekendPlan>(player.weekendPlan ?? DEFAULT_WEEKEND_PLAN)
   const [budget, setBudget] = useState(String(player.settings.monthlyBudget))
   const [saved, setSaved] = useState('')
@@ -150,7 +150,7 @@ export function BudgetHelper({ player, summary }: { player: Player; summary: Sum
     await saveWeekendPrefs({ weekendPlan: plan })
     await updateSettings({ monthlyBudget: amount })
     setBudget(String(amount))
-    setSaved(`Budget set to ${whole(amount)} a month. Quest pay and this month's earnings are recalibrated.`)
+    setSaved(`Budget set to ${whole(amount)} a month. Quests pay the new rate from now on; your wallet and Vault didn't change.`)
   }
 
   return (
@@ -162,7 +162,7 @@ export function BudgetHelper({ player, summary }: { player: Player; summary: Sum
       </label>
       <p className="muted">
         At {whole(value)}: a perfect day ≈ {money(perfectDayPay(value))}, a perfect week ≈ {money(perfectDayPay(value) * 7)}.
-        {value !== current && current > 0 && ` This month's ${money(summary.wallet.earned)} earned becomes about ${money((summary.wallet.earned * value) / current)}.`}
+        {value !== current && ' Changing it only affects what you earn from now on: your wallet and Vault stay exactly as they are.'}
       </p>
       <div className="row end">
         <button className="small" disabled={value === current} onClick={() => apply(value)}>Save budget</button>
@@ -186,6 +186,13 @@ export function BudgetHelper({ player, summary }: { player: Player; summary: Sum
         </div>
       </details>
       {saved && <p className="system-line">{saved}</p>}
+      <details className="budget-planner">
+        <summary>Start my money from $0</summary>
+        <p className="muted">Sets your wallet and Vault to $0 and counts only what you earn and spend from now on. Your quests, XP and purchase history are kept.</p>
+        <div className="row end">
+          <button className="small danger" onClick={() => { if (confirm('Set your wallet and Vault to $0 and start counting from now?')) void resetMoney().then(() => setSaved('Wallet and Vault start from $0 now.')) }}>Reset wallet and Vault to $0</button>
+        </div>
+      </details>
     </SystemWindow>
   )
 }

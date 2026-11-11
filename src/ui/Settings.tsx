@@ -53,7 +53,7 @@ export function Settings({ player, quests, summary, onClose }: { player: Player;
 
   return (
     <main className="hud">
-      <BudgetHelper player={player} summary={summary} />
+      <BudgetHelper player={player} />
       <SystemWindow title="Settings">
         <label>
           Savings gate

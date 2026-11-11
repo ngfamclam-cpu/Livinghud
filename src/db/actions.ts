@@ -4,7 +4,6 @@
 import {
   WEEKEND_ITEMS,
   weekendPrice,
-  monthOf,
   type WeekendPlan,
   DAILY_TEMPLATES,
   DATE_XP,
@@ -146,21 +145,17 @@ export async function updateSettings(patch: Partial<PlayerSettings>): Promise<vo
   const player = await db.players.get(LOCAL_USER)
   if (!player) return
   const settings = { ...player.settings, ...patch }
-  // A new budget recalibrates this month too: what you've already earned this
-  // month is rescaled, so the wallet matches the new budget straight away.
-  // Earlier months stay as they were (their money is already spent or in the Vault).
+  // A new budget changes what quests pay from now on and where new money goes;
+  // money already in the wallet or the Vault never moves (see settleEarnings).
   const oldBudget = player.settings.monthlyBudget
-  if (patch.monthlyBudget !== undefined && patch.monthlyBudget !== oldBudget && oldBudget > 0) {
-    const factor = patch.monthlyBudget / oldBudget
-    const month = monthOf(dayKey(new Date(), settings.resetHour))
-    const mine = await db.completions.where('userId').equals(LOCAL_USER).toArray()
-    const updates = mine.filter(c => c.dollars > 0 && monthOf(c.day) === month).map(c => ({ ...c, dollars: Math.round(c.dollars * factor * 100) / 100 }))
-    if (updates.length) await db.completions.bulkPut(updates)
-  }
+  const budgetChanges = patch.monthlyBudget !== undefined && patch.monthlyBudget !== oldBudget
+    ? [...(player.budgetChanges ?? []), { at: Date.now(), from: oldBudget, to: patch.monthlyBudget }]
+    : player.budgetChanges
   // A new difficulty applies from today, never to days already past.
   const restart = patch.difficulty && patch.difficulty !== player.settings.difficulty
   await db.players.update(LOCAL_USER, {
     settings,
+    ...(budgetChanges ? { budgetChanges } : {}),
     ...(restart ? { penaltiesSince: dayKey(new Date(), settings.resetHour) } : {}),
     updatedAt: Date.now(),
   })
@@ -607,6 +602,11 @@ export async function buyWeekend(itemId: string, count = 1, customPrice?: number
   emit({ type: 'reward.purchased', purchase })
   await announceProgress(summary)
   return null
+}
+
+/** "Start my money from $0": the wallet and Vault count only what's earned and spent from now on. Nothing is deleted. */
+export async function resetMoney(): Promise<void> {
+  await db.players.update(LOCAL_USER, { moneySince: Date.now(), updatedAt: Date.now() })
 }
 
 /** Your own prices for the weekend menu, and your typical weekend for the budget helper. */

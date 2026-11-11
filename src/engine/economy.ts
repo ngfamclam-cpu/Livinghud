@@ -171,3 +171,55 @@ export function checkPurchase(reward: Pick<Reward, 'price' | 'statGate'>, ctx: S
 export function round2(n: number): number {
   return Math.round(n * 100) / 100
 }
+
+// ---- Budget changes never move money you already have ----
+
+/** A change of the monthly budget (owner, Nov 2026: changing it must not touch the Vault or wallet). */
+export interface BudgetChange {
+  at: number
+  from: number
+  to: number
+}
+
+/** The budget in effect at a moment. */
+export function budgetAt(changes: BudgetChange[] | undefined, current: number, t: number): number {
+  if (!changes?.length) return current
+  let b = changes[0].from
+  for (const c of changes) {
+    if (c.at > t) break
+    b = c.to
+  }
+  return b
+}
+
+export interface EarningEvent {
+  month: string
+  at: number
+  dollars: number
+}
+
+export interface SettledMonth {
+  /** Went into that month's wallet. */
+  wallet: number
+  /** Went past the wallet's cap into the Vault. */
+  overflow: number
+}
+
+/**
+ * Splits each month's earnings between wallet and Vault in the order they were
+ * earned, each against the budget in effect at that moment. A later budget
+ * change only decides where future money goes: money already in the wallet
+ * stays there and overflow already in the Vault stays there.
+ */
+export function settleEarnings(events: EarningEvent[], changes: BudgetChange[] | undefined, current: number): Map<string, SettledMonth> {
+  const out = new Map<string, SettledMonth>()
+  for (const e of [...events].sort((a, b) => a.at - b.at)) {
+    if (!(e.dollars > 0)) continue
+    const m = out.get(e.month) ?? out.set(e.month, { wallet: 0, overflow: 0 }).get(e.month)!
+    const room = Math.max(0, budgetAt(changes, current, e.at) - m.wallet)
+    const toWallet = Math.min(e.dollars, room)
+    m.wallet += toWallet
+    m.overflow += e.dollars - toWallet
+  }
+  return out
+}
