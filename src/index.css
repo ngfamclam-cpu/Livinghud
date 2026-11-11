@@ -1203,3 +1203,10 @@ button.pet-card { cursor: pointer; }
 .small-print { font-size: 0.78rem; }
 .budget-planner { margin-top: 10px; }
 .budget-planner summary { cursor: pointer; color: var(--accent); margin-bottom: 8px; }
+
+/* ---- One-tap "Done" for workout exercises ---- */
+.routine-row { display: flex; gap: 6px; align-items: stretch; }
+.routine-row .routine-item { flex: 1; min-width: 0; }
+.routine-done { flex: 0 0 48px; display: grid; place-items: center; font-size: 1.2rem; padding: 0; }
+span.routine-done.ok { color: var(--good); }
+.finish-exercise { width: 100%; margin: 10px 0 6px; padding: 12px; font-size: 1rem; }
