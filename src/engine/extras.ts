@@ -80,9 +80,9 @@ export const scalePay = (amount: number, budget: number) => Math.round(amount * 
  * Bonus dollars per game day from rolls, Red Gates, perfect-day chests, hidden
  * achievements and Job Changes (Golden Quest pay is already on its completion).
  */
-export function extraDollarsByDay(bonuses: BonusRecord[], perfectDays: string[], budget: number, legionOn: boolean): Map<string, number> {
+export function extraDollarsByDay(bonuses: BonusRecord[], perfectDays: string[], budget: number | ((day: string) => number), legionOn: boolean): Map<string, number> {
   const out = new Map<string, number>()
-  const add = (day: string, amount: number) => out.set(day, (out.get(day) ?? 0) + scalePay(amount, budget))
+  const add = (day: string, amount: number) => out.set(day, (out.get(day) ?? 0) + scalePay(amount, typeof budget === 'number' ? budget : budget(day)))
   for (const b of bonuses) {
     if (b.kind === 'roll') add(b.day, rollPay(Number(b.value)))
     if (b.kind === 'gate') add(b.day, EXTRA_PAY.gate)

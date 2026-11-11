@@ -28,3 +28,19 @@ describe('weekend menu', () => {
     expect(weekendSpend([p('2026-11-14', 45), p('2026-11-15', 100, 'weekend:date'), p('2026-11-14', 60, 'reward-1'), p('2026-11-08', 15)], '2026-11-15')).toEqual({ total: 145, count: 2 })
   })
 })
+
+import { budgetAt, settleEarnings } from './economy'
+
+describe('budget changes never move money', () => {
+  it('splits earnings against the budget in effect when they were earned', () => {
+    const ev = (at: number, dollars: number) => ({ month: '2026-11', at, dollars })
+    const changes = [{ at: 100, from: 150, to: 735 }]
+    expect(budgetAt(changes, 735, 50)).toBe(150)
+    expect(budgetAt(changes, 735, 150)).toBe(735)
+    // 200 earned before the change: 150 wallet, 50 Vault. 100 after: room under 735 -> wallet.
+    expect(settleEarnings([ev(10, 120), ev(20, 80), ev(200, 100)], changes, 735).get('2026-11')).toEqual({ wallet: 250, overflow: 50 })
+    // Lowering the budget below what's in the wallet keeps the wallet; new money overflows.
+    const down = [{ at: 100, from: 150, to: 50 }]
+    expect(settleEarnings([ev(10, 120), ev(200, 30)], down, 50).get('2026-11')).toEqual({ wallet: 120, overflow: 30 })
+  })
+})

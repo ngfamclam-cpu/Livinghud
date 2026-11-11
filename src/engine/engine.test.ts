@@ -145,6 +145,15 @@ describe('summary', () => {
     expect(s.wallet.vault).toBe(20)
   })
 
+  it('a budget change leaves the wallet and Vault as they were, and $0 reset starts fresh', () => {
+    const log = [done('a', 'STR', '2026-10-01', 120), done('b', 'VIT', '2026-10-02', 50)]
+    const before = summarize(player, quests, log, now).wallet
+    const raised = { ...player, settings: { ...player.settings, monthlyBudget: 735 }, budgetChanges: [{ at: now.getTime() - 1000, from: 150, to: 735 }] }
+    const after = summarize(raised, quests, log, now).wallet
+    expect([after.earned, after.vault]).toEqual([before.earned, before.vault])
+    expect(summarize({ ...raised, moneySince: now.getTime() }, quests, log, now).wallet).toMatchObject({ earned: 0, vault: 0 })
+  })
+
   it('counts streaks back from today or yesterday', () => {
     const log = [done('a', 'STR', '2026-10-01'), done('a', 'STR', '2026-10-02')]
     expect(summarize(player, quests, log, now).streaks.get('a')).toBe(2)

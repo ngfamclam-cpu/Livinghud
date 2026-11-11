@@ -145,7 +145,7 @@ export function Shop({ player, rewards, purchases, savings, summary, onPlans }: 
 
       {featureOn(player, 'companion') && <CompanionShop summary={summary} />}
 
-      <BudgetHelper player={player} summary={summary} />
+      <BudgetHelper player={player} />
 
       <SystemWindow title="Add a reward">
         {active.length === 0 && <p>Your shop is empty. Start with the suggested list, or add your own rewards below.</p>}

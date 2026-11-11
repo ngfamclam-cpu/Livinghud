@@ -3,7 +3,7 @@
 // nothing can drift, and syncing devices later only has to merge logs.
 
 import { levelFromXp, type LevelInfo } from './leveling'
-import { playerRank, round2, savingsStatus, type SavingsStatus } from './economy'
+import { budgetAt, playerRank, round2, savingsStatus, settleEarnings, type EarningEvent, type SavingsStatus } from './economy'
 import { addDays, dayKey, daysBetween, monthOf, weekOf } from './time'
 import { dayExercises, planDay, playerPlan, progressionDue, raisePlan, routineDone, routineTargets, type RoutineTargets } from './workout'
 import { partyBonds, type Bond } from './party'
@@ -234,11 +234,24 @@ export function summarize(
 
   // Wallet: each month caps at the budget and the overflow goes to the Vault.
   // When a month ends, whatever the wallet didn't spend rolls into the Vault too.
+  // "Start my money from $0" drops everything earned or spent before that moment.
+  const since = player.moneySince ?? 0
+  const noon = (d: string) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd, 12).getTime() }
+  const budgetOn = (d: string) => budgetAt(player.budgetChanges, budget, noon(d))
   const earnedBy = new Map<string, number>()
-  for (const c of completions) earnedBy.set(monthOf(c.day), (earnedBy.get(monthOf(c.day)) ?? 0) + c.dollars)
-  // Surprise rewards pay dollars too, more for better ones (owner's call; see EXTRA_PAY).
-  const extraPay = extrasOn ? extraDollarsByDay(bonuses, perfectList, budget, legionOn) : new Map<string, number>()
-  for (const [d, amount] of extraPay) earnedBy.set(monthOf(d), (earnedBy.get(monthOf(d)) ?? 0) + amount)
+  const events: EarningEvent[] = []
+  for (const c of completions) {
+    if (c.createdAt < since) continue
+    earnedBy.set(monthOf(c.day), (earnedBy.get(monthOf(c.day)) ?? 0) + c.dollars)
+    events.push({ month: monthOf(c.day), at: c.createdAt, dollars: c.dollars })
+  }
+  // Surprise rewards pay dollars too, more for better ones (owner's call; see EXTRA_PAY), scaled by that day's budget.
+  const extraPay = extrasOn ? extraDollarsByDay(bonuses, perfectList, budgetOn, legionOn) : new Map<string, number>()
+  for (const [d, amount] of extraPay) {
+    if (noon(d) < since) continue
+    earnedBy.set(monthOf(d), (earnedBy.get(monthOf(d)) ?? 0) + amount)
+    events.push({ month: monthOf(d), at: noon(d), dollars: amount })
+  }
   // Penalties (if on) come off XP and that month's earnings.
   const resetHour = player.settings.resetHour
   const doneOn = new Map<string, Set<string>>()
@@ -259,6 +272,15 @@ export function summarize(
         })
       : null
   for (const [m, lost] of penalty?.dollarsLost ?? []) earnedBy.set(m, (earnedBy.get(m) ?? 0) - lost)
+  // Wallet vs Vault, each earning against the budget in effect when it was earned.
+  const settled = settleEarnings(events, player.budgetChanges, budget)
+  for (const [m, lost] of penalty?.dollarsLost ?? []) {
+    const mm = settled.get(m)
+    if (!mm) continue
+    const fromOverflow = Math.min(mm.overflow, lost)
+    mm.overflow -= fromOverflow
+    mm.wallet = Math.max(0, mm.wallet - (lost - fromOverflow))
+  }
   // Combo, perfect days, shields and Penalty Quests (src/engine/incentives.ts).
   const incentivesOn = player.features?.incentives !== false
   const penaltyQuestOn = player.features?.penaltyQuest !== false
@@ -282,20 +304,20 @@ export function summarize(
   const spentBy = new Map<string, number>()
   let vaultSpent = 0
   for (const p of purchases) {
+    if (p.createdAt < since) continue
     spentBy.set(monthOf(p.day), (spentBy.get(monthOf(p.day)) ?? 0) + p.fromWallet)
     vaultSpent += p.fromVault
   }
   let vault = -vaultSpent
   const inflow: number[] = []
-  for (const [m, total] of [...earnedBy].sort()) {
-    const overflow = Math.max(0, total - budget)
-    const rollover = m < month ? Math.max(0, Math.min(budget, total) - (spentBy.get(m) ?? 0)) : 0
-    vault += overflow + rollover
-    if (m < month && m >= monthOf(startDay)) inflow.push(overflow + rollover)
+  for (const [m, mm] of [...settled].sort(([a], [b]) => a.localeCompare(b))) {
+    const rollover = m < month ? Math.max(0, mm.wallet - (spentBy.get(m) ?? 0)) : 0
+    vault += mm.overflow + rollover
+    if (m < month && m >= monthOf(startDay)) inflow.push(mm.overflow + rollover)
   }
   const recent = inflow.slice(-3)
-  const inPlans = Math.max(0, planFunds.reduce((sum, f) => sum + f.amount, 0))
-  const earned = round2(Math.min(budget, earnedBy.get(month) ?? 0))
+  const inPlans = Math.max(0, planFunds.filter(f => f.createdAt >= since).reduce((sum, f) => sum + f.amount, 0))
+  const earned = round2(settled.get(month)?.wallet ?? 0)
   const spent = round2(spentBy.get(month) ?? 0)
   const wallet: WalletSummary = {
     month,

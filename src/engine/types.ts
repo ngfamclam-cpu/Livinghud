@@ -75,6 +75,10 @@ export interface Player {
   legion?: import('./extras').LegionPrefs
   /** Reward ideas starred in the Shop to work toward. */
   favoriteRewards?: string[]
+  /** Every change of the monthly budget, oldest first (see settleEarnings). */
+  budgetChanges?: import('./economy').BudgetChange[]
+  /** "Start my money from $0": earnings and purchases before this moment no longer count toward the wallet or Vault. */
+  moneySince?: number
   /** Your own prices for the weekend menu (item id -> dollars). */
   weekendPrices?: Record<string, number>
   /** A typical month of weekends, for the budget suggestion. */
