@@ -75,6 +75,10 @@ export interface Player {
   legion?: import('./extras').LegionPrefs
   /** Reward ideas starred in the Shop to work toward. */
   favoriteRewards?: string[]
+  /** Your own prices for the weekend menu (item id -> dollars). */
+  weekendPrices?: Record<string, number>
+  /** A typical month of weekends, for the budget suggestion. */
+  weekendPlan?: import('./weekend').WeekendPlan
   /** The title shown under the player's name, chosen from earned badges. */
   title?: string | null
   /** The HUD colour theme, chosen from unlocked loot. */

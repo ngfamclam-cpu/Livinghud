@@ -11,17 +11,17 @@ import { TitlesLoot } from './TitlesLoot'
 import { FEATURES, featureOn } from '../engine'
 import { setFeature } from '../db/actions'
 import { APP_VERSION } from '../pwa'
+import { BudgetHelper } from './WeekendMenu'
 
 export function Settings({ player, quests, summary, onClose }: { player: Player; quests: Quest[]; summary: Summary; onClose: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState('')
-  const [budget, setBudget] = useState(String(player.settings.monthlyBudget))
   const [goal, setGoal] = useState<SavingsGoal>(player.settings.savingsGoal)
   const [difficulty, setDifficulty] = useState<Difficulty>(player.settings.difficulty)
   const [saved, setSaved] = useState('')
 
   const saveSettings = async () => {
-    await updateSettings({ monthlyBudget: Math.max(0, Number(budget) || 0), savingsGoal: goal, difficulty })
+    await updateSettings({ savingsGoal: goal, difficulty })
     setSaved('Settings saved.')
   }
 
@@ -53,12 +53,8 @@ export function Settings({ player, quests, summary, onClose }: { player: Player;
 
   return (
     <main className="hud">
+      <BudgetHelper player={player} summary={summary} />
       <SystemWindow title="Settings">
-        <label>
-          Monthly reward budget ($)
-          <input type="number" min={0} inputMode="decimal" value={budget} onChange={e => setBudget(e.target.value)} />
-        </label>
-        <p className="muted">Changing the budget changes what quests pay from now on and how big every month's wallet is.</p>
         <label>
           Savings gate
           <select value={goal.type} onChange={e => setGoal(g => ({ ...g, type: e.target.value as SavingsGoal['type'] }))}>

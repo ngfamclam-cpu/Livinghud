@@ -135,10 +135,19 @@ export type BuyCheck =
  * Whether a reward can be bought right now, and how it would be paid.
  * E-B rewards spend the wallet first and top up from the Vault; A and S spend only the Vault.
  */
-export function checkPurchase(reward: Pick<Reward, 'price' | 'statGate'>, ctx: ShopContext): BuyCheck {
+export function checkPurchase(reward: Pick<Reward, 'price' | 'statGate'>, ctx: ShopContext, opts: { realLife?: boolean } = {}): BuyCheck {
   if (ctx.locked) return { ok: false, reason: ctx.locked }
   const rank = rewardRank(reward.price)
   const minLevel = RANK_MIN_LEVEL[rank]
+  // The weekend menu is everyday real life: money is the only gate, never level or the Vault-only rule.
+  if (opts.realLife) {
+    if (!ctx.savingsMet) return { ok: false, reason: 'Savings goal not met' }
+    const price = round2(reward.price)
+    const fromWallet = round2(Math.min(Math.max(0, ctx.wallet), price))
+    const fromVault = round2(price - fromWallet)
+    if (fromVault > ctx.vault) return { ok: false, reason: `Needs $${(fromVault - ctx.vault).toFixed(2)} more` }
+    return { ok: true, fromWallet, fromVault }
+  }
   if (ctx.level < minLevel) return { ok: false, reason: `Needs level ${minLevel}` }
   if (reward.statGate && (ctx.stats[reward.statGate.stat] ?? 0) < reward.statGate.min) {
     return { ok: false, reason: `Needs ${reward.statGate.stat} ${reward.statGate.min}` }
