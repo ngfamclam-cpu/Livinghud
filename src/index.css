@@ -1189,3 +1189,17 @@ button.pet-card { cursor: pointer; }
 .cond-dot.c-weak { color: var(--gold); font-size: 1.4rem; line-height: 0.6; }
 .cond-text.c-critical, .cond-text.c-sick { color: var(--danger); }
 .cond-text.c-dead { color: #d7c8ff; }
+
+/* ---- Weekend menu ---- */
+.weekend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 10px 0; }
+.weekend-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; border: 1px solid var(--line, rgba(255,255,255,0.12)); border-radius: 10px; background: rgba(255, 255, 255, 0.03); text-align: center; }
+.weekend-item b { font-size: 0.9rem; }
+.weekend-emoji { font-size: 1.8rem; line-height: 1; }
+.weekend-item .stepper { display: flex; align-items: center; gap: 8px; }
+.weekend-item .stepper span { min-width: 1.5em; font-weight: 700; }
+.weekend-purchase { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line, rgba(255,255,255,0.12)); border-radius: 10px; margin-bottom: 8px; }
+.weekend-purchase .row { display: flex; gap: 6px; flex-wrap: wrap; }
+.weekend-purchase .row button { flex: 1; }
+.small-print { font-size: 0.78rem; }
+.budget-planner { margin-top: 10px; }
+.budget-planner summary { cursor: pointer; color: var(--accent); margin-bottom: 8px; }

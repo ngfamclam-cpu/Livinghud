@@ -23,6 +23,7 @@ import { SystemWindow } from './SystemWindow'
 import { EditReward, OneOffPurchase, RewardIdeas } from './ShopExtras'
 import { money, monthName, SPECIAL_LABEL } from './format'
 import { CompanionShop } from './extras/CompanionShop'
+import { BudgetHelper, WeekendMenu } from './WeekendMenu'
 
 interface Props {
   player: Player
@@ -94,6 +95,8 @@ export function Shop({ player, rewards, purchases, savings, summary, onPlans }: 
         )}
       </SystemWindow>
 
+      <WeekendMenu player={player} purchases={purchases} summary={summary} />
+
       <SavingsGate player={player} savings={savings} summary={summary} />
 
       {REWARD_RANKS.map(rank => {
@@ -141,6 +144,8 @@ export function Shop({ player, rewards, purchases, savings, summary, onPlans }: 
       <RewardIdeas player={player} summary={summary} rewards={rewards} />
 
       {featureOn(player, 'companion') && <CompanionShop summary={summary} />}
+
+      <BudgetHelper player={player} summary={summary} />
 
       <SystemWindow title="Add a reward">
         {active.length === 0 && <p>Your shop is empty. Start with the suggested list, or add your own rewards below.</p>}

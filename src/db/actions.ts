@@ -2,6 +2,10 @@
 // then announces what happened on the event bus.
 
 import {
+  WEEKEND_ITEMS,
+  weekendPrice,
+  monthOf,
+  type WeekendPlan,
   DAILY_TEMPLATES,
   DATE_XP,
   MAIN_TEMPLATES,
@@ -142,6 +146,17 @@ export async function updateSettings(patch: Partial<PlayerSettings>): Promise<vo
   const player = await db.players.get(LOCAL_USER)
   if (!player) return
   const settings = { ...player.settings, ...patch }
+  // A new budget recalibrates this month too: what you've already earned this
+  // month is rescaled, so the wallet matches the new budget straight away.
+  // Earlier months stay as they were (their money is already spent or in the Vault).
+  const oldBudget = player.settings.monthlyBudget
+  if (patch.monthlyBudget !== undefined && patch.monthlyBudget !== oldBudget && oldBudget > 0) {
+    const factor = patch.monthlyBudget / oldBudget
+    const month = monthOf(dayKey(new Date(), settings.resetHour))
+    const mine = await db.completions.where('userId').equals(LOCAL_USER).toArray()
+    const updates = mine.filter(c => c.dollars > 0 && monthOf(c.day) === month).map(c => ({ ...c, dollars: Math.round(c.dollars * factor * 100) / 100 }))
+    if (updates.length) await db.completions.bulkPut(updates)
+  }
   // A new difficulty applies from today, never to days already past.
   const restart = patch.difficulty && patch.difficulty !== player.settings.difficulty
   await db.players.update(LOCAL_USER, {
@@ -546,6 +561,57 @@ export async function buyReward(reward: Reward): Promise<string | null> {
   if (purchase.special === 'bigNight') emit({ type: 'recovery.granted', day: addDays(purchase.day, 1) })
   await announceProgress(summary)
   return null
+}
+
+/**
+ * Buys from the weekend menu (drinks, food, tickets, date night, purchases) at
+ * your real prices. Money is the only gate: wallet first, then the Vault, no
+ * level needed. `count` is for rounds of drinks.
+ */
+export async function buyWeekend(itemId: string, count = 1, customPrice?: number, label?: string): Promise<string | null> {
+  const { summary, player } = await snapshot()
+  const item = itemId === 'purchase' ? null : WEEKEND_ITEMS.find(i => i.id === itemId)
+  if (itemId !== 'purchase' && !item) return 'Unknown item'
+  const n = Math.max(1, Math.min(20, Math.floor(count)))
+  const unit = item ? weekendPrice(item, player.weekendPrices) : Math.max(0, customPrice ?? 0)
+  if (!(unit > 0)) return 'Pick a price'
+  const price = Math.round(unit * n * 100) / 100
+  const check = checkPurchase({ price, statGate: null }, {
+    level: summary.level.level,
+    stats: summary.stats,
+    wallet: summary.wallet.available,
+    vault: summary.wallet.vault,
+    savingsMet: summary.savings.met,
+    mainQuestsCleared: summary.mainQuestsCleared,
+    locked: shopLock(summary.incentives, player.incentives, featureOn(player, 'penaltyQuest')),
+  }, { realLife: true })
+  if (!check.ok) return check.reason
+  const special = item?.special ?? 'none'
+  const name = item ? (n > 1 ? `${item.title} ×${n}` : item.title) : label?.trim() ? `${label.trim()}` : `Purchase $${unit}`
+  const purchase: Purchase = {
+    id: newId(),
+    userId: LOCAL_USER,
+    rewardId: `weekend:${itemId}`,
+    title: name,
+    price,
+    rank: rewardRank(price),
+    special,
+    day: summary.today,
+    fromWallet: check.fromWallet,
+    fromVault: check.fromVault,
+    xp: special === 'date' ? DATE_XP : 0,
+    stat: special === 'date' ? 'CHA' : null,
+    createdAt: Date.now(),
+  }
+  await db.purchases.add(purchase)
+  emit({ type: 'reward.purchased', purchase })
+  await announceProgress(summary)
+  return null
+}
+
+/** Your own prices for the weekend menu, and your typical weekend for the budget helper. */
+export async function saveWeekendPrefs(patch: { weekendPrices?: Record<string, number>; weekendPlan?: WeekendPlan }): Promise<void> {
+  await db.players.update(LOCAL_USER, { ...patch, updatedAt: Date.now() })
 }
 
 /** Refunds a purchase made today, putting the money back where it came from. */
