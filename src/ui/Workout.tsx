@@ -172,6 +172,17 @@ export function Workout({ summary, sets, player, onClose, onScan }: Props) {
     setManual('')
   }
 
+  /** "Done": logs whatever is left of the target in one tap, then moves to the next unfinished exercise. */
+  const finish = async (key: ExerciseKey) => {
+    if (key === exercise) stopCamera()
+    const left = (routine?.targets[key] ?? 0) - (routine?.done[key] ?? 0)
+    if (left > 0) await logSet(key, left, 'manual')
+    if (key === exercise) {
+      const next = exercises.find(e => e.key !== key && (routine?.done[e.key] ?? 0) < e.target)
+      if (next) setExercise(next.key)
+    }
+  }
+
   if (editing) {
     return <RoutineEditor plan={routine.plan} index={routine.index} today={summary.today} fitness={fitness} onDone={() => setEditing(false)} />
   }
@@ -235,12 +246,17 @@ export function Workout({ summary, sets, player, onClose, onScan }: Props) {
                   const d = routine.done[e.key] ?? 0
                   const t = e.target
                   return (
-                    <li key={e.key}>
+                    <li key={e.key} className="routine-row">
                       <button className={`routine-item ${e.key === exercise ? 'picked' : ''} ${d >= t ? 'done' : ''}`} onClick={() => setExercise(e.key)}>
                         <span className="quest-title">{e.name}</span>
                         <span className="routine-count">{Math.min(d, t)}/{formatAmount(e, t)}</span>
                         <Bar value={d} max={t} thin />
                       </button>
+                      {d < t ? (
+                        <button className="routine-done" aria-label={`Mark ${e.name} done`} title="Mark done" onClick={() => void finish(e.key)}>✓</button>
+                      ) : (
+                        <span className="routine-done ok" aria-label="Done">✓</span>
+                      )}
                     </li>
                   )
                 })}
@@ -265,6 +281,11 @@ export function Workout({ summary, sets, player, onClose, onScan }: Props) {
           <span className="muted"> / {target} {info.unit}</span>
         </div>
         <Bar value={shownTotal} max={target} />
+        {done < target ? (
+          <button className="finish-exercise" onClick={() => void finish(exercise)}>✓ Done: {info.name} ({formatAmount(current!, target - done)} left)</button>
+        ) : (
+          <p className="system-line clear">{info.name} done.</p>
+        )}
 
         {info.tracking !== 'manual' && (
           <>
