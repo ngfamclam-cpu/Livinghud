@@ -22,6 +22,8 @@ import {
   dailyWeight,
   GOALS_PER_DAY,
   rollRarity,
+  packGirls,
+  packRarities,
   foilFor,
   GOLDEN_XP_MULT,
   HIDDEN_XP,
@@ -1327,30 +1329,33 @@ export async function trackFromReflection(item: { kind: 'daily' | 'side' | 'goal
  * is stable per source record, and each record drops at most once.
  */
 /** Puts a card you already own straight into your binder (a Pack Forge card) and reveals it. */
-export async function grantCard(cardId: string, source: string, sourceId: string): Promise<void> {
+export async function grantCard(cardId: string, source: string, sourceId: string, opts: { quiet?: boolean; foilKey?: string } = {}): Promise<{ copies: number; starUp: boolean; foil: boolean } | null> {
   const player = await db.players.get(LOCAL_USER)
-  if (!player) return
+  if (!player) return null
   setCustomCards((await db.customCards.where('userId').equals(LOCAL_USER).toArray()).map(customCard))
   const mine = await db.loot.where('userId').equals(LOCAL_USER).filter(d => d.cardId === cardId).toArray()
   const before = mine.reduce((n, d) => n + (d.foil ? 2 : 1), 0)
   // About 1 in 15 drops comes out holographic and counts as two copies.
-  const foil = featureOn(player, 'extras') && foilFor(surpriseSeed(player), sourceId)
+  const foil = featureOn(player, 'extras') && foilFor(surpriseSeed(player), opts.foilKey ?? sourceId)
   await db.loot.add({ id: newId(), userId: LOCAL_USER, cardId, source, sourceId, day: dayKey(new Date(), player.settings.resetHour), ...(foil ? { foil: true } : {}), createdAt: Date.now() })
   const after = before + (foil ? 2 : 1)
-  emit({ type: 'loot.card', cardId, copies: after, starUp: stars(after) > stars(before) && before > 0, foil })
+  const starUp = stars(after) > stars(before) && before > 0
+  if (!opts.quiet) emit({ type: 'loot.card', cardId, copies: after, starUp, foil })
+  return { copies: after, starUp, foil }
 }
 
-export async function dropLoot(source: DropSource, sourceId: string, opts: { minRarity?: Rarity; secrets?: Set<string> } = {}): Promise<void> {
+export async function dropLoot(source: DropSource, sourceId: string, opts: { minRarity?: Rarity; secrets?: Set<string>; girls?: number } = {}): Promise<void> {
   const player = await db.players.get(LOCAL_USER)
   if (!player || !featureOn(player, 'cards')) return
   if (await db.loot.where('sourceId').equals(sourceId).count()) return
   const rarity = rollRarity(source, sourceId, surpriseSeed(player), { minRarity: opts.minRarity })
   if (!rarity) return
   const secrets = opts.secrets ?? (await snapshot()).summary.incentives?.secrets ?? new Set<string>()
-  // A brand-new card is forged in the background and flips in when it's ready
-  // (falls back to a copy of one you own when the forge can't make one).
-  const { forgeDrop } = await import('./forge')
-  void forgeDrop(rarity, source, sourceId, secrets)
+  // A card pack is put together in the background and opens when it's ready:
+  // 5 funny cards plus 1 girl card (2 for big quests or a lucky roll).
+  const girls = opts.girls ?? packGirls(source, sourceId, surpriseSeed(player))
+  const { forgePackDrop } = await import('./forge')
+  void forgePackDrop(packRarities(rarity, girls), source, sourceId, secrets)
 }
 
 /** Undoing a quest takes back the card it dropped. */
@@ -1473,7 +1478,7 @@ async function rewardPerfectDay(before: Summary, day: string): Promise<void> {
   const milestone = packMilestone(before.incentives?.combo ?? 0, summary.incentives.combo)
   if (milestone) {
     emit({ type: 'combo.pack', combo: milestone })
-    for (let i = 0; i < PACK_SIZE; i++) await dropLoot('pack', `pack-${day}-${milestone}-${i}`, { minRarity: i === 0 ? 'epic' : undefined, secrets })
+    await dropLoot('pack', `pack-${day}-${milestone}`, { minRarity: 'epic', secrets, girls: PACK_SIZE })
   }
 }
 

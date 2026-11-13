@@ -5,6 +5,8 @@
 //
 // POST /api/forge   header x-sync-key, body { cardId: "rave-3", variant: 0-9999 }
 //                   or { companionId: "mina", outfitId: "knit", variant } for a companion portrait
+//                   or { funnyId: "fun-3", variant } (a funny pack card), { soldierKind: "Mage", veteran, variant }
+//                   or { petId: "ember-fox", level: 1-6, variant } (AI looks, src/engine/looks.ts)
 //   -> { image: <base64 JPEG> }
 //   -> 503 { error: 'not-configured' } without CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN
 //   -> 429 { error: 'limit' } when today's free allowance is used up
@@ -12,6 +14,7 @@
 
 import { blobStore, jsonResponse, normalizeKey, sha256, type Store } from '../server/blob.js'
 import { FORGE_STEPS, MAX_VARIANT, companionPrompt, forgeCard, forgePrompt, humanCompanion, type ForgeLevel } from '../src/engine/forge.js'
+import { funnyCard, funnyPrompt, petPrompt, soldierPrompt } from '../src/engine/looks.js'
 
 const MODEL = '@cf/black-forest-labs/flux-1-schnell'
 const env = () => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}
@@ -24,12 +27,21 @@ export async function handle(request: Request, store: Store = blobStore, fetcher
   const token = env().CLOUDFLARE_API_TOKEN?.trim()
   if (!account || !token) return jsonResponse({ error: 'not-configured' }, 503)
 
-  const body = (await request.json().catch(() => ({}))) as { cardId?: unknown; variant?: unknown; companionId?: unknown; outfitId?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { cardId?: unknown; variant?: unknown; companionId?: unknown; outfitId?: unknown; funnyId?: unknown; soldierKind?: unknown; veteran?: unknown; petId?: unknown; level?: unknown }
   const variant = body.variant === undefined ? 0 : Number(body.variant)
   if (!Number.isInteger(variant) || variant < 0 || variant > MAX_VARIANT) return jsonResponse({ error: 'bad-variant' }, 400)
   // A card from the catalog, or a companion's outfit portrait. Nothing else can be made.
   let promptFor: ((level: ForgeLevel) => string) | null = null
-  if (typeof body.companionId === 'string') {
+  if (typeof body.funnyId === 'string') {
+    const card = funnyCard(body.funnyId)
+    if (card) promptFor = () => funnyPrompt(card, variant)
+  } else if (typeof body.soldierKind === 'string') {
+    const prompt = soldierPrompt(body.soldierKind, variant, body.veteran === true)
+    if (prompt) promptFor = () => prompt
+  } else if (typeof body.petId === 'string') {
+    const prompt = petPrompt(body.petId, Number(body.level) || 1, variant)
+    if (prompt) promptFor = () => prompt
+  } else if (typeof body.companionId === 'string') {
     const companion = humanCompanion(body.companionId)
     const outfitId = typeof body.outfitId === 'string' ? body.outfitId : ''
     if (companion && companionPrompt(companion, outfitId, variant)) promptFor = level => companionPrompt(companion, outfitId, variant, level)!

@@ -2,10 +2,11 @@ import type { OwnedPet, Summary } from '../../engine'
 import { setActivePet } from '../../db/extras'
 import { HumanPortrait } from './HumanPortrait'
 import { PetPortrait } from './PetPortrait'
+import { petPhoto } from '../../db/looks'
 
 /** A small round avatar for any companion (pet art, or her current portrait). */
 export function CompanionAvatar({ summary, pet, size = 44 }: { summary: Summary; pet: OwnedPet; size?: number }) {
-  if (!pet.def.human) return <PetPortrait pet={pet} mood="calm" size={size} />
+  if (!pet.def.human) return <PetPortrait pet={pet} mood="calm" size={size} photoId={pet.condition === 'dead' ? undefined : petPhoto(summary.extras.portraits, pet.def.id, pet.level)} />
   const h = pet.def.human
   const outfit = summary.extras.outfits[h.id] ?? h.outfits[0].id
   const photoId = summary.extras.portraits[`${h.id}:${outfit}`] ?? summary.extras.portraits[`${h.id}:${h.outfits[0].id}`]

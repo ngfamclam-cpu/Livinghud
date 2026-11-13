@@ -3,6 +3,7 @@ import { AFFECTION_NAMES, PETS, type OwnedPet, type Summary } from '../../engine
 import { renamePet, setActivePet } from '../../db/extras'
 import { SystemWindow } from '../SystemWindow'
 import { CompanionAvatar } from './PetSwitcher'
+import { makeLook, petLook, petLookKey } from '../../db/looks'
 
 const RARITY_LABEL = { common: 'Common', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' } as const
 
@@ -11,6 +12,7 @@ export function PetSanctuary({ summary }: { summary: Summary }) {
   const pets = summary.extras.pets!
   const [open, setOpen] = useState<OwnedPet | null>(null)
   const [name, setName] = useState('')
+  const [looking, setLooking] = useState('')
   const pick = (p: OwnedPet) => {
     setOpen(open?.def.id === p.def.id ? null : p)
     setName(p.name)
@@ -57,7 +59,13 @@ export function PetSanctuary({ summary }: { summary: Summary }) {
               <input value={name} maxLength={20} onChange={e => setName(e.target.value)} aria-label="Pet name" />
               <button className="small ghost">Rename</button>
             </form>
+            {looking && <p className="muted">{looking}</p>}
             <div className="row end">
+              {!open.def.human && open.condition !== 'dead' && (
+                <button className="ghost small" onClick={() => { setLooking('Drawing a new look…'); void makeLook(petLookKey(open.def.id, open.level), petLook(open.def.id, open.level), !!summary.extras.portraits[petLookKey(open.def.id, open.level)]).then(r => setLooking(r.ok ? '' : r.message)) }}>
+                  {summary.extras.portraits[petLookKey(open.def.id, open.level)] ? 'New look' : '✦ Make AI look'}
+                </button>
+              )}
               {open.def.id === pets.active.def.id ? <span className="cleared">Your active pet</span> : <button onClick={() => { void setActivePet(open.def.id); setOpen(null) }}>Make active</button>}
             </div>
           </div>

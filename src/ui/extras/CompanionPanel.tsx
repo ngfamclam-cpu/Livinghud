@@ -5,6 +5,7 @@ import { HumanPanel } from './HumanPanel'
 import { PetSwitcher } from './PetSwitcher'
 import { SystemWindow } from '../SystemWindow'
 import { PetPortrait } from './PetPortrait'
+import { petLook, petLookKey, petPhoto, useAutoLooks } from '../../db/looks'
 
 interface Care {
   pets: number
@@ -54,6 +55,10 @@ export function CompanionPanel(props: PanelProps) {
 /** A pet: tap to pet, feed it a snack, play with it. It talks about your day. */
 function PetPanel({ summary, dailiesTotal, dailiesDone, onPets }: PanelProps) {
   const c = summary.extras.companion
+  const lookPet = c?.pet
+  const photo = lookPet && lookPet.condition !== 'dead' ? petPhoto(summary.extras.portraits, lookPet.def.id, lookPet.level) : undefined
+  // The active pet gets an AI look for its current level (made once, in the background).
+  useAutoLooks(summary, lookPet && !lookPet.def.human && lookPet.condition !== 'dead' ? [{ key: petLookKey(lookPet.def.id, lookPet.level), req: petLook(lookPet.def.id, lookPet.level) }] : [])
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(c?.name ?? 'Pip')
   const [action, setAction] = useState<CompanionAction | null>(null)
@@ -116,7 +121,7 @@ function PetPanel({ summary, dailiesTotal, dailiesDone, onPets }: PanelProps) {
       <div className="companion-stage">
         <div className="companion-speech" aria-live="polite">{line}</div>
         <button className="companion-touch" onClick={() => act('pet')} aria-label={`Pet ${c.name}`}>
-          <PetPortrait pet={pet} mood={c.mood} action={action} size={132} />
+          <PetPortrait pet={pet} mood={c.mood} action={action} size={132} photoId={photo} />
           {particles.map(p => <span key={p.id} className="companion-particle" style={{ left: `${p.x}%` }} aria-hidden="true">{p.text}</span>)}
         </button>
       </div>

@@ -3,6 +3,20 @@ import { BATTLE_CRIES, CLEARS_PER_LEVEL, MAX_SOLDIER_LEVEL, QUESTS_PER_SOLDIER, 
 import { renameSoldier, setGuard } from '../../db/extras'
 import { SystemWindow } from '../SystemWindow'
 import { ShadowFigure } from './ShadowFigure'
+import { Photo } from '../lifelog/Photo'
+import { makeLook, soldierLook, soldierLookKey, useAutoLooks } from '../../db/looks'
+import type { SoldierKind } from '../../engine'
+
+/** A soldier's AI look when it has one (dark frame, violet glow, idle sway), else its shadow silhouette. */
+function SoldierLook({ photoId, kind, veteran, size = 64 }: { photoId?: string; kind: SoldierKind; veteran: boolean; size?: number }) {
+  if (!photoId) return <ShadowFigure kind={kind} veteran={veteran} size={size} />
+  return (
+    <span className={`soldier-photo ${veteran ? 'veteran' : ''}`} style={{ width: size, height: Math.round(size * 1.4) }}>
+      <Photo id={photoId} alt={kind} />
+      <span className="soldier-smoke" aria-hidden="true" />
+    </span>
+  )
+}
 
 const DAY = 86_400_000
 
@@ -16,6 +30,24 @@ export function LegionView({ summary, quests }: { summary: Summary; quests: Ques
   useEffect(() => () => timers.current.forEach(t => window.clearTimeout(t)), [])
   const soldier = x.legion.find(s => s.id === picked) ?? null
   const now = Date.now()
+  const looks = x.portraits
+  const [summoning, setSummoning] = useState<string | null>(null)
+  // The picked soldier and the newest few get their AI look in the background.
+  const autoFor = [...(soldier ? [soldier] : []), ...[...x.legion].sort((a, b) => b.at - a.at).slice(0, 4)]
+  useAutoLooks(summary, autoFor.map(s => ({ key: soldierLookKey(s.id), req: soldierLook(s.id, s.kind, s.veteran || s.level >= 6) })))
+  const missingLooks = x.legion.filter(s => !looks[soldierLookKey(s.id)])
+  const summon = async () => {
+    for (let i = 0; i < missingLooks.length; i++) {
+      const s = missingLooks[i]
+      setSummoning(`Summoning ${i + 1} of ${missingLooks.length}…`)
+      const r = await makeLook(soldierLookKey(s.id), soldierLook(s.id, s.kind, s.veteran || s.level >= 6))
+      if (!r.ok && r.message !== 'Already being made.') {
+        setSummoning(r.message)
+        return
+      }
+    }
+    setSummoning(null)
+  }
 
   if (!x.job) {
     return (
@@ -65,7 +97,7 @@ export function LegionView({ summary, quests }: { summary: Summary; quests: Ques
               aria-pressed={picked === s.id}
               title={`${s.displayName}, level ${s.level}`}
             >
-              <ShadowFigure kind={s.kind} veteran={s.veteran || s.level >= 6} />
+              <SoldierLook photoId={looks[soldierLookKey(s.id)]} kind={s.kind} veteran={s.veteran || s.level >= 6} />
               <small className="slot-name">{s.displayName.split(' ')[0]}</small>
               <small className="slot-level">Lv {s.level}{s.guardQuestId ? ' 🛡' : ''}</small>
             </button>
@@ -73,25 +105,28 @@ export function LegionView({ summary, quests }: { summary: Summary; quests: Ques
         </div>
       )}
 
-      {soldier && <SoldierCard key={soldier.id} soldier={soldier} quests={guardable} allQuests={quests} onClose={() => setPicked(null)} />}
+      {soldier && <SoldierCard key={soldier.id} soldier={soldier} photoId={looks[soldierLookKey(soldier.id)]} quests={guardable} allQuests={quests} onClose={() => setPicked(null)} />}
 
       {x.legion.length > 0 && (
         <div className="row end">
+          {missingLooks.length > 0 && <button className="ghost small" disabled={summoning?.startsWith('Summoning') ?? false} onClick={() => void summon()}>✦ Summon looks ({missingLooks.length})</button>}
           <button onClick={muster} disabled={mustering}>⚔ Muster the Legion</button>
         </div>
       )}
+      {summoning && <p className="muted">{summoning}</p>}
       <p className="muted">Post soldiers to guard your quests: every {CLEARS_PER_LEVEL} clears of a guarded quest levels its guard up (max level {MAX_SOLDIER_LEVEL}). New soldiers glow for their first day.</p>
     </SystemWindow>
   )
 }
 
-function SoldierCard({ soldier: s, quests, allQuests, onClose }: { soldier: SoldierProfile; quests: Quest[]; allQuests: Quest[]; onClose: () => void }) {
+function SoldierCard({ soldier: s, photoId, quests, allQuests, onClose }: { soldier: SoldierProfile; photoId?: string; quests: Quest[]; allQuests: Quest[]; onClose: () => void }) {
   const [name, setName] = useState(s.displayName)
+  const [remaking, setRemaking] = useState('')
   const guardTitle = s.guardQuestId ? allQuests.find(q => q.id === s.guardQuestId)?.title ?? 'a retired quest' : null
   return (
     <div className="soldier-card">
       <div className="soldier-card-head">
-        <ShadowFigure kind={s.kind} veteran size={84} />
+        <SoldierLook photoId={photoId} kind={s.kind} veteran={s.veteran || s.level >= 6} size={110} />
         <div className="grow">
           <form className="inline-form" onSubmit={e => { e.preventDefault(); void renameSoldier(s.id, name) }}>
             <input value={name} maxLength={30} onChange={e => setName(e.target.value)} aria-label="Soldier name" />
@@ -115,7 +150,11 @@ function SoldierCard({ soldier: s, quests, allQuests, onClose }: { soldier: Sold
           {quests.map(q => <option key={q.id} value={q.id}>{q.kind === 'side' ? 'Side: ' : ''}{q.title}</option>)}
         </select>
       </label>
-      <div className="row end"><button className="ghost small" onClick={onClose}>Close</button></div>
+      {remaking && <p className="muted">{remaking}</p>}
+      <div className="row end">
+        <button className="ghost small" onClick={() => { setRemaking('Summoning a new look…'); void makeLook(soldierLookKey(s.id), soldierLook(s.id, s.kind, s.veteran || s.level >= 6), true).then(r => setRemaking(r.ok ? '' : r.message)) }}>{photoId ? 'New look' : 'Summon look'}</button>
+        <button className="ghost small" onClick={onClose}>Close</button>
+      </div>
     </div>
   )
 }
