@@ -38,6 +38,8 @@ export interface Card {
   series: string
   /** Flavour text on the card. */
   text: string
+  /** Label in the card's corner (custom cards: "MY CARD", funny pack cards: "FUNNY"). */
+  tag?: string
   /** Idols. */
   scene?: 'K' | 'J' | 'C' | 'A'
   group?: string
@@ -70,8 +72,8 @@ export function setCustomCards(list: Card[]): void {
 }
 
 /** A card from one of your own (see CustomCard). */
-export const customCard = (c: { id: string; name: string; rarity: Rarity; text: string; photoId: string }): Card => ({
-  id: `custom-${c.id}`, kind: 'idol', name: c.name, rarity: c.rarity, text: c.text, photoId: c.photoId, series: 'custom',
+export const customCard = (c: { id: string; name: string; rarity: Rarity; text: string; photoId: string; forge?: string }): Card => ({
+  id: `custom-${c.id}`, kind: 'idol', name: c.name, rarity: c.rarity, text: c.text, photoId: c.photoId, series: 'custom', ...(c.forge?.startsWith('fun-') ? { tag: 'FUNNY' } : {}),
 })
 
 
@@ -184,4 +186,30 @@ export function starUpXp(drops: { cardId: string; createdAt: number; foil?: bool
   let ups = 0
   for (const e of collection(drops).values()) ups += Math.max(0, e.stars - 1)
   return ups * STAR_UP_XP
+}
+
+// ---- Card packs (owner, Nov 2026: "instead of cards as rewards, make them packs") ----
+
+/** Funny Common cards in every pack. */
+export const FUNNY_PER_PACK = 5
+/** Big moments always put two girl cards in the pack; anything else has this chance. */
+export const DOUBLE_GIRL_LUCK = 0.2
+const BIG_DROPS = new Set<DropSource>(['boss', 'main', 'strength', 'perfect', 'golden', 'gate', 'roll', 'pack'])
+
+/** How many girl cards a pack holds: 1, or 2 for big quests and lucky rolls. */
+export function packGirls(source: DropSource, sourceId: string, seed: string): 1 | 2 {
+  if (BIG_DROPS.has(source)) return 2
+  return unit(`${seed}:${source}:${sourceId}:double`) < DOUBLE_GIRL_LUCK ? 2 : 1
+}
+
+/** The girl cards' rarities: the rolled one, then (for a second card) at least Rare. */
+export function packRarities(first: Rarity, girls: number): Rarity[] {
+  const out: Rarity[] = [first]
+  for (let i = 1; i < girls; i++) out.push(RARITIES.indexOf(first) >= RARITIES.indexOf('rare') ? first : 'rare')
+  return out
+}
+
+/** `n` different funny cards for a pack, stable for the same source. */
+export function pickFunny(seed: string, ids: string[], n = FUNNY_PER_PACK): string[] {
+  return [...ids].map(id => ({ id, k: hash(`${seed}:${id}`) })).sort((a, b) => a.k - b.k).slice(0, Math.min(n, ids.length)).map(x => x.id)
 }

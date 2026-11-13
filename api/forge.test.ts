@@ -3,6 +3,7 @@ import { handle } from './forge'
 import { sha256, normalizeKey } from '../server/blob'
 import { memoryStore } from '../server/memoryStore'
 import { FORGE_SERIES, forgeCard, forgePrompt, pickPack, replacementPick } from '../src/engine/forge'
+import { FUNNY_CARDS, funnyCard, funnyPrompt, petPrompt, soldierPrompt } from '../src/engine/looks'
 
 const KEY = 'ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ2'
 const req = (body: unknown, key: string | null = KEY) =>
@@ -141,5 +142,41 @@ describe('pack picking', () => {
     expect((await handle(req({ cardId: 'rave-0', variant: 123 }), await withSave(), ok)).status).toBe(200)
     expect((await handle(req({ cardId: 'rave-0', variant: -1 }), await withSave(), ok)).status).toBe(400)
     expect((await handle(req({ cardId: 'rave-0', variant: 1.5 }), await withSave(), ok)).status).toBe(400)
+  })
+})
+
+describe('forge api: AI looks and funny pack cards', () => {
+  beforeEach(() => {
+    env.CLOUDFLARE_ACCOUNT_ID = 'acct'
+    env.CLOUDFLARE_API_TOKEN = 'tok'
+  })
+  afterEach(() => {
+    delete env.CLOUDFLARE_ACCOUNT_ID
+    delete env.CLOUDFLARE_API_TOKEN
+  })
+
+  it('only builds prompts from the looks catalog', async () => {
+    const prompts: string[] = []
+    const fetcher = (async (_url: string, init: RequestInit) => {
+      prompts.push(JSON.parse(String(init.body)).prompt)
+      return new Response(JSON.stringify({ success: true, result: { image: 'QUJD' } }), { status: 200 })
+    }) as unknown as typeof fetch
+    const store = await withSave()
+    expect((await handle(req({ funnyId: 'fun-1', variant: 2 }), store, fetcher)).status).toBe(200)
+    expect((await handle(req({ soldierKind: 'Mage', veteran: true, variant: 7 }), store, fetcher)).status).toBe(200)
+    expect((await handle(req({ petId: 'ember-fox', level: 3, variant: 1 }), store, fetcher)).status).toBe(200)
+    expect(prompts[0]).toBe(funnyPrompt(funnyCard('fun-1')!, 2))
+    expect(prompts[1]).toBe(soldierPrompt('Mage', 7, true))
+    expect(prompts[2]).toBe(petPrompt('ember-fox', 3, 1))
+    expect((await handle(req({ funnyId: 'fun-999' }), store, fetcher)).status).toBe(400)
+    expect((await handle(req({ soldierKind: 'Dragon' }), store, fetcher)).status).toBe(400)
+    expect((await handle(req({ petId: 'nope', level: 1 }), store, fetcher)).status).toBe(400)
+    expect(prompts).toHaveLength(3)
+  })
+
+  it('keeps every look prompt free of people and text', () => {
+    for (const c of FUNNY_CARDS) expect(funnyPrompt(c)).toMatch(/No text/)
+    expect(petPrompt('pip', 1)).toMatch(/egg/)
+    expect(petPrompt('phoenix', 5)).toMatch(/crown/)
   })
 })

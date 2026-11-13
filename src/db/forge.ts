@@ -1,7 +1,7 @@
 // Pack Forge, app side: asks api/forge.ts for each card's image, crops it with
 // the bulk-import tools, saves it as one of your cards and reveals it as a drop.
 
-import { forgeCard, pickOwnedCard, pickPack, replacementPick, setCustomCards, customCard, MAX_VARIANT, type PackPick, type Rarity } from '../engine'
+import { FUNNY_CARDS, emit, forgeCard, funnyCard, pickFunny, pickOwnedCard, pickPack, replacementPick, setCustomCards, customCard, MAX_VARIANT, type PackPick, type Rarity } from '../engine'
 import { addCustomCard, grantCard, snapshot } from './actions'
 import { db, LOCAL_USER } from './db'
 import { addPhoto } from './photos'
@@ -154,14 +154,15 @@ export type RemakeOutcome = { ok: true } | { ok: false; reason: 'no-sync' | 'not
 export async function remakeCard(customId: string): Promise<RemakeOutcome> {
   const mine = await db.customCards.get(customId)
   const card = mine?.forge ? forgeCard(mine.forge) : undefined
-  if (!mine || !card) return { ok: false, reason: 'failed', message: 'This card wasn’t made by the forge.' }
+  const funny = mine?.forge ? funnyCard(mine.forge) : undefined
+  if (!mine || (!card && !funny)) return { ok: false, reason: 'failed', message: 'This card wasn’t made by the forge.' }
   const key = syncKey()
   if (!key) return { ok: false, reason: 'no-sync' }
   for (let attempt = 0; attempt < 3; attempt++) {
     const variant = Math.floor(Math.random() * (MAX_VARIANT + 1))
-    const r = await makeImage(key, { card, variant })
+    const r = card ? await makeImage(key, { card, variant }) : await forgeImage(key, { funnyId: funny!.id, variant })
     if (r instanceof Blob) {
-      const photoId = await cardPhoto(r, card.id)
+      const photoId = await cardPhoto(r, mine.forge!)
       await db.customCards.update(customId, { photoId, updatedAt: Date.now() })
       const { deletePhotos } = await import('./photos')
       await deletePhotos([mine.photoId])
@@ -230,4 +231,100 @@ export async function pruneOrphanForged(): Promise<void> {
   const owned = new Set((await db.loot.where('userId').equals(LOCAL_USER).toArray()).map(d => d.cardId))
   const { deleteCustomCard } = await import('./actions')
   for (const c of mine) if (!owned.has(`custom-${c.id}`)) await deleteCustomCard(c.id)
+}
+
+/**
+ * A quest reward as a card pack: 5 funny Common cards (each image is made the
+ * first time it drops, then reused, so duplicates power up) plus 1 or 2 brand-new
+ * girl cards of the rolled rarities. Opens as one pack when it's ready. Anything
+ * the forge can't make right now falls back to a card you already own.
+ */
+export async function forgePackDrop(girlRarities: Rarity[], source: string, sourceId: string, unlocked: Set<string>): Promise<void> {
+  if (inFlight.has(sourceId)) return
+  inFlight.add(sourceId)
+  try {
+    const player = await db.players.get(LOCAL_USER)
+    let mine = await db.customCards.where('userId').equals(LOCAL_USER).toArray()
+    const recent = mine.filter(c => c.forge).sort((a, b) => b.createdAt - a.createdAt).slice(0, 18).map(c => c.forge!)
+    const key = syncKey()
+    const seed = `${player?.id ?? 'local'}:${sourceId}`
+
+    // Girl cards: brand-new forges.
+    const girls: ({ pick: PackPick; image: Blob } | null)[] = []
+    const tried = new Set<string>()
+    let stop = !key
+    for (let g = 0; g < girlRarities.length; g++) {
+      let made: { pick: PackPick; image: Blob } | null = null
+      for (let attempt = 0; attempt < 3 && !made && !stop; attempt++) {
+        const pick = replacementPick(girlRarities[g], tried, `${sourceId}:${g}:${attempt}`, recent, unlocked)
+        if (!pick) break
+        tried.add(pick.card.id)
+        const r = await makeImage(key!, pick)
+        if (r instanceof Blob) made = { pick, image: r }
+        else if (r.error !== 'declined') stop = true
+      }
+      girls.push(made)
+    }
+
+    // Funny cards: reuse the image if it was made before, otherwise make it now.
+    const funnyIds = pickFunny(seed, FUNNY_CARDS.map(c => c.id))
+    const funny: ({ id: string; existing?: string; image?: Blob } | null)[] = []
+    let next = 0
+    const slots: typeof funny = new Array(funnyIds.length).fill(null)
+    await Promise.all(Array.from({ length: PARALLEL }, async () => {
+      while (next < funnyIds.length) {
+        const i = next++
+        const id = funnyIds[i]
+        const have = mine.find(c => c.forge === id)
+        if (have) { slots[i] = { id, existing: have.id }; continue }
+        if (stop) continue
+        const r = await forgeImage(key!, { funnyId: id, variant: Math.floor(Math.random() * (MAX_VARIANT + 1)) })
+        if (r instanceof Blob) slots[i] = { id, image: r }
+        else if (r.error !== 'declined') stop = true
+      }
+    }))
+    funny.push(...slots)
+
+    if (cancelled.has(sourceId) || (await db.loot.where('sourceId').equals(sourceId).count())) return
+
+    // Save what was made, then grant everything (funny first, girls last) and open the pack.
+    const cards: { cardId: string; girl: boolean }[] = []
+    for (const f of funny) {
+      if (!f) continue
+      if (f.existing) cards.push({ cardId: `custom-${f.existing}`, girl: false })
+      else if (f.image) {
+        const def = funnyCard(f.id)!
+        const photo = await cardPhoto(f.image, f.id)
+        const id = await addCustomCard({ name: def.name, rarity: 'common', text: def.text, photoId: photo, forge: def.id })
+        cards.push({ cardId: `custom-${id}`, girl: false })
+      }
+    }
+    mine = await db.customCards.where('userId').equals(LOCAL_USER).toArray()
+    setCustomCards(mine.map(customCard))
+    for (let g = 0; g < girls.length; g++) {
+      const made = girls[g]
+      if (made) {
+        const card = made.pick.card
+        const photo = await cardPhoto(made.image, card.id)
+        const id = await addCustomCard({ name: card.name, rarity: card.rarity, text: card.text, photoId: photo, forge: card.id })
+        cards.push({ cardId: `custom-${id}`, girl: true })
+      } else {
+        // Fallback: a copy of a card you already have (copies power cards up).
+        setCustomCards((await db.customCards.where('userId').equals(LOCAL_USER).toArray()).map(customCard))
+        const owned = pickOwnedCard(girlRarities[g], `${sourceId}:${g}`)
+        if (owned) cards.push({ cardId: owned.id, girl: true })
+      }
+    }
+    if (cancelled.has(sourceId) || cards.length === 0) return
+    setCustomCards((await db.customCards.where('userId').equals(LOCAL_USER).toArray()).map(customCard))
+    const opened: { cardId: string; copies: number; starUp: boolean; foil?: boolean; girl: boolean }[] = []
+    for (let i = 0; i < cards.length; i++) {
+      const r = await grantCard(cards[i].cardId, source, sourceId, { quiet: true, foilKey: `${sourceId}:${i}` })
+      if (r) opened.push({ cardId: cards[i].cardId, copies: r.copies, starUp: r.starUp, foil: r.foil, girl: cards[i].girl })
+    }
+    emit({ type: 'loot.pack', source, cards: opened })
+  } finally {
+    inFlight.delete(sourceId)
+    cancelled.delete(sourceId)
+  }
 }

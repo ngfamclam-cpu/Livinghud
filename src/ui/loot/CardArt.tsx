@@ -108,7 +108,7 @@ export function CardArt({ card, stars = 0, locked = false, foil = false }: { car
       {card.photoId && (
         <div className="custom-art" aria-hidden>
           <Photo id={card.photoId} alt="" />
-          <span className="card-tag-html">MY CARD</span>
+          <span className="card-tag-html">{card.tag ?? 'MY CARD'}</span>
         </div>
       )}
       <div className="card-caption">

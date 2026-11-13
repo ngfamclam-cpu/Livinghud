@@ -30,22 +30,37 @@ interface Reveal {
   foil?: boolean
 }
 
-/** The drop reveal: a card flips in when loot drops. Queues if several drop at once. */
+interface PackItem extends Reveal {
+  girl: boolean
+}
+
+type Queued = ({ kind: 'card' } & Reveal) | { kind: 'pack'; items: PackItem[] }
+
+/** The drop reveal: a single card flips in, or a card pack tears open. Queues if several drop at once. */
 export function LootReveal() {
-  const [queue, setQueue] = useState<Reveal[]>([])
+  const [queue, setQueue] = useState<Queued[]>([])
   useEffect(
     () =>
       onGameEvent(e => {
-        if (e.type !== 'loot.card') return
-        const card = cardById(e.cardId)
-        if (card) setQueue(q => [...q, { card, copies: e.copies, starUp: e.starUp, foil: e.foil }])
+        if (e.type === 'loot.card') {
+          const card = cardById(e.cardId)
+          if (card) setQueue(q => [...q, { kind: 'card', card, copies: e.copies, starUp: e.starUp, foil: e.foil }])
+        }
+        if (e.type === 'loot.pack') {
+          const items = e.cards.flatMap(c => {
+            const card = cardById(c.cardId)
+            return card ? [{ card, copies: c.copies, starUp: c.starUp, foil: c.foil, girl: c.girl }] : []
+          })
+          if (items.length) setQueue(q => [...q, { kind: 'pack', items }])
+        }
       }),
     [],
   )
   const current = queue[0]
   if (!current) return null
-  const starsNow = STAR_COPIES.filter(n => current.copies >= n).length
   const close = () => setQueue(q => q.slice(1))
+  if (current.kind === 'pack') return <PackOpening key={queue.length} items={current.items} onClose={close} />
+  const starsNow = STAR_COPIES.filter(n => current.copies >= n).length
   return (
     <div className="overlay loot-reveal" role="dialog" aria-label={`Loot drop: ${current.card.name}`} onClick={close}>
       <p className={`drop-title r-${current.card.rarity}`}>{current.foil ? '✦ FOIL ' : ''}{RARITY_NAMES[current.card.rarity].toUpperCase()} DROP</p>
@@ -57,6 +72,57 @@ export function LootReveal() {
         {current.foil ? 'Holographic! Counts as two copies. ' : ''}{current.copies <= (current.foil ? 2 : 1) ? 'New card for your collection!' : current.starUp ? `Powered up to ${'★'.repeat(starsNow)}! +${STAR_UP_XP} XP` : `Duplicate ×${current.copies}. ${nextStar(current.copies)}`}
       </p>
       <button className="arise" onClick={close}>Collect</button>
+    </div>
+  )
+}
+
+/** A sealed pack: tap to tear it open, the cards fan out (funny ones first, the girl cards last and bigger). */
+function PackOpening({ items, onClose }: { items: PackItem[]; onClose: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [zoom, setZoom] = useState<PackItem | null>(null)
+  const best = items.reduce((r, i) => (RARITIES.indexOf(i.card.rarity) > RARITIES.indexOf(r) ? i.card.rarity : r), 'common' as Rarity)
+  const girls = items.filter(i => i.girl).length
+  const ups = items.filter(i => i.starUp).length
+  if (!open) {
+    return (
+      <div className="overlay loot-reveal pack-reveal" role="dialog" aria-label="A card pack dropped">
+        <p className={`drop-title r-${best}`}>CARD PACK</p>
+        <button className={`sealed-pack r-${best}`} onClick={() => setOpen(true)} aria-label="Open the pack">
+          <span className="pack-shine" aria-hidden="true" />
+          <span className="pack-label">LIVING<b>HUD</b></span>
+          <small>{items.length} cards · {girls} special</small>
+        </button>
+        <p className="muted">Tap to tear it open</p>
+      </div>
+    )
+  }
+  if (zoom) {
+    const starsNow = STAR_COPIES.filter(n => zoom.copies >= n).length
+    return (
+      <div className="overlay loot-reveal" role="dialog" aria-label={zoom.card.name} onClick={() => setZoom(null)}>
+        <div className="flip-in"><CardArt card={zoom.card} stars={starsNow} foil={zoom.foil} /></div>
+        <p className="drop-text">{zoom.card.text}</p>
+        <button className="ghost" onClick={() => setZoom(null)}>Back to the pack</button>
+      </div>
+    )
+  }
+  return (
+    <div className="overlay loot-reveal pack-reveal opened" role="dialog" aria-label="Card pack opened">
+      <p className={`drop-title r-${best}`}>PACK OPENED</p>
+      <div className="pack-spread">
+        {items.map((it, i) => {
+          const starsNow = STAR_COPIES.filter(n => it.copies >= n).length
+          const isNew = it.copies <= (it.foil ? 2 : 1)
+          return (
+            <button key={i} className={`pack-slot ${it.girl ? 'girl' : ''}`} style={{ animationDelay: `${0.15 + i * (it.girl ? 0.5 : 0.18)}s` }} onClick={() => setZoom(it)} aria-label={`${it.card.name}, tap to look closer`}>
+              <CardArt card={it.card} stars={starsNow} foil={it.foil} />
+              <small className={`pack-tag ${isNew ? 'new' : it.starUp ? 'up' : ''}`}>{isNew ? 'NEW' : it.starUp ? `★ UP` : `×${it.copies}`}</small>
+            </button>
+          )
+        })}
+      </div>
+      <p className="system-line">{ups > 0 ? `${ups} card${ups === 1 ? '' : 's'} powered up! +${ups * STAR_UP_XP} XP. ` : ''}Tap a card to look closer.</p>
+      <button className="arise" onClick={onClose}>Collect all</button>
     </div>
   )
 }
@@ -87,7 +153,7 @@ export function Collection({ loot, custom, onClose }: { player?: Player; summary
     <main className="hud collection">
       <SystemWindow title={`Collection · ${owned.size}/${cards.length}`}>
         <p className="muted">
-          Every card is forged for you. Bosses, main quest stages, the strength routine and perfect days always drop a brand-new one; other quests have a 1-in-4 chance. If a new card can’t be made right then, you get a copy of one you own instead: copies power a card up (★★ at {STAR_COPIES[1]} copies, ★★★ at {STAR_COPIES[2]}), +{STAR_UP_XP} XP each time.
+          Rewards come as card packs: 5 funny cards plus 1 brand-new girl card, or 2 for bosses, main quest stages, the strength routine, perfect days, Golden Quests, Red Gates and lucky rolls (and 1 in 5 other packs). Bosses and those big moments always drop a pack; other quests have a 1-in-4 chance. Funny cards repeat, and copies power a card up (★★ at {STAR_COPIES[1]} copies, ★★★ at {STAR_COPIES[2]}), +{STAR_UP_XP} XP each time. If a new card can’t be made right then, you get a copy of one you own.
         </p>
         <div className="tabs-inline">
           {RARITY_FILTERS.map(f => (

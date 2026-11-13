@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CARDS, DROP_CHANCE, cardById, setCustomCards, collection, pickOwnedCard, rollRarity, starUpXp, stars, summarize, type LootDrop, type Player } from './index'
+import { CARDS, DROP_CHANCE, FUNNY_PER_PACK, packGirls, packRarities, pickFunny, cardById, setCustomCards, collection, pickOwnedCard, rollRarity, starUpXp, stars, summarize, type LootDrop, type Player } from './index'
 
 describe('custom cards', () => {
   it('are the whole card set once registered', () => {
@@ -58,5 +58,23 @@ describe('loot', () => {
     }
     expect(summarize(player, [], [], new Date(2026, 9, 2, 12), { loot: drops }).totalXp).toBe(30)
     expect(summarize({ ...player, features: { cards: false } }, [], [], new Date(2026, 9, 2, 12), { loot: drops }).totalXp).toBe(0)
+  })
+})
+
+describe('card packs', () => {
+  it('hold 5 different funny cards and 1 or 2 girl cards', () => {
+    const ids = Array.from({ length: 40 }, (_, i) => `fun-${i + 1}`)
+    const five = pickFunny('seed:q1', ids)
+    expect(five).toHaveLength(FUNNY_PER_PACK)
+    expect(new Set(five).size).toBe(5)
+    expect(pickFunny('seed:q1', ids)).toEqual(five)
+    expect(packGirls('boss', 'b1', 's')).toBe(2)
+    expect(packGirls('strength', 'x', 's')).toBe(2)
+    const n = Array.from({ length: 400 }, (_, i) => packGirls('quest', `q${i}`, 's')).filter(g => g === 2).length
+    expect(n).toBeGreaterThan(40)
+    expect(n).toBeLessThan(130)
+    expect(packRarities('common', 2)).toEqual(['common', 'rare'])
+    expect(packRarities('epic', 2)).toEqual(['epic', 'epic'])
+    expect(packRarities('common', 1)).toEqual(['common'])
   })
 })
