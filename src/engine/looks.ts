@@ -124,6 +124,7 @@ const PET_STAGE = [
 ]
 const PET_STYLE = 'Cute but epic fantasy creature art, an original design, vibrant colours, soft glowing magical lighting, highly detailed digital painting like a premium collectible game, full body, centred, simple soft background. No text, no logos, no watermark, no people.'
 
+/** Evolved pets (max level) are drawn with the top stage. */
 export function petPrompt(petId: string, level: number, variant = 0): string | null {
   const look = PET_LOOKS[petId]
   if (!look) return null
@@ -134,4 +135,30 @@ export function petPrompt(petId: string, level: number, variant = 0): string | n
   return egg
     ? `Illustration of a glowing mystical egg with pastel blue and lavender swirls, a tiny spirit creature peeking out of a crack, ${where}. ${PET_STYLE}`
     : `Illustration of ${look}, ${stage}, ${where}. ${PET_STYLE}`
+}
+
+// ---- The Hunter avatar: a new look every 5 levels (stage 0-10) ----
+// The face stays hidden (hood, mask or helmet), so it suits anyone.
+
+export const AVATAR_STAGES = [
+  'a beginner hunter in a plain dark hoodie and worn sneakers, face hidden in the shadow of the hood, holding a cheap dagger, nervous stance',
+  'a rookie hunter in a dark hooded jacket with leather bracers and a short sword, face hidden in shadow, a faint blue glow in the eyes',
+  'a capable hunter in a long black coat with light leather armour and twin daggers, hood up, face in shadow, eyes glowing blue',
+  'a skilled hunter in a reinforced black trench coat with armoured gloves, a curved blade on the back, faint blue aura',
+  'a veteran hunter in sleek black armour plates over a long coat, a glowing blue longsword, face hidden behind a dark mask, steady blue aura',
+  'an elite hunter in ornate black armour with violet trim, a cape torn by battle, dual glowing blades, a swirling violet aura',
+  'a feared hunter in jagged obsidian armour with a horned helmet, a greatsword wreathed in purple flame, shadows rising from the ground',
+  'a commander of shadows in regal black armour with a flowing cape, a crown of violet light above the helmet, silhouettes of shadow soldiers behind',
+  'a legendary hunter in black and gold armour radiating violet lightning, a massive dark blade, an army of shadow soldiers kneeling behind',
+  'a near-mythic shadow lord in towering black armour with glowing violet runes, wings of black smoke, eyes like violet stars',
+  'the sovereign of shadows on a throne of black crystal, armour of living darkness and gold, a crown of violet flame, endless shadow army bowing below',
+]
+
+const AVATAR_STYLE = 'Original dark fantasy character art, cinematic dramatic lighting, rain and city lights at night, highly detailed digital painting, full body, centred, portrait composition. The face is completely hidden in shadow or behind a mask. No text, no logos, no watermark.'
+
+export function avatarPrompt(stage: number, variant = 0): string | null {
+  const look = AVATAR_STAGES[stage]
+  if (!look) return null
+  const where = ['on a rooftop above a neon city', 'at the mouth of a glowing dungeon gate', 'in a ruined cathedral', 'on a battlefield under a blood moon'][Math.abs(Math.floor(variant)) % 4]
+  return `Illustration of ${look}, ${where}. ${AVATAR_STYLE}`
 }

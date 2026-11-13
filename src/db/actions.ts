@@ -22,6 +22,13 @@ import {
   dailyWeight,
   GOALS_PER_DAY,
   rollRarity,
+  PET_PERKS,
+  perkAmount,
+  petXpBoost,
+  canLearn,
+  skillById,
+  ABILITY_INFO,
+  abilityXp,
   packGirls,
   packRarities,
   foilFor,
@@ -206,6 +213,20 @@ export async function snapshot() {
 export async function announceProgress(before: Summary): Promise<void> {
   const { summary: after } = await snapshot()
   if (after.level.level > before.level.level) emit({ type: 'level.up', level: after.level.level })
+  if (after.progression.hunter.rank !== before.progression.hunter.rank && after.level.level > before.level.level) {
+    emit({ type: 'hunter.rankup', rank: after.progression.hunter.rank, title: after.progression.hunter.title, level: after.level.level })
+  }
+  if (after.progression.pointsLeft > before.progression.pointsLeft) {
+    emit({ type: 'extra', title: 'Skill point earned', text: `You have ${after.progression.pointsLeft} to spend in the skill tree (More → Skills).` })
+  }
+  if (after.progression.avatarStage > before.progression.avatarStage) {
+    emit({ type: 'extra', title: 'Your Hunter evolves', text: 'A new look is being drawn for your avatar.' })
+  }
+  for (const p of after.extras.pets?.owned ?? []) {
+    const was = before.extras.pets?.owned.find(o => o.def.id === p.def.id)
+    if (was && p.evolved && !was.evolved) emit({ type: 'extra', title: `${p.name} evolved!`, text: `It became ${p.form}. Its perk and ability are 50% stronger.` })
+    if (was && p.ability && !was.ability) emit({ type: 'extra', title: `${p.name} learned a skill`, text: 'It has a daily ability now: tap it on the companion panel.' })
+  }
   const { budget } = after.wallet
   if (budget > 0 && before.wallet.earned < budget && after.wallet.earned >= budget) {
     emit({ type: 'wallet.full', month: after.wallet.month, budget })
@@ -300,7 +321,12 @@ export async function completeQuest(
   // Today's Golden Quest pays triple XP (src/engine/extras.ts).
   const extras = await import('./extras')
   const golden = extras.goldenFor(summary, quest, day)
-  const reward = { ...base, xp: Math.round(base.xp * bonus * comboBoost * (golden ? GOLDEN_XP_MULT : 1)) }
+  // Skill tree XP and the active pet's perk (src/engine/progression.ts); Golden Touch makes Golden Quests ×4.
+  const prog = summary.progression.effects
+  const activePet = summary.extras.pets?.active
+  const petBoost = activePet && !activePet.def.human && activePet.condition !== 'dead' ? petXpBoost({ id: activePet.def.id, rarity: activePet.def.rarity, level: activePet.level, evolved: activePet.evolved }, quest.stat) : 1
+  const goldenMult = prog.goldenMult ?? GOLDEN_XP_MULT
+  const reward = { ...base, xp: Math.round(base.xp * bonus * comboBoost * prog.xp * petBoost * (golden ? goldenMult : 1)) }
   const completion: Completion = {
     id: newId(),
     userId: LOCAL_USER,
@@ -1353,7 +1379,10 @@ export async function dropLoot(source: DropSource, sourceId: string, opts: { min
   const secrets = opts.secrets ?? (await snapshot()).summary.incentives?.secrets ?? new Set<string>()
   // A card pack is put together in the background and opens when it's ready:
   // 5 funny cards plus 1 girl card (2 for big quests or a lucky roll).
-  const girls = opts.girls ?? packGirls(source, sourceId, surpriseSeed(player))
+  const snap = (await snapshot()).summary
+  const active = snap.extras.pets?.active
+  const packPerk = active && PET_PERKS[active.def.id]?.kind === 'packLuck' && active.condition !== 'dead' ? perkAmount({ id: active.def.id, rarity: active.def.rarity, level: active.level, evolved: active.evolved }) : 0
+  const girls = opts.girls ?? packGirls(source, sourceId, surpriseSeed(player), snap.progression.effects.doubleGirl + packPerk)
   const { forgePackDrop } = await import('./forge')
   void forgePackDrop(packRarities(rarity, girls), source, sourceId, secrets)
 }
@@ -1497,4 +1526,59 @@ export async function spendShield(day: string, task: string): Promise<boolean> {
   await db.penaltyClears.add({ id: newId(), userId: LOCAL_USER, day, kind: 'shield', task, createdAt: Date.now() })
   emit({ type: 'penalty.cleared', task, shield: true })
   return true
+}
+
+// ---- Skill tree, Rest Rune and pet abilities (src/engine/progression.ts) ----
+
+/** Learns a skill if you have the level, the points and the one before it. Returns why not. */
+export async function learnSkill(id: string): Promise<string | null> {
+  const { summary, player } = await snapshot()
+  const check = canLearn(id, player.skills, summary.level.level)
+  if (!check.ok) return check.reason
+  await db.players.update(LOCAL_USER, { skills: [...(player.skills ?? []), id], updatedAt: Date.now() })
+  emit({ type: 'extra', title: `Skill learned: ${skillById(id)?.name}`, text: skillById(id)?.text ?? '' })
+  return null
+}
+
+/** Gives back every skill point so you can choose again. */
+export async function resetSkills(): Promise<void> {
+  await db.players.update(LOCAL_USER, { skills: [], updatedAt: Date.now() })
+}
+
+/** Rest Rune: one free Lazy-day coupon per calendar month. */
+export async function claimRestRune(): Promise<string | null> {
+  const { summary } = await snapshot()
+  if (!summary.progression.effects.restRune) return 'Learn Rest Rune first'
+  const sourceId = `rune-${summary.today.slice(0, 7)}`
+  if (await db.bonuses.where('sourceId').equals(sourceId).count()) return 'Already claimed this month'
+  await db.bonuses.add({ id: newId(), userId: LOCAL_USER, kind: 'coupon', day: summary.today, sourceId, value: 'lazy-day', createdAt: Date.now() })
+  emit({ type: 'extra', title: 'Rest Rune', text: 'A Lazy-day coupon is in your pouch. Use it on a day you need off.' })
+  return null
+}
+
+/** The active pet's once-a-day ability. Returns why not, or null. */
+export async function triggerPetAbility(): Promise<string | null> {
+  const { summary } = await snapshot()
+  const pet = summary.extras.pets?.active
+  if (!pet || !pet.ability) return 'Your pet learns an ability at level 3'
+  if (pet.condition === 'dead') return 'Ghosts can’t use abilities'
+  if (summary.progression.abilityUsedToday) return 'Already used today'
+  const like = { id: pet.def.id, rarity: pet.def.rarity, level: pet.level, evolved: pet.evolved }
+  const xp = abilityXp(pet.ability, like)
+  const sourceId = `ability-${summary.today}`
+  await db.bonuses.add({ id: newId(), userId: LOCAL_USER, kind: 'ability', day: summary.today, sourceId, value: `${pet.ability}:${xp}`, createdAt: Date.now() })
+  const info = ABILITY_INFO[pet.ability]
+  if (pet.ability === 'fetch') {
+    emit({ type: 'extra', title: `${pet.name} used ${info.name}`, text: 'It ran off and came back with something in its mouth…' })
+    const { forgePackDrop } = await import('./forge')
+    void forgePackDrop([], 'fetch', sourceId, new Set(), pet.evolved ? 2 : 1)
+  } else if (pet.ability === 'foresight') {
+    const gate = summary.extras.gate
+    const when = gate ? new Date(gate.opensAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : null
+    emit({ type: 'extra', title: `${pet.name} used ${info.name}`, text: `${when ? `Today’s Red Gate opens at ${when}.` : 'No Red Gate opens today.'} +${xp} XP.` })
+  } else {
+    emit({ type: 'extra', title: `${pet.name} used ${info.name}`, text: `+${xp} XP!` })
+  }
+  await announceProgress(summary)
+  return null
 }

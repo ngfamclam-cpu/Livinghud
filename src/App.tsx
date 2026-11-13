@@ -19,6 +19,8 @@ import { LifeLog } from './ui/lifelog/LifeLog'
 import { GoalsView } from './ui/goals/GoalsView'
 import { Finance } from './ui/finance/Finance'
 import { Collection, LootReveal } from './ui/loot/Loot'
+import { RankUp } from './ui/RankUp'
+import { SkillsScreen } from './ui/Skills'
 import { Briefing } from './ui/Briefing'
 import { briefingSeen } from './ui/briefingSeen'
 import { customCard, dayKey, featureOn, setCustomCards, shopLock } from './engine'
@@ -43,7 +45,7 @@ const TABS: { key: Tab; label: string }[] = [
 export default function App() {
   const now = useNow()
   const [tab, setTab] = useState<Tab>('hud')
-  const [screen, setScreen] = useState<'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | 'collection' | 'finance' | 'party' | 'settings' | 'customize' | 'rewards' | 'search' | null>(null)
+  const [screen, setScreen] = useState<'skills' | 'workout' | 'scan' | 'focus' | 'journal' | 'report' | 'plans' | 'goals' | 'collection' | 'finance' | 'party' | 'settings' | 'customize' | 'rewards' | 'search' | null>(null)
   const [logCamera, setLogCamera] = useState(0)
   const [planId, setPlanId] = useState<string | null>(null)
   const [briefingDone, setBriefingDone] = useState(false)
@@ -143,6 +145,7 @@ export default function App() {
         {showBriefing && <Briefing player={player} quests={quests} summary={summary} onClose={() => setBriefingDone(true)} onReport={() => setBriefingDone(true)} />}
         <SystemToasts />
         {featureOn(player, 'cards') && <LootReveal />}
+        <RankUp rank={summary.progression.hunter.rank} />
         {theme}
       </>
     )
@@ -171,6 +174,7 @@ export default function App() {
 
   const moreItems: MoreItem[] = [
     { key: 'search', label: 'Search', hint: 'Everything you’ve written or logged', open: () => setScreen('search') },
+    { key: 'skills', label: 'Skills & Hunter rank', hint: summary.progression.pointsLeft > 0 ? `${summary.progression.pointsLeft} skill point${summary.progression.pointsLeft === 1 ? '' : 's'} to spend` : 'Skill tree, rank, avatar', open: () => setScreen('skills') },
     featureOn(player, 'party') && { key: 'party', label: 'Party', hint: 'Friends, family, bonds', open: () => setScreen('party') },
     featureOn(player, 'finance') && { key: 'finance', label: 'Finances', hint: 'Spending, bills, reports', open: () => setScreen('finance') },
     (featureOn(player, 'extras') || featureOn(player, 'legion')) && { key: 'rewards', label: 'Rewards & Legion', hint: 'Coupons, job changes, secrets', open: () => setScreen('rewards') },
@@ -201,6 +205,7 @@ export default function App() {
         {screen === 'settings' && <Settings player={player} quests={quests} summary={summary} onClose={() => setScreen(null)} />}
         {screen === 'customize' && <CustomizeHud onClose={() => setScreen(null)} />}
         {screen === 'search' && <Search data={data} onOpen={openFromSearch} onClose={() => setScreen(null)} />}
+        {screen === 'skills' && <SkillsScreen player={player} summary={summary} onClose={() => setScreen(null)} />}
         {screen === 'rewards' && <RewardsScreen player={player} summary={summary} quests={quests} onClose={() => setScreen(null)} />}
         {screen === 'finance' && <Finance summary={summary} finance={player.finance} transactions={data.transactions} bills={data.bills} onClose={() => setScreen(null)} />}
         {screen === 'collection' && <Collection player={player} summary={summary} loot={data.loot} custom={data.customCards} onClose={() => setScreen(null)} />}
@@ -220,6 +225,7 @@ export default function App() {
         )}
         <SystemToasts />
         {featureOn(player, 'cards') && <LootReveal />}
+        <RankUp rank={summary.progression.hunter.rank} />
         {theme}
       </>
     )
@@ -239,13 +245,14 @@ export default function App() {
       {current === 'log' && (
         <LifeLog key={logCamera} data={{ ...data, player }} summary={summary} startCamera={logCamera > 0} onJournal={() => setScreen('journal')} onClose={() => { setLogCamera(0); setTab('hud') }} />
       )}
-      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} memories={data.memories} onLifeLog={openLog} goals={data.goals} onGoals={() => setScreen('goals')} loot={data.loot} onCollection={() => setScreen('collection')} transactions={data.transactions} bills={data.bills} onFinance={() => setScreen('finance')} onCustomize={() => setScreen('customize')} onRewards={() => setScreen('rewards')} />}
+      {current === 'hud' && <Hud player={player} quests={quests} summary={summary} onStartWorkout={() => setScreen('workout')} onFocus={() => openFocus()} onJournal={() => setScreen('journal')} journaledToday={data.journal.some(e => e.day === summary.today)} onReport={() => setScreen('report')} surprises={data.surprises} now={now} onPlans={openPlans} memories={data.memories} onLifeLog={openLog} goals={data.goals} onGoals={() => setScreen('goals')} loot={data.loot} onCollection={() => setScreen('collection')} transactions={data.transactions} bills={data.bills} onFinance={() => setScreen('finance')} onCustomize={() => setScreen('customize')} onRewards={() => setScreen('rewards')} onSkills={() => setScreen('skills')} />}
       {current === 'quests' && <QuestBoard player={player} quests={quests} completions={data.completions} summary={summary} onFight={bossId => openFocus({ bossId })} />}
       {current === 'shop' && <Shop player={player} rewards={rewards} purchases={purchases} savings={savings} summary={summary} onPlans={() => openPlans()} />}
       {current === 'more' && <MoreMenu items={moreItems} />}
       {briefing}
       <SystemToasts />
       {featureOn(player, 'cards') && <LootReveal />}
+        <RankUp rank={summary.progression.hunter.rank} />
       {theme}
     </>
   )

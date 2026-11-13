@@ -75,6 +75,8 @@ export interface Player {
   legion?: import('./extras').LegionPrefs
   /** Reward ideas starred in the Shop to work toward. */
   favoriteRewards?: string[]
+  /** Skills learned in the skill tree, in the order they were learned (see src/engine/progression.ts). */
+  skills?: string[]
   /** Every change of the monthly budget, oldest first (see settleEarnings). */
   budgetChanges?: import('./economy').BudgetChange[]
   /** "Start my money from $0": earnings and purchases before this moment no longer count toward the wallet or Vault. */

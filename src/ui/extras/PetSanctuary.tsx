@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AFFECTION_NAMES, PETS, type OwnedPet, type Summary } from '../../engine'
+import { ABILITY_INFO, ABILITY_LEVEL, AFFECTION_NAMES, EVOLVED_NAMES, PETS, PET_PERKS, perkText, statName, type OwnedPet, type Summary } from '../../engine'
 import { renamePet, setActivePet } from '../../db/extras'
 import { SystemWindow } from '../SystemWindow'
 import { CompanionAvatar } from './PetSwitcher'
@@ -54,7 +54,9 @@ export function PetSanctuary({ summary }: { summary: Summary }) {
           <div className="grow">
             <p className="soldier-rank">{open.def.name} · {open.def.family} · {open.def.element}</p>
             <p className="muted"><i>“{open.def.blurb}”</i></p>
-            <p className="muted">Level {open.level} ({open.stage}) · {open.xp} XP{open.nextXp !== null ? ` / ${open.nextXp}` : ' · max'}</p>
+            <p className="muted">Level {open.level} ({open.evolved ? `evolved: ${open.form}` : open.stage}) · {open.xp} XP{open.nextXp !== null ? ` / ${open.nextXp}` : ' · max'}</p>
+            {!open.def.human && PET_PERKS[open.def.id] && <p className="pet-perk">✦ Perk while active: {perkText({ id: open.def.id, rarity: open.def.rarity, level: open.level, evolved: open.evolved }, statName)}</p>}
+            {!open.def.human && <p className="muted small-print">{open.ability ? `Daily ability: ${ABILITY_INFO[open.ability].name}. ${ABILITY_INFO[open.ability].text}` : `Learns a daily ability at level ${ABILITY_LEVEL}.`} {open.evolved ? '' : `Evolves into ${EVOLVED_NAMES[open.def.id] ?? 'its final form'} at max level.`}</p>}
             <form className="inline-form" onSubmit={e => { e.preventDefault(); void renamePet(open.def.id, name) }}>
               <input value={name} maxLength={20} onChange={e => setName(e.target.value)} aria-label="Pet name" />
               <button className="small ghost">Rename</button>
@@ -62,7 +64,7 @@ export function PetSanctuary({ summary }: { summary: Summary }) {
             {looking && <p className="muted">{looking}</p>}
             <div className="row end">
               {!open.def.human && open.condition !== 'dead' && (
-                <button className="ghost small" onClick={() => { setLooking('Drawing a new look…'); void makeLook(petLookKey(open.def.id, open.level), petLook(open.def.id, open.level), !!summary.extras.portraits[petLookKey(open.def.id, open.level)]).then(r => setLooking(r.ok ? '' : r.message)) }}>
+                <button className="ghost small" onClick={() => { setLooking('Drawing a new look…'); void makeLook(petLookKey(open.def.id, open.evolved && open.def.id !== 'pip' ? 6 : open.level), petLook(open.def.id, open.evolved && open.def.id !== 'pip' ? 6 : open.level), !!summary.extras.portraits[petLookKey(open.def.id, open.evolved && open.def.id !== 'pip' ? 6 : open.level)]).then(r => setLooking(r.ok ? '' : r.message)) }}>
                   {summary.extras.portraits[petLookKey(open.def.id, open.level)] ? 'New look' : '✦ Make AI look'}
                 </button>
               )}

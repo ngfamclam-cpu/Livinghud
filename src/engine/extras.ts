@@ -30,7 +30,7 @@ const startOfDay = (day: string) => {
 }
 
 /** Saved moments: rolls, Red Gate clears, coupons (earned and used), wildcards (earned and used), job changes. */
-export type BonusKind = 'roll' | 'gate' | 'coupon' | 'coupon-use' | 'wildcard' | 'wildcard-use' | 'job' | 'hidden' | 'egg' | 'pet' | 'companion' | 'portrait'
+export type BonusKind = 'roll' | 'gate' | 'coupon' | 'coupon-use' | 'wildcard' | 'wildcard-use' | 'job' | 'hidden' | 'egg' | 'pet' | 'companion' | 'portrait' | 'ability'
 
 export interface BonusRecord {
   id: string
@@ -116,7 +116,7 @@ export interface RedGate {
 }
 
 /** About every other day a Red Gate opens at a random time while you're awake. */
-export function redGate(seed: string, day: string, wakeTime: string, bedTime: string): RedGate | null {
+export function redGate(seed: string, day: string, wakeTime: string, bedTime: string, minutes = GATE_MINUTES): RedGate | null {
   if (unit(`${seed}:gate:${day}`) >= 0.5) return null
   const wake = minutesOf(wakeTime)
   let bed = minutesOf(bedTime)
@@ -125,7 +125,7 @@ export function redGate(seed: string, day: string, wakeTime: string, bedTime: st
   const to = Math.max(from + 30, bed - 180)
   const at = from + Math.floor(unit(`${seed}:gate-time:${day}`) * (to - from))
   const opensAt = startOfDay(day) + at * 60_000
-  return { day, opensAt, closesAt: opensAt + GATE_MINUTES * 60_000 }
+  return { day, opensAt, closesAt: opensAt + minutes * 60_000 }
 }
 
 /** Dailies cleared while the gate was open. */

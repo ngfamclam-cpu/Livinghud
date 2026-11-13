@@ -1,3 +1,4 @@
+import { SkillsScreen } from '../Skills'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type {
   Boss,
@@ -78,7 +79,7 @@ export interface DashData {
   bills: Bill[]
 }
 
-type Page = 'dashboard' | 'lifelog' | 'goals' | 'collection' | 'finance' | 'quests' | 'party' | 'shop' | 'plans' | 'journal' | 'report' | 'settings' | 'workout' | 'scan' | 'focus' | 'rewards' | 'search'
+type Page = 'skills' | 'dashboard' | 'lifelog' | 'goals' | 'collection' | 'finance' | 'quests' | 'party' | 'shop' | 'plans' | 'journal' | 'report' | 'settings' | 'workout' | 'scan' | 'focus' | 'rewards' | 'search'
 
 const NAV: { key: Page; label: string; icon: string; feature?: Parameters<typeof featureOn>[1] }[] = [
   { key: 'dashboard', label: 'Command centre', icon: '◈' },
@@ -88,6 +89,7 @@ const NAV: { key: Page; label: string; icon: string; feature?: Parameters<typeof
   { key: 'goals', label: 'Top 3 goals', icon: '◎' },
   { key: 'collection', label: 'Collection', icon: '🂠', feature: 'cards' },
   { key: 'finance', label: 'Finances', icon: '$', feature: 'finance' },
+  { key: 'skills', label: 'Skills & Hunter', icon: '⚜' },
   { key: 'rewards', label: 'Rewards & Legion', icon: '♛', feature: 'extras' },
   { key: 'workout', label: 'Training', icon: '⚔' },
   { key: 'focus', label: 'Focus dungeon', icon: '⧗', feature: 'focus' },
@@ -207,6 +209,7 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
                   bills={data.bills}
                   onFinance={() => setPage('finance')}
                   onRewards={() => setPage('rewards')}
+                  onSkills={() => setPage('skills')}
                 />
               </div>
               <div className="dash-col">
@@ -231,6 +234,7 @@ export function Desktop({ data, summary, reportInput, now }: { data: DashData; s
             />
           )}
           {page === 'rewards' && <RewardsScreen player={player} summary={summary} quests={quests} />}
+          {page === 'skills' && <SkillsScreen player={player} summary={summary} />}
           {page === 'collection' && <Collection player={player} summary={summary} loot={data.loot} custom={data.customCards} />}
           {page === 'goals' && (
             <main className="hud">
