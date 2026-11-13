@@ -7,6 +7,7 @@
 // The Shadow Legion may adopt shadow beasts later; not yet.
 
 import type { Completion, StatKey } from './types'
+import { ABILITY_LEVEL, EVOLVED_NAMES, PET_PERKS, perkAmount, petAbility, type PetAbility } from './progression'
 import type { BonusRecord } from './extras'
 import { HUMAN_COMPANIONS, type HumanCompanion } from './forge'
 
@@ -167,6 +168,11 @@ export interface OwnedPet {
   condition: PetCondition | null
   /** Dead pets: quest clears still needed to revive it. */
   reviveLeft: number
+  /** Reached max level: its final form (see EVOLVED_NAMES), stronger perk and ability. */
+  evolved: boolean
+  form: string | null
+  /** Its once-a-day ability, from level ABILITY_LEVEL (pets only). */
+  ability: PetAbility | null
 }
 
 export type PetCondition = 'healthy' | 'weak' | 'sick' | 'critical' | 'dead'
@@ -179,6 +185,9 @@ export interface PetEgg {
 }
 
 export interface PetsInput {
+  /** Skill effects: multiplier on neglect damage, and quest clears to revive a fallen pet. */
+  damageScale?: number
+  reviveClears?: number
   completions: Completion[]
   /** Perfect days (YYYY-MM-DD). */
   perfectDays: string[]
@@ -224,13 +233,13 @@ interface HealthResult {
   reviveLeft: number
 }
 
-function simulateHealth(id: string, days: NeglectDay[], completions: Completion[], activeAt: (t: number) => string, firstActive: number | null): HealthResult {
+function simulateHealth(id: string, days: NeglectDay[], completions: Completion[], activeAt: (t: number) => string, firstActive: number | null, scale = 1, reviveClears: number = PET_HEALTH.reviveClears): HealthResult {
   if (firstActive === null) return { health: PET_HEALTH.max, dead: false, lostBefore: 0, reviveLeft: 0 }
   const clears = [...completions].sort((a, b) => a.createdAt - b.createdAt)
   let health = PET_HEALTH.max
   let diedAt: number | null = null
   let lostBefore = 0
-  const reviveTime = (since: number) => clears.filter(c => c.createdAt > since)[PET_HEALTH.reviveClears - 1]?.createdAt ?? null
+  const reviveTime = (since: number) => clears.filter(c => c.createdAt > since)[reviveClears - 1]?.createdAt ?? null
   for (const d of days) {
     if (d.end <= firstActive) continue
     if (diedAt !== null) {
@@ -242,7 +251,7 @@ function simulateHealth(id: string, days: NeglectDay[], completions: Completion[
     if (d.rest) continue
     const share = activeAt(d.end - 1) === id ? 1 : PET_HEALTH.restingShare
     if (d.perfect) health = Math.min(PET_HEALTH.max, health + PET_HEALTH.perfectHeal * share)
-    else health -= Math.min(PET_HEALTH.maxDailyDamage, d.missed * PET_HEALTH.missDamage) * share
+    else health -= Math.min(PET_HEALTH.maxDailyDamage, d.missed * PET_HEALTH.missDamage) * share * scale
     if (health <= 0) {
       health = 0
       diedAt = d.end
@@ -257,7 +266,7 @@ function simulateHealth(id: string, days: NeglectDay[], completions: Completion[
     }
   }
   const done = diedAt === null ? 0 : clears.filter(c => c.createdAt > diedAt!).length
-  return { health: Math.round(health), dead: diedAt !== null, lostBefore, reviveLeft: diedAt === null ? 0 : PET_HEALTH.reviveClears - done }
+  return { health: Math.round(health), dead: diedAt !== null, lostBefore, reviveLeft: diedAt === null ? 0 : reviveClears - done }
 }
 
 export interface PetsState {
@@ -298,12 +307,22 @@ export function petsState(i: PetsInput): PetsState {
     }
     return id
   }
+  // A "tamer" pet by your side shields every pet from part of the neglect damage.
+  const currentId = switches.length ? switches[switches.length - 1].value : 'pip'
+  let scale = i.damageScale ?? 1
+  const tamer = PET_PERKS[currentId]?.kind === 'tamer' ? petById(currentId) : undefined
+  if (tamer) {
+    const raw = i.completions.filter(c => activeAt(c.createdAt) === currentId).length * PET_XP.clear
+    let lv = 1
+    while (lv < 5 && raw >= PET_LEVEL_XP[lv]) lv++
+    scale *= Math.max(0.3, 1 - perkAmount({ id: tamer.id, rarity: tamer.rarity, level: lv, evolved: lv === 5 }))
+  }
   // Health first: a pet that died loses the growth it had before.
   const health = new Map<string, HealthResult>()
   for (const id of owned) {
     if (HUMAN_PETS.some(h => h.id === id)) continue
     const first = id === 'pip' ? 0 : switches.find(s => s.value === id)?.createdAt ?? null
-    health.set(id, simulateHealth(id, i.days ?? [], i.completions, activeAt, first))
+    health.set(id, simulateHealth(id, i.days ?? [], i.completions, activeAt, first, scale, i.reviveClears))
   }
   const lost = (id: string) => health.get(id)?.lostBefore ?? 0
   const xp = new Map<string, number>([['pip', lost('pip') ? 0 : i.pipHeadStart]])
@@ -338,6 +357,9 @@ export function petsState(i: PetsInput): PetsState {
       health: h ? h.health : null,
       condition: h ? (h.dead ? 'dead' : conditionOf(h.health)) : null,
       reviveLeft: h?.reviveLeft ?? 0,
+      evolved: !def.human && level === maxLevel,
+      form: !def.human && level === maxLevel ? EVOLVED_NAMES[def.id] ?? null : null,
+      ability: !def.human && level >= ABILITY_LEVEL ? petAbility(def.id, def.element) : null,
     }
   }
   const list = PETS.filter(p => owned.has(p.id)).map(make)

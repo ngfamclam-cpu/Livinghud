@@ -239,7 +239,7 @@ export async function pruneOrphanForged(): Promise<void> {
  * girl cards of the rolled rarities. Opens as one pack when it's ready. Anything
  * the forge can't make right now falls back to a card you already own.
  */
-export async function forgePackDrop(girlRarities: Rarity[], source: string, sourceId: string, unlocked: Set<string>): Promise<void> {
+export async function forgePackDrop(girlRarities: Rarity[], source: string, sourceId: string, unlocked: Set<string>, funnyCount?: number): Promise<void> {
   if (inFlight.has(sourceId)) return
   inFlight.add(sourceId)
   try {
@@ -267,7 +267,7 @@ export async function forgePackDrop(girlRarities: Rarity[], source: string, sour
     }
 
     // Funny cards: reuse the image if it was made before, otherwise make it now.
-    const funnyIds = pickFunny(seed, FUNNY_CARDS.map(c => c.id))
+    const funnyIds = pickFunny(seed, FUNNY_CARDS.map(c => c.id), funnyCount)
     const funny: ({ id: string; existing?: string; image?: Blob } | null)[] = []
     let next = 0
     const slots: typeof funny = new Array(funnyIds.length).fill(null)

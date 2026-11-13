@@ -1255,3 +1255,46 @@ span.routine-done.ok { color: var(--good); }
 @media (prefers-reduced-motion: reduce) { .soldier-photo, .soldier-smoke, .pet-photo { animation: none !important; } }
 .soldier-photo > .photo, .pet-photo > .photo { display: block; width: 100%; height: 100%; }
 .soldier-photo > .photo img, .pet-photo > .photo img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ---- Skills, Hunter rank and avatar ---- */
+:root { --hunter: #9aa4b2; }
+:root[data-hunter="D"] { --hunter: #4dffa6; }
+:root[data-hunter="C"] { --hunter: #4da3ff; }
+:root[data-hunter="B"] { --hunter: #b388ff; }
+:root[data-hunter="A"] { --hunter: #ff5f6d; }
+:root[data-hunter="S"] { --hunter: #ffcf5c; }
+:root[data-hunter="B"] .system-window, :root[data-hunter="A"] .system-window { box-shadow: 0 0 0 1px color-mix(in srgb, var(--hunter) 35%, transparent), 0 0 18px color-mix(in srgb, var(--hunter) 18%, transparent); }
+:root[data-hunter="S"] .system-window { box-shadow: 0 0 0 1px color-mix(in srgb, var(--hunter) 55%, transparent), 0 0 24px color-mix(in srgb, var(--hunter) 28%, transparent); animation: s-rank-aura 4s ease-in-out infinite; }
+@keyframes s-rank-aura { 50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--hunter) 75%, transparent), 0 0 34px color-mix(in srgb, var(--hunter) 40%, transparent); } }
+.hunter-row { display: flex; gap: 14px; align-items: center; }
+.hunter-avatar { position: relative; flex: 0 0 auto; width: 72px; height: 100px; padding: 0; border-radius: 12px; overflow: visible; border: 2px solid var(--hunter); background: #07040f; box-shadow: 0 0 16px color-mix(in srgb, var(--hunter) 60%, transparent); }
+.hunter-card.big .hunter-avatar { width: 128px; height: 180px; }
+.hunter-avatar > .photo { display: block; width: 100%; height: 100%; border-radius: 10px; overflow: hidden; }
+.hunter-avatar > .photo img { width: 100%; height: 100%; object-fit: cover; }
+.hunter-silhouette { display: grid; place-items: center; height: 100%; font-size: 2.4rem; opacity: 0.5; }
+.hunter-rank-badge { position: absolute; right: -10px; bottom: -10px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 1.1rem; color: #0b0f1a; background: var(--hunter); box-shadow: 0 0 12px var(--hunter); }
+.hunter-title { margin: 0 0 4px; font-weight: 700; color: var(--hunter); letter-spacing: 0.05em; }
+.hunter-ladder { display: flex; gap: 6px; margin: 8px 0; }
+.hunter-ladder span { width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; font-weight: 700; border: 1px solid rgba(255,255,255,0.15); opacity: 0.45; }
+.hunter-ladder span.past { opacity: 0.8; }
+.hunter-ladder span.now { opacity: 1; border-color: var(--hunter); color: var(--hunter); box-shadow: 0 0 10px var(--hunter); }
+.skill-tree { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.skill-branch h3 { margin: 4px 0; }
+.skill-node { border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; position: relative; }
+.skill-node + .skill-node::before { content: ''; position: absolute; top: -9px; left: 50%; width: 2px; height: 8px; background: rgba(255,255,255,0.2); }
+.skill-node.learned { border-color: var(--good); background: color-mix(in srgb, var(--good) 8%, transparent); }
+.skill-node.ready { border-color: var(--accent); box-shadow: 0 0 10px var(--glow); }
+.skill-node.locked { opacity: 0.6; }
+.skill-head { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; }
+.skill-node p { margin: 4px 0 6px; }
+.rank-up { flex-direction: column; display: flex; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.rank-up-kicker { letter-spacing: 0.3em; color: var(--accent); margin: 0; }
+.rank-up-letter { position: relative; font-size: 9rem; font-weight: 900; line-height: 1; color: var(--hunter); text-shadow: 0 0 30px var(--hunter), 0 0 60px var(--hunter); animation: rank-slam 0.9s cubic-bezier(0.2, 0.8, 0.2, 1.3) both; }
+.rank-up-wave { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px; border-radius: 50%; border: 3px solid var(--hunter); animation: rank-wave 1.4s ease-out 0.4s infinite; }
+.rank-up-wave.w2 { animation-delay: 1.1s; }
+.rank-up-title { font-size: 1.4rem; font-weight: 700; letter-spacing: 0.1em; margin: 0; }
+@keyframes rank-slam { from { transform: scale(3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes rank-wave { from { transform: scale(1); opacity: 1; } to { transform: scale(8); opacity: 0; } }
+.pet-perk { margin: 6px 0 2px; font-size: 0.85rem; color: var(--accent); }
+.pet-ability { margin: 4px 0; }
+@media (prefers-reduced-motion: reduce) { .rank-up-letter, .rank-up-wave, :root[data-hunter="S"] .system-window { animation: none !important; } }

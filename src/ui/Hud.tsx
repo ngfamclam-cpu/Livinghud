@@ -1,3 +1,4 @@
+import { HunterCard } from './Skills'
 import { Fragment, useState, type ReactNode } from 'react'
 import { DAY_NAMES, HP_PER_CLEAN_DAY, KNOCKOUT_DOLLARS, LOW_HP, MAX_HP, NORMAL_XP_PER_MISS, addDays, featureOn, dayExercises, formatAmount, questReward, dailyWeight, type Bill, type Completion, type DayGoals, type LootDrop, type Transaction, type Memory, type Player, type Quest, type Summary, type SurpriseClear, statName } from '../engine'
 import { acceptRoutineOffer, completeQuest, declineRoutineOffer, undoQuest } from '../db/actions'
@@ -44,9 +45,10 @@ interface HudProps {
   onCustomize?: () => void
   /** Opens the Rewards & Shadow Legion screen. */
   onRewards?: () => void
+  onSkills?: () => void
 }
 
-export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop, memories, onLifeLog, goals, onGoals, loot, onCollection, transactions, bills, onFinance, onCustomize, onRewards }: HudProps) {
+export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJournal, journaledToday, onReport, surprises, now, onPlans, desktop, memories, onLifeLog, goals, onGoals, loot, onCollection, transactions, bills, onFinance, onCustomize, onRewards, onSkills }: HudProps) {
   const layout = useHudLayout()
   const active = quests.filter(q => q.active).sort((a, b) => a.createdAt - b.createdAt)
   const dailies = active.filter(q => q.kind === 'daily')
@@ -188,6 +190,7 @@ export function Hud({ player, quests, summary, onStartWorkout, onFocus, onJourna
     collection:
       featureOn(player, 'cards') && <CollectionPanel loot={loot} onOpen={onCollection} />,
     companion: summary.extras.companion && <CompanionPanel summary={summary} dailiesTotal={dailies.length} dailiesDone={doneCount} onPets={onRewards} seed={`${player.id}:${player.createdAt}`} questTemplates={new Set(quests.map(q => q.templateId ?? ''))} />,
+    hunter: <HunterCard summary={summary} onOpen={onSkills} />,
     rewards: (featureOn(player, 'extras') || featureOn(player, 'legion')) && onRewards && <RewardsPanel summary={summary} onOpen={onRewards} onCards={featureOn(player, 'cards') ? onCollection : undefined} />,
   }
   const shown = layout.order.filter(id => layout.place[id] !== 'hidden' && panels[id])
@@ -290,6 +293,7 @@ const PANEL_SHORT: Record<PanelId, string> = {
   collection: 'cards',
   companion: 'companion',
   rewards: 'rewards',
+  hunter: 'hunter',
 }
 
 function QuestRow({ quest, done, streak = 0, routine, onStartWorkout, onPhoto, pay, onPlan, golden }: RowProps) {

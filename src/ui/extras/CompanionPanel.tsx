@@ -5,6 +5,8 @@ import { HumanPanel } from './HumanPanel'
 import { PetSwitcher } from './PetSwitcher'
 import { SystemWindow } from '../SystemWindow'
 import { PetPortrait } from './PetPortrait'
+import { ABILITY_INFO, ABILITY_LEVEL, PET_PERKS, perkText, statName } from '../../engine'
+import { triggerPetAbility } from '../../db/actions'
 import { petLook, petLookKey, petPhoto, useAutoLooks } from '../../db/looks'
 
 interface Care {
@@ -56,9 +58,12 @@ export function CompanionPanel(props: PanelProps) {
 function PetPanel({ summary, dailiesTotal, dailiesDone, onPets }: PanelProps) {
   const c = summary.extras.companion
   const lookPet = c?.pet
-  const photo = lookPet && lookPet.condition !== 'dead' ? petPhoto(summary.extras.portraits, lookPet.def.id, lookPet.level) : undefined
+  // Evolved pets are drawn in their final form (the top look stage).
+  const lookLevel = lookPet ? (lookPet.evolved && lookPet.def.id !== 'pip' ? 6 : lookPet.level) : 1
+  const photo = lookPet && lookPet.condition !== 'dead' ? petPhoto(summary.extras.portraits, lookPet.def.id, lookLevel) : undefined
   // The active pet gets an AI look for its current level (made once, in the background).
-  useAutoLooks(summary, lookPet && !lookPet.def.human && lookPet.condition !== 'dead' ? [{ key: petLookKey(lookPet.def.id, lookPet.level), req: petLook(lookPet.def.id, lookPet.level) }] : [])
+  useAutoLooks(summary, lookPet && !lookPet.def.human && lookPet.condition !== 'dead' ? [{ key: petLookKey(lookPet.def.id, lookLevel), req: petLook(lookPet.def.id, lookLevel) }] : [])
+  const [abilityMsg, setAbilityMsg] = useState('')
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(c?.name ?? 'Pip')
   const [action, setAction] = useState<CompanionAction | null>(null)
@@ -132,7 +137,7 @@ function PetPanel({ summary, dailiesTotal, dailiesDone, onPets }: PanelProps) {
             <button className="small">Save</button>
           </form>
         ) : (
-          <button className="link-button" onClick={() => setEditing(true)} title="Rename"><b>{c.name}</b> · Lv {pet.level} {pet.def.id === 'pip' ? pet.stage : pet.stage} ✎</button>
+          <button className="link-button" onClick={() => setEditing(true)} title="Rename"><b>{c.name}</b> · Lv {pet.level} {pet.evolved ? `· ✦ ${pet.form}` : pet.stage} ✎</button>
         )}
         <span className="companion-hearts" aria-label={`Affection today: ${hearts} of 5`}>{'♥'.repeat(hearts)}<span className="muted">{'♥'.repeat(5 - hearts)}</span></span>
       </div>
@@ -147,13 +152,27 @@ function PetPanel({ summary, dailiesTotal, dailiesDone, onPets }: PanelProps) {
           <small>{cond === 'dead' ? `💀 Ghost · revives in ${pet.reviveLeft} quest clear${pet.reviveLeft === 1 ? '' : 's'}` : `❤ Health ${pet.health}/100 · ${cond === 'healthy' ? 'healthy' : cond} · each missed daily hurts it, perfect days heal`}</small>
         </div>
       )}
+      {PET_PERKS[pet.def.id] && (
+        <p className="pet-perk">✦ Perk: {perkText({ id: pet.def.id, rarity: pet.def.rarity, level: pet.level, evolved: pet.evolved }, statName)}{pet.condition === 'dead' ? ' (paused while a ghost)' : ''}</p>
+      )}
+      {pet.ability ? (
+        <div className="row pet-ability">
+          <span className="grow small-print"><b>{ABILITY_INFO[pet.ability].name}</b> · {ABILITY_INFO[pet.ability].text}</span>
+          <button className="small" disabled={summary.progression.abilityUsedToday || cond === 'dead'} onClick={() => void triggerPetAbility().then(r => setAbilityMsg(r ?? ''))}>
+            {summary.progression.abilityUsedToday ? 'Used today' : `Use ${ABILITY_INFO[pet.ability].name}`}
+          </button>
+        </div>
+      ) : (
+        <p className="muted small-print">Learns a daily ability at level {ABILITY_LEVEL}.{pet.nextXp !== null ? ` Evolves at max level.` : ''}</p>
+      )}
+      {abilityMsg && <p className="muted small-print">{abilityMsg}</p>}
       {pet.nextXp !== null ? (
         <div className="pet-xp" aria-label={`${pet.xp} of ${pet.nextXp} pet XP to the next level`}>
           <span style={{ width: `${Math.min(100, (pet.xp / pet.nextXp) * 100)}%` }} />
           <small>{pet.xp}/{pet.nextXp} XP · grows 1 per quest cleared, 5 per perfect day, only while active</small>
         </div>
       ) : (
-        <p className="muted">Fully grown. A true {pet.def.rarity} companion.</p>
+        <p className="muted">Evolved into {pet.form}: perk and ability 50% stronger.</p>
       )}
       <PetSwitcher summary={summary} onPets={onPets} />
     </SystemWindow>

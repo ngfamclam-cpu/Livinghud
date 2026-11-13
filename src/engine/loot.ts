@@ -197,9 +197,9 @@ export const DOUBLE_GIRL_LUCK = 0.2
 const BIG_DROPS = new Set<DropSource>(['boss', 'main', 'strength', 'perfect', 'golden', 'gate', 'roll', 'pack'])
 
 /** How many girl cards a pack holds: 1, or 2 for big quests and lucky rolls. */
-export function packGirls(source: DropSource, sourceId: string, seed: string): 1 | 2 {
+export function packGirls(source: DropSource, sourceId: string, seed: string, luck = DOUBLE_GIRL_LUCK): 1 | 2 {
   if (BIG_DROPS.has(source)) return 2
-  return unit(`${seed}:${source}:${sourceId}:double`) < DOUBLE_GIRL_LUCK ? 2 : 1
+  return unit(`${seed}:${source}:${sourceId}:double`) < Math.min(0.9, luck) ? 2 : 1
 }
 
 /** The girl cards' rarities: the rolled one, then (for a second card) at least Rare. */

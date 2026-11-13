@@ -33,6 +33,7 @@ export type GameEvent =
   | { type: 'penalty.cleared'; task: string; shield: boolean }
   | { type: 'finance.logged'; kind: 'expense' | 'income'; amount: number; category: string }
   | { type: 'loot.card'; cardId: string; copies: number; starUp: boolean; foil?: boolean }
+  | { type: 'hunter.rankup'; rank: string; title: string; level: number }
   | { type: 'loot.pack'; source: string; cards: { cardId: string; copies: number; starUp: boolean; foil?: boolean; girl: boolean }[] }
   /** Surprise rewards: Golden Quest, Red Gate, Lucky Roll, coupons, wildcards, job changes, hidden achievements, the Legion. */
   | { type: 'extra'; title: string; text: string }

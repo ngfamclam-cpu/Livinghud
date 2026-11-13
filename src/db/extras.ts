@@ -56,7 +56,7 @@ export async function afterDailyCleared(completion: Completion): Promise<void> {
     if (rollsCoupon(seed, 'golden', `golden-${day}`)) await giveCoupon(seed, day, `golden-${day}`)
   }
   if (day !== summary.today) return
-  const gate = redGate(seed, day, player.settings.wakeTime, player.settings.bedTime)
+  const gate = redGate(seed, day, player.settings.wakeTime, player.settings.bedTime, summary.progression.effects.gateMinutes)
   if (!gate || (await db.bonuses.where('sourceId').equals(`gate-${day}`).filter(b => b.kind === 'gate').count())) return
   const dailyIds = new Set(quests.filter(q => q.kind === 'daily').map(q => q.id))
   if (gateCount(gate, completions, dailyIds) < GATE_NEEDED) return
@@ -78,7 +78,7 @@ export async function afterDailyUndone(done: Completion): Promise<void> {
   if (done.golden) back.push(`golden-${day}`)
   // No longer a perfect day: its roll (and what it gave) goes too.
   if (!summary.incentives?.perfectToday || day !== summary.today) back.push(`roll-${day}`, `perfect-${day}`)
-  const gate = redGate(surpriseSeed(player), day, player.settings.wakeTime, player.settings.bedTime)
+  const gate = redGate(surpriseSeed(player), day, player.settings.wakeTime, player.settings.bedTime, summary.progression.effects.gateMinutes)
   const dailyIds = new Set(quests.filter(q => q.kind === 'daily').map(q => q.id))
   if (gate && gateCount(gate, completions, dailyIds) < GATE_NEEDED) back.push(`gate-${day}`)
   await takeBack(back)
@@ -100,7 +100,7 @@ export async function rollTheDice(): Promise<number | null> {
   if (!day || !featureOn(player, 'extras')) return null
   if (await db.bonuses.where('sourceId').equals(`roll-${day}`).filter(b => b.kind === 'roll').count()) return null
   const seed = surpriseSeed(player)
-  const n = luckyRoll(seed, day)
+  const n = Math.min(20, luckyRoll(seed, day) + summary.progression.effects.rollBonus)
   const reward = rollReward(n)
   await addBonus('roll', day, `roll-${day}`, String(n))
   const pay = scalePay(rollPay(n), player.settings.monthlyBudget)

@@ -14,7 +14,7 @@
 
 import { blobStore, jsonResponse, normalizeKey, sha256, type Store } from '../server/blob.js'
 import { FORGE_STEPS, MAX_VARIANT, companionPrompt, forgeCard, forgePrompt, humanCompanion, type ForgeLevel } from '../src/engine/forge.js'
-import { funnyCard, funnyPrompt, petPrompt, soldierPrompt } from '../src/engine/looks.js'
+import { avatarPrompt, funnyCard, funnyPrompt, petPrompt, soldierPrompt } from '../src/engine/looks.js'
 
 const MODEL = '@cf/black-forest-labs/flux-1-schnell'
 const env = () => (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}
@@ -27,7 +27,7 @@ export async function handle(request: Request, store: Store = blobStore, fetcher
   const token = env().CLOUDFLARE_API_TOKEN?.trim()
   if (!account || !token) return jsonResponse({ error: 'not-configured' }, 503)
 
-  const body = (await request.json().catch(() => ({}))) as { cardId?: unknown; variant?: unknown; companionId?: unknown; outfitId?: unknown; funnyId?: unknown; soldierKind?: unknown; veteran?: unknown; petId?: unknown; level?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { cardId?: unknown; variant?: unknown; companionId?: unknown; outfitId?: unknown; funnyId?: unknown; soldierKind?: unknown; veteran?: unknown; petId?: unknown; level?: unknown; avatarStage?: unknown }
   const variant = body.variant === undefined ? 0 : Number(body.variant)
   if (!Number.isInteger(variant) || variant < 0 || variant > MAX_VARIANT) return jsonResponse({ error: 'bad-variant' }, 400)
   // A card from the catalog, or a companion's outfit portrait. Nothing else can be made.
@@ -37,6 +37,9 @@ export async function handle(request: Request, store: Store = blobStore, fetcher
     if (card) promptFor = () => funnyPrompt(card, variant)
   } else if (typeof body.soldierKind === 'string') {
     const prompt = soldierPrompt(body.soldierKind, variant, body.veteran === true)
+    if (prompt) promptFor = () => prompt
+  } else if (body.avatarStage !== undefined) {
+    const prompt = Number.isInteger(Number(body.avatarStage)) ? avatarPrompt(Number(body.avatarStage), variant) : null
     if (prompt) promptFor = () => prompt
   } else if (typeof body.petId === 'string') {
     const prompt = petPrompt(body.petId, Number(body.level) || 1, variant)

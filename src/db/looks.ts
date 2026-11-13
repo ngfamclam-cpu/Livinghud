@@ -10,7 +10,7 @@ import { db, LOCAL_USER, newId } from './db'
 import { cardPhoto, forgeImage } from './forge'
 import { syncKey } from './sync'
 
-export type LookRequest = { soldierKind: string; veteran: boolean; variant: number } | { petId: string; level: number; variant: number }
+export type LookRequest = { soldierKind: string; veteran: boolean; variant: number } | { petId: string; level: number; variant: number } | { avatarStage: number; variant: number }
 
 const inFlight = new Set<string>()
 /** Looks made this session (the summary can lag a moment behind the save). */
@@ -30,6 +30,14 @@ function stableVariant(text: string): number {
 
 export const soldierLook = (id: string, kind: string, veteran: boolean): LookRequest => ({ soldierKind: kind, veteran, variant: stableVariant(id) })
 export const petLook = (id: string, level: number): LookRequest => ({ petId: id, level, variant: stableVariant(`${id}:${level}`) })
+export const avatarLookKey = (stage: number) => `avatar:${stage}`
+export const avatarLook = (stage: number): LookRequest => ({ avatarStage: stage, variant: stableVariant(`avatar:${stage}`) })
+
+/** The Hunter avatar: this stage's look if made, else the closest earlier one. */
+export function avatarPhoto(portraits: Record<string, string>, stage: number): string | undefined {
+  for (let s = stage; s >= 0; s--) if (portraits[avatarLookKey(s)]) return portraits[avatarLookKey(s)]
+  return undefined
+}
 
 export type LookOutcome = { ok: true } | { ok: false; message: string }
 

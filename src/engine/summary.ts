@@ -3,6 +3,7 @@
 // nothing can drift, and syncing devices later only has to merge logs.
 
 import { levelFromXp, type LevelInfo } from './leveling'
+import { activeSkills, avatarStage, hunterRank, pointsLeft, skillEffects, type SkillEffects } from './progression'
 import { budgetAt, playerRank, round2, savingsStatus, settleEarnings, type EarningEvent, type SavingsStatus } from './economy'
 import { addDays, dayKey, daysBetween, monthOf, weekOf } from './time'
 import { dayExercises, planDay, playerPlan, progressionDue, raisePlan, routineDone, routineTargets, type RoutineTargets } from './workout'
@@ -107,6 +108,16 @@ export interface Summary {
   /** Combo meter, perfect days, shields and any open Penalty Quest; null before the rules start. */
   incentives: IncentiveState | null
   extras: ExtrasState
+  /** Skill tree, Hunter rank by level and the avatar's look stage (src/engine/progression.ts). */
+  progression: {
+    skills: Set<string>
+    effects: SkillEffects
+    pointsLeft: number
+    hunter: ReturnType<typeof hunterRank>
+    avatarStage: number
+    /** Today's pet ability already used. */
+    abilityUsedToday: boolean
+  }
   /** Distinct places, cities and countries in the Life log. */
   travel: { places: number; cities: number; countries: number }
   /** The plan with raised targets the System offers after 3 clean weeks; null when not due. */
@@ -227,9 +238,9 @@ export function summarize(
         rolls: rolls.map(r => Number(r.value)), loot, soldiers: legion.soldiers.length, couponsUsed,
       })
     : []
-  const extrasXp = extrasOn
+  const extrasXp = (extrasOn
     ? rolls.reduce((sum, r) => sum + rollReward(Number(r.value)).xp, 0) + gateClears.length * GATE_XP + hidden.length * HIDDEN_XP
-    : 0
+    : 0) + bonuses.filter(b => b.kind === 'ability').reduce((sum, b) => sum + (Number(b.value.split(':')[1]) || 0), 0)
   const jobXp = legionOn ? jobsTaken.reduce((sum, j) => sum + (jobById(j.value)?.xp ?? 0), 0) : 0
 
   // Wallet: each month caps at the budget and the overflow goes to the Vault.
@@ -406,7 +417,9 @@ export function summarize(
 
   // Surprise rewards state for the screens.
   const todayDailies = dailies.filter(q => dayKey(new Date(q.createdAt), player.settings.resetHour) <= today)
-  const gate = extrasOn ? redGate(seed, today, player.settings.wakeTime, player.settings.bedTime) : null
+  const skills = activeSkills(player.skills, level.level)
+  const effects = skillEffects(skills)
+  const gate = extrasOn ? redGate(seed, today, player.settings.wakeTime, player.settings.bedTime, effects.gateMinutes) : null
   const rollFor = (day: string) => (perfectList.includes(day) && !rolls.some(r => r.day === day) ? day : null)
   const rollDay = extrasOn ? (rollFor(today) ?? rollFor(addDays(today, -1))) : null
   const usedCoupons = new Set(bonuses.filter(b => b.kind === 'coupon-use').map(b => b.value))
@@ -424,6 +437,8 @@ export function summarize(
   const missedYesterday = todayDailies.filter(q => dayKey(new Date(q.createdAt), player.settings.resetHour) <= addDays(today, -1) && !completions.some(c => c.questId === q.id && c.day === addDays(today, -1))).length
   const pets = player.features?.companion !== false
     ? petsState({
+        damageScale: effects.petDamage,
+        reviveClears: effects.reviveClears,
         completions,
         perfectDays: perfectList,
         bonuses,
@@ -461,7 +476,7 @@ export function summarize(
     golden: extrasOn ? goldenQuestId(seed, today, todayDailies) : null,
     gate: gate && { ...gate, count: gateCount(gate, completions, allDailyIds), needed: GATE_NEEDED, cleared: gateClears.some(g => g.day === today) },
     rollDay,
-    roll: rollDay ? luckyRoll(seed, rollDay) : null,
+    roll: rollDay ? Math.min(20, luckyRoll(seed, rollDay) + effects.rollBonus) : null,
     rolledToday: rolls.find(r => r.day === today) ? Number(rolls.find(r => r.day === today)!.value) : null,
     cursedToday: rolls.some(r => r.day === today && r.value === '1'),
     coupons: extrasOn ? [...couponRecords.values()].filter(c => !usedCoupons.has(c.id)).flatMap(c => {
@@ -494,6 +509,14 @@ export function summarize(
   const exercises = dayExercises(plan, kind)
 
   return {
+    progression: {
+      skills,
+      effects,
+      pointsLeft: pointsLeft(player.skills, level.level),
+      hunter: hunterRank(level.level),
+      avatarStage: avatarStage(level.level),
+      abilityUsedToday: bonuses.some(b => b.kind === 'ability' && b.day === today),
+    },
     today,
     week,
     totalXp,
