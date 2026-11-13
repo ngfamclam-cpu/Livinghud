@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { COMBO_MAX, COMBO_STEP, DEFAULT_PENALTY_MENU, PACK_MILESTONES, PERFECT_DAY_XP, SECRET_UNLOCKS, defaultIncentives, type Player } from '../engine'
+import { COMBO_MAX, COMBO_STEP, DEFAULT_MIN_RATE, DEFAULT_PENALTY_MENU, PACK_MILESTONES, PERFECT_DAY_XP, SECRET_UNLOCKS, defaultIncentives, type Player } from '../engine'
 import { ensureTriggerToken, saveIncentiveSettings } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 
 /** Settings: tune the Penalty Quest, edit your penalty list, and set up the phone game lock. */
 export function IncentiveSettingsPanel({ player }: { player: Player }) {
   const current = player.incentives ?? defaultIncentives('')
-  const [threshold, setThreshold] = useState(current.threshold)
+  const [minRate, setMinRate] = useState(current.minRate ?? DEFAULT_MIN_RATE)
   const [lockShop, setLockShop] = useState(current.lockShop)
   const [menu, setMenu] = useState<string[]>(current.menu)
   const [newItem, setNewItem] = useState('')
@@ -16,7 +16,7 @@ export function IncentiveSettingsPanel({ player }: { player: Player }) {
   const statusLink = token ? `${location.origin}/api/trigger?t=${token}&status=1` : ''
 
   const save = async () => {
-    await saveIncentiveSettings({ threshold, lockShop, menu })
+    await saveIncentiveSettings({ minRate, lockShop, menu })
     setSaved(true)
   }
   const copy = async () => {
@@ -42,8 +42,9 @@ export function IncentiveSettingsPanel({ player }: { player: Player }) {
 
       <h3>Penalty Quest</h3>
       <label>
-        Trigger after missing this many dailies in a day: <b>{threshold}</b>
-        <input type="range" min={1} max={5} step={1} value={threshold} onChange={e => { setThreshold(Number(e.target.value)); setSaved(false) }} />
+        Safe if you clear at least <b>{Math.round(minRate * 100)}%</b> of your dailies in a day
+        <input type="range" min={50} max={100} step={5} value={Math.round(minRate * 100)} onChange={e => { setMinRate(Number(e.target.value) / 100); setSaved(false) }} />
+        <small className="muted">Below that, a Penalty Quest opens the next day.</small>
       </label>
       <label className="toggle-line">
         <input type="checkbox" checked={lockShop} onChange={e => { setLockShop(e.target.checked); setSaved(false) }} />
