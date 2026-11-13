@@ -1456,6 +1456,7 @@ export async function saveIncentiveSettings(patch: Partial<Omit<IncentiveSetting
   const current = player.incentives ?? defaultIncentives(dayKey(new Date(), player.settings.resetHour))
   const next = { ...current, ...patch }
   next.threshold = Math.max(1, Math.min(5, Math.round(next.threshold)))
+  next.minRate = Math.max(0.5, Math.min(1, Math.round((next.minRate ?? 0.75) * 20) / 20))
   next.menu = next.menu.map(m => m.trim().slice(0, 80)).filter(Boolean).slice(0, 20)
   await db.players.update(LOCAL_USER, { incentives: next, updatedAt: Date.now() })
 }

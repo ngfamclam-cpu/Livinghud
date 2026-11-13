@@ -37,8 +37,13 @@ export const DEFAULT_PENALTY_MENU = [
 ]
 
 export interface IncentiveSettings {
-  /** Missed dailies in one day that trigger a Penalty Quest the next day (1-5). */
+  /** Old rule (missed dailies in a day); kept for older saves, no longer used. */
   threshold: number
+  /**
+   * Share of the day's dailies you must clear to avoid a Penalty Quest the next
+   * day (0.5-1). Owner, Nov 2026: "shouldn't come up if I do 75% of my dailies".
+   */
+  minRate?: number
   menu: string[]
   /** Lock the Shop while a Penalty Quest is open. */
   lockShop: boolean
@@ -46,7 +51,18 @@ export interface IncentiveSettings {
   since: string
 }
 
-export const defaultIncentives = (since: string): IncentiveSettings => ({ threshold: 2, menu: DEFAULT_PENALTY_MENU, lockShop: true, since })
+export const DEFAULT_MIN_RATE = 0.75
+
+export const defaultIncentives = (since: string): IncentiveSettings => ({ threshold: 2, minRate: DEFAULT_MIN_RATE, menu: DEFAULT_PENALTY_MENU, lockShop: true, since })
+
+/** The day's dailies fell short of the minimum share (a Recovery Day or a day with none due never does). */
+export function fellShort(log: PlayLog, day: string, minRate = DEFAULT_MIN_RATE): boolean {
+  if (log.restDays.has(day)) return false
+  const dueNow = due(log, day).length
+  if (dueNow === 0) return false
+  const done = dueNow - missedOn(log, day)
+  return done / dueNow < Math.min(1, Math.max(0.5, minRate)) - 1e-9
+}
 
 export interface DailyRef {
   id: string
@@ -145,11 +161,11 @@ export function shieldsEarned(log: PlayLog, today: string, since: string): numbe
   return n
 }
 
-/** Days (up to today) that carry a Penalty Quest: the day after missing `threshold`+ dailies. */
+/** Days (up to today) that carry a Penalty Quest: the day after clearing less than `minRate` of the dailies. */
 export function penaltyDays(log: PlayLog, settings: IncentiveSettings, today: string): string[] {
   const out: string[] = []
   for (let day = addDays(settings.since, 1); day <= today; day = addDays(day, 1)) {
-    if (missedOn(log, addDays(day, -1)) >= Math.max(1, settings.threshold)) out.push(day)
+    if (fellShort(log, addDays(day, -1), settings.minRate)) out.push(day)
   }
   return out
 }

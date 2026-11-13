@@ -54,13 +54,22 @@ describe('perfect days and combo', () => {
 })
 
 describe('penalty quests', () => {
-  const settings = { ...defaultIncentives('2026-10-01'), threshold: 2 }
+  const settings = defaultIncentives('2026-10-01')
 
-  it('trigger the day after missing the threshold', () => {
-    const l = log({ '2026-10-01': 2, '2026-10-02': 0, '2026-10-03': 1, '2026-10-04': 2 }, [])
-    expect(missedOn(l, '2026-10-02')).toBe(2)
-    expect(penaltyDays(l, settings, '2026-10-04')).toEqual(['2026-10-03'])
-    expect(penaltyDays(l, { ...settings, threshold: 1 }, '2026-10-05')).toEqual(['2026-10-03', '2026-10-04'])
+  it('trigger the day after clearing less than 75% of the dailies', () => {
+    // Four dailies: 3 of 4 (75%) is safe, 2 of 4 isn't.
+    const ids = ['a', 'b', 'c', 'd']
+    const four = (done: Record<string, number>): PlayLog => ({
+      dailies: ids.map(id => ({ id, since: '2026-10-01' })),
+      doneOn: new Map(Object.entries(done).map(([d, n]) => [d, new Set(ids.slice(0, n))])),
+      restDays: new Set(),
+    })
+    const l = four({ '2026-10-01': 4, '2026-10-02': 3, '2026-10-03': 2, '2026-10-04': 0 })
+    expect(missedOn(l, '2026-10-03')).toBe(2)
+    expect(penaltyDays(l, settings, '2026-10-05')).toEqual(['2026-10-04', '2026-10-05'])
+    expect(penaltyDays(l, { ...settings, minRate: 1 }, '2026-10-05')).toEqual(['2026-10-03', '2026-10-04', '2026-10-05'])
+    // With two dailies, missing one is 50%: still a penalty.
+    expect(penaltyDays(log({ '2026-10-01': 1 }), settings, '2026-10-02')).toEqual(['2026-10-02'])
   })
 
   it('never trigger from a Recovery Day', () => {
