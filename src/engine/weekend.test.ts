@@ -44,3 +44,21 @@ describe('budget changes never move money', () => {
     expect(settleEarnings([ev(10, 120), ev(200, 30)], down, 50).get('2026-11')).toEqual({ wallet: 120, overflow: 30 })
   })
 })
+
+import { dayOffCheck, dayOffPrice } from './weekend'
+
+describe('day off pass', () => {
+  it('costs about two perfect days and is once a week, today or tomorrow', () => {
+    expect(dayOffPrice(150)).toBe(15)
+    expect(dayOffPrice(735)).toBe(60)
+    expect(dayOffPrice(20)).toBe(5)
+    const none = () => false
+    expect(dayOffCheck([], '2026-11-14', '2026-11-14', none)).toBeNull()
+    expect(dayOffCheck([], '2026-11-16', '2026-11-14', none)).toBe('Only for today or tomorrow')
+    expect(dayOffCheck([], '2026-11-14', '2026-11-14', d => d === '2026-11-14')).toBe('That day is already a Recovery Day')
+    const used = [{ special: 'dayOff', day: '2026-11-10', forDay: '2026-11-11' }] as Purchase[]
+    expect(dayOffCheck(used, '2026-11-14', '2026-11-14', none)).toMatch(/One day off per week/)
+    // Sunday the 15th is the same week; Monday the 16th is a new one.
+    expect(dayOffCheck(used, '2026-11-16', '2026-11-15', none)).toBeNull()
+  })
+})

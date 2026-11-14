@@ -146,7 +146,7 @@ export type RewardRank = 'E' | 'D' | 'C' | 'B' | 'A' | 'S'
  * Special reward rules. A date costs money and also earns CHA XP; a big night
  * out (a rave, a night of drinking) grants a Recovery Day token for the next day.
  */
-export type RewardSpecial = 'none' | 'date' | 'bigNight'
+export type RewardSpecial = 'none' | 'date' | 'bigNight' | 'dayOff'
 
 export interface Reward {
   id: string

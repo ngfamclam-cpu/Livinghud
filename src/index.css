@@ -1298,3 +1298,4 @@ span.routine-done.ok { color: var(--good); }
 .pet-perk { margin: 6px 0 2px; font-size: 0.85rem; color: var(--accent); }
 .pet-ability { margin: 4px 0; }
 @media (prefers-reduced-motion: reduce) { .rank-up-letter, .rank-up-wave, :root[data-hunter="S"] .system-window { animation: none !important; } }
+.weekend-purchase.day-off { border-color: color-mix(in srgb, var(--good) 50%, transparent); }

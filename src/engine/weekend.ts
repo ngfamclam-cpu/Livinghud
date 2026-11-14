@@ -75,3 +75,29 @@ export function weekendSpend(purchases: Purchase[], today: string): { total: num
   }
   return { total: round2(total), count }
 }
+
+// ---- Day Off pass: buy a break from your dailies ----
+
+/** Day Off passes per Mon-Sun week. */
+export const DAY_OFF_PER_WEEK = 1
+
+/** What a day off costs: about two perfect days of pay at your budget, at least $5. */
+export function dayOffPrice(monthlyBudget: number): number {
+  return Math.max(5, Math.round((monthlyBudget / 12) / 5) * 5)
+}
+
+/** Monday of the week a day is in. */
+function mondayOf(day: string): string {
+  const dow = new Date(`${day}T12:00:00`).getDay()
+  return addDays(day, -((dow + 6) % 7))
+}
+
+/** Whether a Day Off pass can be bought for `forDay` (today or tomorrow), and why not. */
+export function dayOffCheck(purchases: Purchase[], forDay: string, today: string, isRecovery: (day: string) => boolean): string | null {
+  if (forDay !== today && forDay !== addDays(today, 1)) return 'Only for today or tomorrow'
+  if (isRecovery(forDay)) return 'That day is already a Recovery Day'
+  const week = mondayOf(forDay)
+  const used = purchases.filter(p => p.special === 'dayOff' && mondayOf(p.forDay ?? p.day) === week).length
+  if (used >= DAY_OFF_PER_WEEK) return 'One day off per week (Monday to Sunday)'
+  return null
+}
