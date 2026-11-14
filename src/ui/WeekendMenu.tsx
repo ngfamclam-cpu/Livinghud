@@ -12,8 +12,11 @@ import {
   type Purchase,
   type Summary,
   type WeekendPlan,
+  addDays,
+  dayOffCheck,
+  dayOffPrice,
 } from '../engine'
-import { buyWeekend, resetMoney, saveWeekendPrefs, updateSettings } from '../db/actions'
+import { buyDayOff, buyWeekend, resetMoney, saveWeekendPrefs, updateSettings } from '../db/actions'
 import { SystemWindow } from './SystemWindow'
 import { money } from './format'
 
@@ -88,6 +91,8 @@ export function WeekendMenu({ player, purchases, summary }: { player: Player; pu
           ))}
         </div>
       </div>
+
+      <DayOffPass purchases={purchases} summary={summary} onMessage={setMessage} />
 
       <p className="muted small-print">No level needed here: your money is the gate. {summary.savings.target > 0 && !summary.savings.met && 'Your savings goal still has to be met first. '}Bought by mistake? Refund it today under Purchases.</p>
       <button className="ghost small" onClick={() => setEditing(e => !e)}>{editing ? 'Done' : 'Change prices'}</button>
@@ -194,5 +199,31 @@ export function BudgetHelper({ player }: { player: Player }) {
         </div>
       </details>
     </SystemWindow>
+  )
+}
+
+/** Buy a break: today or tomorrow becomes a Recovery Day (once a week). */
+function DayOffPass({ purchases, summary, onMessage }: { purchases: Purchase[]; summary: Summary; onMessage: (m: string) => void }) {
+  const price = dayOffPrice(summary.wallet.budget)
+  const tomorrow = addDays(summary.today, 1)
+  const isRest = (d: string) => summary.recoveryDays.has(d)
+  const whyToday = dayOffCheck(purchases, summary.today, summary.today, isRest)
+  const whyTomorrow = dayOffCheck(purchases, tomorrow, summary.today, isRest)
+  const buy = async (day: string) => {
+    if (!confirm(`Take ${day === summary.today ? 'today' : 'tomorrow'} off for ${money(price)}?\n\nNo penalties, your streaks and combo are safe, and your pets won't get hurt. Anything you still clear that day counts as a bonus.`)) return
+    const why = await buyDayOff(day)
+    onMessage(why ? `Can't take the day off: ${why}.` : `${day === summary.today ? 'Today' : 'Tomorrow'} is a Recovery Day. Enjoy the break.`)
+  }
+  return (
+    <div className="weekend-purchase day-off">
+      <b>🛌 Day off pass · {money(price)}</b>
+      <small className="muted">Skip your dailies for a day: no Penalty Quest, streaks and combo pause, pets stay healthy. One a week; about two perfect days of pay.</small>
+      {summary.recoveryToday && <small className="system-line">Today is already a Recovery Day.</small>}
+      <div className="row">
+        <button className="small" disabled={!!whyToday} title={whyToday ?? ''} onClick={() => void buy(summary.today)}>Today</button>
+        <button className="small" disabled={!!whyTomorrow} title={whyTomorrow ?? ''} onClick={() => void buy(tomorrow)}>Tomorrow</button>
+      </div>
+      {whyToday && whyTomorrow && !summary.recoveryToday && <small className="muted">{whyTomorrow}</small>}
+    </div>
   )
 }

@@ -11,4 +11,5 @@ export const SPECIAL_LABEL: Record<RewardSpecial, string> = {
   none: 'Normal',
   date: 'Date: also earns CHA XP',
   bigNight: 'Big night: grants a Recovery Day',
+  dayOff: 'Day off: that day becomes a Recovery Day',
 }

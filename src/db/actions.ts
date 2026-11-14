@@ -3,6 +3,8 @@
 
 import {
   WEEKEND_ITEMS,
+  dayOffCheck,
+  dayOffPrice,
   weekendPrice,
   type WeekendPlan,
   DAILY_TEMPLATES,
@@ -635,6 +637,49 @@ export async function buyWeekend(itemId: string, count = 1, customPrice?: number
 /** "Start my money from $0": the wallet and Vault count only what's earned and spent from now on. Nothing is deleted. */
 export async function resetMoney(): Promise<void> {
   await db.players.update(LOCAL_USER, { moneySince: Date.now(), updatedAt: Date.now() })
+}
+
+/**
+ * Buys a Day Off pass for today or tomorrow: that day becomes a Recovery Day
+ * (no penalties, streaks and combo pause, pets don't get hurt). Paid like the
+ * weekend menu: wallet first, then the Vault, no level needed.
+ */
+export async function buyDayOff(forDay: string): Promise<string | null> {
+  const { summary, player, purchases } = await snapshot()
+  const why = dayOffCheck(purchases, forDay, summary.today, d => summary.recoveryDays.has(d))
+  if (why) return why
+  const price = dayOffPrice(player.settings.monthlyBudget)
+  const check = checkPurchase({ price, statGate: null }, {
+    level: summary.level.level,
+    stats: summary.stats,
+    wallet: summary.wallet.available,
+    vault: summary.wallet.vault,
+    savingsMet: summary.savings.met,
+    mainQuestsCleared: summary.mainQuestsCleared,
+    locked: shopLock(summary.incentives, player.incentives, featureOn(player, 'penaltyQuest')),
+  }, { realLife: true })
+  if (!check.ok) return check.reason
+  const purchase: Purchase = {
+    id: newId(),
+    userId: LOCAL_USER,
+    rewardId: 'day-off',
+    title: forDay === summary.today ? 'Day off (today)' : 'Day off (tomorrow)',
+    price,
+    rank: rewardRank(price),
+    special: 'dayOff',
+    day: summary.today,
+    forDay,
+    fromWallet: check.fromWallet,
+    fromVault: check.fromVault,
+    xp: 0,
+    stat: null,
+    createdAt: Date.now(),
+  }
+  await db.purchases.add(purchase)
+  emit({ type: 'reward.purchased', purchase })
+  emit({ type: 'recovery.granted', day: forDay })
+  await announceProgress(summary)
+  return null
 }
 
 /** Your own prices for the weekend menu, and your typical weekend for the budget helper. */

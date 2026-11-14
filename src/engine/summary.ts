@@ -76,6 +76,8 @@ export interface Summary {
   streaks: Map<string, number>
   /** Today is a Recovery Day: streaks are protected and missed dailies don't count. */
   recoveryToday: boolean
+  /** Every Recovery Day (big nights, lazy-day coupons, Day Off passes). */
+  recoveryDays: Set<string>
   /** Today's training: where the plan's cycle is, today's exercises, targets and logged progress. */
   routine: {
     plan: TrainingPlan
@@ -192,6 +194,8 @@ export function summarize(
   const month = monthOf(today)
   // A big night out grants a Recovery Day token for the next day.
   const recoveryDays = new Set(purchases.filter(p => p.special === 'bigNight').map(p => addDays(p.forDay ?? p.day, 1)))
+  // A bought Day Off pass makes its own day a Recovery Day (owner, Nov 2026: "a way to buy a day break from dailies").
+  for (const p of purchases) if (p.special === 'dayOff') recoveryDays.add(p.forDay ?? p.day)
   // A redeemed lazy-day coupon makes that day a Recovery Day too.
   const extrasOn = player.features?.extras !== false
   const couponRecords = new Map(bonuses.filter(b => b.kind === 'coupon').map(b => [b.id, b]))
@@ -509,6 +513,7 @@ export function summarize(
   const exercises = dayExercises(plan, kind)
 
   return {
+    recoveryDays,
     progression: {
       skills,
       effects,
