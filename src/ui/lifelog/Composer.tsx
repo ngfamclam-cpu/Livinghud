@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Memory, MemoryPhoto, Place } from '../../engine'
-import { addMemory, locate, locationAllowed, placeAt, updateMemory } from '../../db/memories'
+import { addMemory, locate, locationAllowed, momentFor, placeAt, updateMemory } from '../../db/memories'
 import { addPhoto, deletePhotos } from '../../db/photos'
 import { SystemWindow } from '../SystemWindow'
 import { Photo } from './Photo'
@@ -10,13 +10,22 @@ export function Composer({
   places,
   editing,
   startWithCamera,
+  day: startDay,
+  today,
   onDone,
 }: {
   places: Place[]
   editing?: Memory
   startWithCamera?: boolean
-  onDone: () => void
+  /** The day it's for (the Life log page you were on); you can change it. */
+  day: string
+  today: string
+  onDone: (savedDay: string) => void
 }) {
+  const [day, setDay] = useState(editing?.day ?? (startDay > today ? today : startDay))
+  const [dateNote, setDateNote] = useState('')
+  // Only the automatic "where I am" tag: it's wrong for an old memory, so it goes if you pick another day.
+  const autoPlaced = useRef(false)
   const [note, setNote] = useState(editing?.note ?? '')
   const [photos, setPhotos] = useState<MemoryPhoto[]>(editing?.photos ?? [])
   const [placeId, setPlaceId] = useState<string | null>(editing?.placeId ?? null)
@@ -45,16 +54,38 @@ export function Composer({
   useEffect(() => {
     // New entries tag your location by themselves once you've allowed it.
     if (editing) return
+    if (day !== today) return
     void locationAllowed().then(ok => {
-      if (ok) void findPlace()
+      if (ok) void findPlace().then(() => { autoPlaced.current = true })
     })
     if (startWithCamera) camera.current?.click()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const pickDay = (d: string) => {
+    if (!d || d > today) return
+    setDay(d)
+    setDateNote('')
+    if (d !== today && autoPlaced.current) {
+      autoPlaced.current = false
+      setPlaceId(null)
+    }
+  }
+
   const onFiles = async (files: FileList | null) => {
     if (!files?.length) return
     setError('')
+    // An older photo from the gallery: offer its own date (only for a new memory still set to today).
+    if (!editing && day === today) {
+      const oldest = Math.min(...[...files].map(f => f.lastModified || Date.now()))
+      const t = new Date(oldest)
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const photoDay = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`
+      if (photoDay < today) {
+        pickDay(photoDay)
+        setDateNote('Date set from the photo. Change it below if that’s wrong.')
+      }
+    }
     for (const file of [...files]) {
       setBusy(b => b + 1)
       try {
@@ -75,15 +106,15 @@ export function Composer({
   }
 
   const save = async () => {
-    if (editing) await updateMemory(editing.id, { note, photos, placeId })
-    else await addMemory({ note, photos, placeId })
+    if (editing) await updateMemory(editing.id, { note, photos, placeId, day })
+    else await addMemory({ note, photos, placeId, at: await momentFor(day) })
     added.current = []
-    onDone()
+    onDone(day)
   }
 
   const cancel = () => {
     if (added.current.length) void deletePhotos(added.current)
-    onDone()
+    onDone(editing?.day ?? startDay)
   }
 
   return (
@@ -103,6 +134,12 @@ export function Composer({
         <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={e => { void onFiles(e.target.files); e.target.value = '' }} />
         <input ref={gallery} type="file" accept="image/*" multiple hidden onChange={e => { void onFiles(e.target.files); e.target.value = '' }} />
       </div>
+      <label className="composer-date">
+        Day
+        <input type="date" value={day} max={today} onChange={e => pickDay(e.target.value)} />
+        {day !== today && <small className="muted">An older memory: it goes on that day’s page and doesn’t count for today’s photo quest.</small>}
+        {dateNote && <small className="system-line">{dateNote}</small>}
+      </label>
       <label>
         Note
         <textarea rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="What happened, who you were with, how it felt…" maxLength={2000} />
@@ -123,7 +160,7 @@ export function Composer({
       <p className="muted">A photo clears "Photo of the day"; a note on its own counts as the minimum.</p>
       <div className="row end">
         <button className="ghost" onClick={cancel}>Cancel</button>
-        <button disabled={busy > 0 || (!note.trim() && photos.length === 0)} onClick={save}>{editing ? 'Save changes' : 'Save memory'}</button>
+        <button disabled={busy > 0 || (!note.trim() && photos.length === 0)} onClick={save}>{editing ? 'Save changes' : day === today ? 'Save memory' : 'Save to that day'}</button>
       </div>
     </SystemWindow>
   )

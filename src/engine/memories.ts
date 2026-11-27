@@ -1,3 +1,4 @@
+import { dayKey } from './time'
 // The Life log: notes, photos and places, one page per day. Pure rules here;
 // photos themselves live in the cloud and a local cache (src/db/photos.ts).
 
@@ -119,4 +120,21 @@ export function placeFromLookup(data: {
   const local = a.neighbourhood ?? a.suburb ?? a.quarter ?? ''
   const name = data.name || (street && city ? `${street}, ${city}` : street) || local || city || data.display_name?.split(',')[0] || 'Unnamed place'
   return { name, city, country: a.country ?? '', countryCode: (a.country_code ?? '').toLowerCase() }
+}
+
+/**
+ * When a memory happened, for a chosen game day (owner, Nov 2026: adding an old
+ * memory to an older day logged it as today). Today keeps the current moment;
+ * another day keeps the time of day from `keepTime` (an edit) when that still
+ * lands on the chosen game day, otherwise it is noon of that day.
+ */
+export function memoryAt(day: string, today: string, now: number, resetHour: number, keepTime?: number): number {
+  if (day === today) return keepTime !== undefined && dayKey(new Date(keepTime), resetHour) === day ? keepTime : now
+  const [y, m, d] = day.split('-').map(Number)
+  if (keepTime !== undefined) {
+    const t = new Date(keepTime)
+    const moved = new Date(y, m - 1, d, t.getHours(), t.getMinutes(), t.getSeconds()).getTime()
+    if (dayKey(new Date(moved), resetHour) === day) return moved
+  }
+  return new Date(y, m - 1, d, 12).getTime()
 }

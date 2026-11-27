@@ -1,6 +1,6 @@
 // Life log writes: entries, places and the "Photo of the day" daily quest.
 
-import { TRAVEL_IDS, TRAVEL_XP, DAILY_TEMPLATES, dayKey, emit, featureOn, nearestPlace, photoQuestStat, photoQuestVersion, placeFromLookup, type Memory, type MemoryPhoto, type Place } from '../engine'
+import { TRAVEL_IDS, TRAVEL_XP, DAILY_TEMPLATES, dayKey, memoryAt, emit, featureOn, nearestPlace, photoQuestStat, photoQuestVersion, placeFromLookup, type Memory, type MemoryPhoto, type Place } from '../engine'
 import { completeQuest, snapshot } from './actions'
 import { db, LOCAL_USER, newId } from './db'
 import { deletePhotos } from './photos'
@@ -165,13 +165,28 @@ export async function addMemory(input: { note: string; photos: MemoryPhoto[]; pl
   return memory
 }
 
-export async function updateMemory(id: string, patch: Partial<Pick<Memory, 'note' | 'photos' | 'placeId'>>): Promise<void> {
+export async function updateMemory(id: string, patch: Partial<Pick<Memory, 'note' | 'photos' | 'placeId' | 'day'>>): Promise<void> {
   const before = await db.memories.get(id)
   if (!before) return
   const removed = patch.photos ? before.photos.filter(p => !patch.photos!.some(q => q.id === p.id)).map(p => p.id) : []
-  await db.memories.update(id, { ...patch, ...(patch.note !== undefined ? { note: patch.note.trim() } : {}), updatedAt: Date.now() })
+  // Moving it to another day keeps its time of day where it can.
+  let moved: Partial<Memory> = {}
+  if (patch.day && patch.day !== before.day) {
+    const { summary, player } = await snapshot()
+    moved = { day: patch.day, at: memoryAt(patch.day, summary.today, Date.now(), player.settings.resetHour, before.at) }
+  }
+  const { day: _day, ...rest } = patch
+  void _day
+  await db.memories.update(id, { ...rest, ...moved, ...(patch.note !== undefined ? { note: patch.note.trim() } : {}), updatedAt: Date.now() })
   if (removed.length) await deletePhotos(removed)
   await refreshPhotoQuest(before.day)
+  if (moved.day) await refreshPhotoQuest(moved.day)
+}
+
+/** The moment to save for a new memory on a chosen day (see memoryAt). */
+export async function momentFor(day: string): Promise<number> {
+  const { summary, player } = await snapshot()
+  return memoryAt(day, summary.today, Date.now(), player.settings.resetHour)
 }
 
 /** Deletes an entry and its photos (here and in the cloud). */
