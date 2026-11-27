@@ -102,3 +102,20 @@ describe('search', () => {
     expect(searchMemories(memories, places, '')).toEqual([])
   })
 })
+
+import { memoryAt } from './memories'
+
+describe('memoryAt (adding a memory to an older day)', () => {
+  const now = new Date(2026, 10, 27, 15, 30).getTime()
+  it('uses now for today and noon for an older day', () => {
+    expect(memoryAt('2026-11-27', '2026-11-27', now, 4)).toBe(now)
+    expect(memoryAt('2026-11-20', '2026-11-27', now, 4)).toBe(new Date(2026, 10, 20, 12).getTime())
+  })
+  it('keeps the time of day when an edit moves it, unless that lands on another game day', () => {
+    const evening = new Date(2026, 10, 25, 21, 15).getTime()
+    expect(memoryAt('2026-11-20', '2026-11-27', now, 4, evening)).toBe(new Date(2026, 10, 20, 21, 15).getTime())
+    // 1 a.m. belongs to the day before (reset at 4 a.m.), so noon instead.
+    const late = new Date(2026, 10, 25, 1, 0).getTime()
+    expect(memoryAt('2026-11-20', '2026-11-27', now, 4, late)).toBe(new Date(2026, 10, 20, 12).getTime())
+  })
+})

@@ -91,9 +91,11 @@ export function LifeLog({
           places={data.places}
           editing={composing.editing}
           startWithCamera={composing.camera}
-          onDone={() => {
+          day={composing.camera ? summary.today : view === 'day' ? day : summary.today}
+          today={summary.today}
+          onDone={savedDay => {
             setComposing(null)
-            if (!composing.editing) openDay(summary.today)
+            openDay(savedDay)
           }}
         />
       )}
